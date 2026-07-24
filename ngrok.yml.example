@@ -1,0 +1,9 @@
+# Copy to ngrok.yml (endpoint only). Authtoken comes from your global ngrok config.
+# Windows global config: %LOCALAPPDATA%\ngrok\ngrok.yml
+# Then run: npm run tunnel
+version: "3"
+endpoints:
+  - name: web
+    url: https://easymatchbd.ngrok.dev
+    upstream:
+      url: http://127.0.0.1:4100

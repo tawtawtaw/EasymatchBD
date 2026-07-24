@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-hidden="true">
+  <defs>
+    <linearGradient id="bg2" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#fff7ed"/>
+      <stop offset="50%" stop-color="#fecaca"/>
+      <stop offset="100%" stop-color="#fbcfe8"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fde68a"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="900" fill="url(#bg2)"/>
+  <circle cx="300" cy="650" r="180" fill="#ffffff" opacity="0.28"/>
+  <circle cx="1300" cy="250" r="140" fill="#ffffff" opacity="0.22"/>
+  <ellipse cx="800" cy="520" rx="420" ry="260" fill="#ffffff" opacity="0.35"/>
+  <path d="M560 520c0-90 70-160 160-160h160c90 0 160 70 160 160v40H560v-40z" fill="#9f1239" opacity="0.15"/>
+  <circle cx="720" cy="430" r="95" fill="none" stroke="url(#gold)" stroke-width="18"/>
+  <circle cx="880" cy="430" r="95" fill="none" stroke="url(#gold)" stroke-width="18"/>
+  <path d="M720 525c35 55 95 55 160 0" fill="none" stroke="#be123c" stroke-width="12" stroke-linecap="round" opacity="0.55"/>
+</svg>

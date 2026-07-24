@@ -1,0 +1,749 @@
+import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
+import { useFocusEffect } from "@react-navigation/native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { EmptyState, ErrorState, LoadingState } from "../../components/ScreenState";
+import { DiscoveryFieldSection } from "../../components/DiscoveryFieldSection";
+import { PaidMembershipGate } from "../../components/PaidMembershipGate";
+import { ProfilePausedBanner } from "../../components/ProfilePausedBanner";
+import { discoverySectionTitle } from "../../i18n/biodata-fields";
+import { tDiscoveryProfile } from "../../i18n/messages";
+import { useIsPaidMember } from "../../hooks/use-is-paid-member";
+import { getApiErrorMessage } from "../../lib/api-error";
+import { resolveMemberDisplayName } from "../../lib/member-display";
+import type { DiscoveryProfileScreenProps, MainTabParamList } from "../../navigation/types";
+import { navigateToChatThread } from "../../navigation/nestedNavigation";
+import { getDropdowns } from "../../services/dropdowns";
+import {
+  discoveryPhotoUrl,
+  getDiscoveryProfile,
+  removeProfileBookmark,
+  saveProfileBookmark,
+  sendDiscoveryInterest,
+} from "../../services/discovery";
+import { getAuthImageHeaders } from "../../lib/auth-image-headers";
+import { useAuthStore } from "../../store/authStore";
+import { useLocaleStore } from "../../store/localeStore";
+import type { AppLocale } from "../../lib/locale";
+import { useMemberAlertsStore } from "../../store/memberAlertsStore";
+import type { DropdownMap } from "../../types/dropdowns";
+import type { DiscoveryProfile } from "../../types/discovery";
+import { colors } from "../../theme/colors";
+
+export default function DiscoveryProfileScreen({
+  route,
+  navigation,
+}: DiscoveryProfileScreenProps) {
+  const tabNavigation = navigation.getParent<
+    BottomTabNavigationProp<MainTabParamList>
+  >();
+  const { profileId, profileCode } = route.params;
+  const locale = useLocaleStore((s) => s.locale);
+  const session = useAuthStore((s) => s.session);
+  const isPaid = useIsPaidMember();
+  const copy = tDiscoveryProfile(locale);
+  const [profile, setProfile] = useState<DiscoveryProfile | null>(null);
+  const [dropdowns, setDropdowns] = useState<DropdownMap>({});
+  const [loading, setLoading] = useState(true);
+  const [acting, setActing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [bookmarkBusy, setBookmarkBusy] = useState(false);
+  const hasLoadedRef = useRef(false);
+
+  const load = useCallback(async (options?: { silent?: boolean; forceFresh?: boolean }) => {
+    if (!options?.silent) {
+      setLoading(true);
+    }
+    setError(null);
+    try {
+      const [data, dropdownData] = await Promise.all([
+        getDiscoveryProfile(profileId, { forceFresh: options?.forceFresh }),
+        getDropdowns(locale),
+      ]);
+      setProfile(data);
+      setIsBookmarked(Boolean(data.isBookmarked));
+      setDropdowns(dropdownData);
+      navigation.setOptions({ title: data.profileCode });
+
+      const photoId = data.media.primaryPhotoId;
+      if (photoId) {
+        setPhotoUri(discoveryPhotoUrl(profileId, photoId));
+      } else {
+        setPhotoUri(null);
+      }
+    } catch (err) {
+      if (!options?.silent) {
+        setError(getApiErrorMessage(err, copy.loadError));
+      }
+    } finally {
+      if (!options?.silent) {
+        setLoading(false);
+      }
+    }
+  }, [copy.loadError, locale, navigation, profileId]);
+
+  useEffect(() => {
+    hasLoadedRef.current = false;
+  }, [profileId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void load({ silent: hasLoadedRef.current });
+      hasLoadedRef.current = true;
+    }, [load]),
+  );
+
+  async function handleToggleBookmark() {
+    setBookmarkBusy(true);
+    setError(null);
+    try {
+      if (isBookmarked) {
+        await removeProfileBookmark(profileCode || profileId);
+        setIsBookmarked(false);
+      } else {
+        await saveProfileBookmark(profileCode || profileId);
+        setIsBookmarked(true);
+      }
+    } catch (err) {
+      setError(getApiErrorMessage(err, copy.bookmarkError));
+    } finally {
+      setBookmarkBusy(false);
+    }
+  }
+
+  function openReportMember() {
+    tabNavigation?.navigate("Profile", {
+      screen: "Complaints",
+      params: { profileCode, openForm: true },
+    });
+  }
+
+  async function handleSendInterest() {
+    setActing(true);
+    setMessage(null);
+    setError(null);
+    try {
+      const result = await sendDiscoveryInterest(profileId);
+      const nextStatus = result.mutual ? "connected" : "interest_sent";
+      setProfile((current) =>
+        current
+          ? {
+              ...current,
+              relationship: {
+                ...current.relationship,
+                status: nextStatus,
+              },
+            }
+          : current,
+      );
+      setMessage(result.mutual ? copy.mutualInterest : copy.interestSent);
+      void useMemberAlertsStore.getState().refresh();
+      void load({ silent: true, forceFresh: true });
+    } catch (err) {
+      setError(getApiErrorMessage(err, copy.sendInterestError));
+    } finally {
+      setActing(false);
+    }
+  }
+
+  if (loading) {
+    return <LoadingState label={copy.loading} />;
+  }
+
+  if (error && !profile) {
+    return <ErrorState message={error} onRetry={() => void load()} />;
+  }
+
+  if (!profile) {
+    return <EmptyState message={copy.notFound} />;
+  }
+
+  const name = resolveMemberDisplayName({ profileCode }, profile.personal, {
+    profileRef: (code) => `${copy.profileId} ${code}`,
+    member: copy.member,
+  });
+  const connectionId = profile.relationship.connectionId;
+  const isSelf = profile.relationship.status === "self";
+  const privacyHint = copy.cumulativePrivacyHint.replace(
+    "{level}",
+    String(profile.viewerPrivacyLevel),
+  );
+  const relationshipStatus = profile.relationship.status;
+  const isProfilePaused = Boolean(session?.isPaused);
+  const canSendInterest = relationshipStatus === "none" && !isProfilePaused;
+  const isConnected = relationshipStatus === "connected" && connectionId;
+  const tokenReady = photoUri !== null;
+
+  function openChat() {
+    if (!connectionId) return;
+    navigateToChatThread(tabNavigation ?? navigation, {
+      connectionId,
+      memberName: name,
+      profileCode,
+    });
+  }
+
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      {isProfilePaused ? (
+        <View style={styles.pausedBannerWrap}>
+          <ProfilePausedBanner locale={locale} />
+        </View>
+      ) : null}
+
+      <View style={styles.hero}>
+        {tokenReady ? (
+          <AuthenticatedPhoto uri={photoUri!} loadingLabel={copy.loadingPhoto} />
+        ) : (
+          <View style={styles.photoPlaceholder}>
+            <Text style={styles.photoPlaceholderText}>{copy.noPhoto}</Text>
+          </View>
+        )}
+        <Text style={styles.name}>{name}</Text>
+        <Text style={styles.code}>
+          {copy.profileId} {profileCode}
+        </Text>
+        {profile.media.isVerified ? (
+          <Text style={styles.verified}>{copy.verifiedMember}</Text>
+        ) : null}
+        {profile.compatibility.totalCriteria > 0 ? (
+          <Text style={styles.compat}>
+            {copy.compatibility} {profile.compatibility.score}% (
+            {profile.compatibility.matchedCount}/{profile.compatibility.totalCriteria})
+          </Text>
+        ) : (
+          <Text style={styles.compatMuted}>{copy.compatibilityUnavailable}</Text>
+        )}
+        <Text style={styles.privacy}>
+          {copy.privacyLevel} {profile.viewerPrivacyLevel}
+          {profile.hiddenFieldCount > 0
+            ? ` · ${profile.hiddenFieldCount} ${copy.fieldsHidden}`
+            : ""}
+        </Text>
+        <Text style={styles.privacyHint}>{privacyHint}</Text>
+      </View>
+
+      {message ? <Text style={styles.success}>{message}</Text> : null}
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+
+      {!isSelf ? (
+        <View style={styles.actionRow}>
+          <Pressable
+            style={[
+              styles.actionButton,
+              isBookmarked && styles.actionButtonSaved,
+              bookmarkBusy && styles.buttonDisabled,
+            ]}
+            onPress={() => void handleToggleBookmark()}
+            disabled={bookmarkBusy}
+          >
+            <Text style={styles.actionButtonText}>
+              {isBookmarked ? copy.savedBookmark : copy.saveBookmark}
+            </Text>
+          </Pressable>
+          <Pressable
+            style={styles.actionButton}
+            onPress={() =>
+              navigation.navigate("DiscoveryCompare", { profileId, profileCode })
+            }
+          >
+            <Text style={styles.actionButtonText}>{copy.compareWithMe}</Text>
+          </Pressable>
+          <Pressable style={styles.actionButtonMuted} onPress={openReportMember}>
+            <Text style={styles.actionButtonMutedText}>{copy.fileComplaint}</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      <DiscoveryInterestActions
+        copy={copy}
+        locale={locale}
+        isSelf={isSelf}
+        isPaid={isPaid}
+        acting={acting}
+        relationshipStatus={relationshipStatus}
+        canSendInterest={canSendInterest}
+        isConnected={Boolean(isConnected)}
+        onSendInterest={() => void handleSendInterest()}
+        onOpenChat={openChat}
+      />
+
+      {profile.media.galleryPhotoIds?.length ? (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>
+            {discoverySectionTitle(locale, "gallery")}
+          </Text>
+          <Text style={styles.muted}>{copy.photoConfidentialNotice}</Text>
+          <View style={styles.galleryGrid}>
+            {profile.media.galleryPhotoIds.map((photoId) => (
+              <AuthenticatedPhoto
+                key={photoId}
+                uri={discoveryPhotoUrl(profileId, photoId)}
+                loadingLabel={copy.loadingPhoto}
+                compact
+              />
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      <DiscoveryFieldSection
+        title={discoverySectionTitle(locale, "personal")}
+        kind="personal"
+        data={profile.personal}
+        dropdowns={dropdowns}
+        locale={locale}
+        personal={profile.personal}
+      />
+      <DiscoveryFieldSection
+        title={discoverySectionTitle(locale, "family")}
+        kind="family"
+        data={profile.family}
+        dropdowns={dropdowns}
+        locale={locale}
+        personal={profile.personal}
+      />
+      <DiscoveryFieldSection
+        title={discoverySectionTitle(locale, "marital")}
+        kind="marital"
+        data={profile.marital}
+        dropdowns={dropdowns}
+        locale={locale}
+        personal={profile.personal}
+      />
+      <DiscoveryFieldSection
+        title={discoverySectionTitle(locale, "siblings")}
+        kind="siblings"
+        data={profile.siblings}
+        dropdowns={dropdowns}
+        locale={locale}
+        personal={profile.personal}
+      />
+      <DiscoveryFieldSection
+        title={discoverySectionTitle(locale, "paternalRelatives")}
+        kind="paternal_relatives"
+        data={profile.paternalRelatives}
+        dropdowns={dropdowns}
+        locale={locale}
+        personal={profile.personal}
+      />
+      <DiscoveryFieldSection
+        title={discoverySectionTitle(locale, "maternalRelatives")}
+        kind="maternal_relatives"
+        data={profile.maternalRelatives}
+        dropdowns={dropdowns}
+        locale={locale}
+        personal={profile.personal}
+      />
+      <DiscoveryFieldSection
+        title={discoverySectionTitle(locale, "partner")}
+        kind="partner"
+        data={profile.partner}
+        dropdowns={dropdowns}
+        locale={locale}
+        personal={profile.personal}
+      />
+
+      <DiscoveryInterestActions
+        copy={copy}
+        locale={locale}
+        isSelf={isSelf}
+        isPaid={isPaid}
+        acting={acting}
+        relationshipStatus={relationshipStatus}
+        canSendInterest={canSendInterest}
+        isConnected={Boolean(isConnected)}
+        onSendInterest={() => void handleSendInterest()}
+        onOpenChat={openChat}
+        bottom
+      />
+    </ScrollView>
+  );
+}
+
+type DiscoveryInterestActionsProps = {
+  copy: ReturnType<typeof tDiscoveryProfile>;
+  locale: AppLocale;
+  isSelf: boolean;
+  isPaid: boolean;
+  acting: boolean;
+  relationshipStatus: DiscoveryProfile["relationship"]["status"];
+  canSendInterest: boolean;
+  isConnected: boolean;
+  onSendInterest: () => void;
+  onOpenChat: () => void;
+  bottom?: boolean;
+};
+
+function DiscoveryInterestActions({
+  copy,
+  locale,
+  isSelf,
+  isPaid,
+  acting,
+  relationshipStatus,
+  canSendInterest,
+  isConnected,
+  onSendInterest,
+  onOpenChat,
+  bottom = false,
+}: DiscoveryInterestActionsProps) {
+  if (isSelf) {
+    return null;
+  }
+
+  const wrapperStyle = bottom ? styles.bottomInterestActions : undefined;
+
+  return (
+    <View style={wrapperStyle}>
+      {canSendInterest ? (
+        isPaid ? (
+          <Pressable
+            style={[styles.primaryButton, acting && styles.buttonDisabled]}
+            onPress={onSendInterest}
+            disabled={acting}
+          >
+            <Text style={styles.primaryButtonText}>
+              {acting ? copy.sending : copy.sendInterest}
+            </Text>
+          </Pressable>
+        ) : (
+          <PaidMembershipGate feature="interest" locale={locale} compact />
+        )
+      ) : relationshipStatus === "interest_sent" ? (
+        <View style={styles.interestSentBadge}>
+          <Text style={styles.interestSentBadgeText}>{copy.interestSentBadge}</Text>
+        </View>
+      ) : relationshipStatus === "interest_received" ? (
+        <View style={styles.interestReceivedBadge}>
+          <Text style={styles.interestReceivedBadgeText}>{copy.interestReceived}</Text>
+        </View>
+      ) : isConnected ? (
+        <>
+          <View style={styles.connectedBadge}>
+            <Text style={styles.connectedBadgeText}>{copy.connectedBadge}</Text>
+          </View>
+          {isPaid ? (
+            <Pressable style={styles.primaryButton} onPress={onOpenChat}>
+              <Text style={styles.primaryButtonText}>{copy.openChat}</Text>
+            </Pressable>
+          ) : (
+            <PaidMembershipGate feature="messages" locale={locale} compact />
+          )}
+        </>
+      ) : relationshipStatus === "connected" ? (
+        <View style={styles.connectedBadge}>
+          <Text style={styles.connectedBadgeText}>{copy.connectedBadge}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function AuthenticatedPhoto({
+  uri,
+  loadingLabel,
+  compact = false,
+}: {
+  uri: string;
+  loadingLabel: string;
+  compact?: boolean;
+}) {
+  const [headers, setHeaders] = useState<Record<string, string> | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getAuthImageHeaders().then((nextHeaders) => {
+      if (!cancelled) {
+        setHeaders(nextHeaders);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [uri]);
+
+  if (!headers) {
+    return (
+      <View style={[styles.photoPlaceholder, compact && styles.galleryPhoto]}>
+        <Text style={styles.photoPlaceholderText}>{loadingLabel}</Text>
+      </View>
+    );
+  }
+
+  return (
+    <Image
+      source={{ uri, headers }}
+      style={[styles.photo, compact && styles.galleryPhoto]}
+      resizeMode="cover"
+    />
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.rose50,
+  },
+  content: {
+    padding: 16,
+    paddingBottom: 32,
+  },
+  pausedBannerWrap: {
+    marginBottom: 12,
+  },
+  bottomInterestActions: {
+    marginTop: 8,
+  },
+  hero: {
+    backgroundColor: colors.white,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.rose100,
+    padding: 16,
+    alignItems: "center",
+  },
+  photo: {
+    width: 120,
+    height: 120,
+    borderRadius: 16,
+    backgroundColor: colors.rose100,
+  },
+  photoPlaceholder: {
+    width: 120,
+    height: 120,
+    borderRadius: 16,
+    backgroundColor: colors.rose100,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  photoPlaceholderText: {
+    fontSize: 12,
+    color: colors.zinc500,
+  },
+  name: {
+    marginTop: 12,
+    fontSize: 22,
+    fontWeight: "800",
+    color: colors.zinc900,
+    textAlign: "center",
+  },
+  code: {
+    marginTop: 4,
+    fontSize: 12,
+    color: colors.zinc500,
+  },
+  verified: {
+    marginTop: 8,
+    fontSize: 12,
+    fontWeight: "700",
+    color: colors.emerald600,
+  },
+  compat: {
+    marginTop: 6,
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.emerald600,
+  },
+  compatMuted: {
+    marginTop: 6,
+    fontSize: 12,
+    color: colors.zinc500,
+    textAlign: "center",
+  },
+  privacy: {
+    marginTop: 6,
+    fontSize: 12,
+    color: colors.zinc600,
+    textAlign: "center",
+  },
+  privacyHint: {
+    marginTop: 4,
+    fontSize: 11,
+    color: colors.zinc500,
+    textAlign: "center",
+  },
+  success: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: "#ecfdf5",
+    color: colors.emerald600,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  error: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: "#fef2f2",
+    color: colors.red600,
+    fontSize: 13,
+  },
+  primaryButton: {
+    marginTop: 16,
+    borderRadius: 999,
+    backgroundColor: colors.rose800,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  buttonDisabled: {
+    opacity: 0.7,
+  },
+  primaryButtonText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  secondaryButton: {
+    marginTop: 12,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.rose100,
+    backgroundColor: colors.white,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  secondaryButtonText: {
+    color: colors.rose900,
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  actionRow: {
+    marginTop: 12,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  actionButton: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.rose100,
+    backgroundColor: colors.white,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  actionButtonSaved: {
+    backgroundColor: colors.rose50,
+    borderColor: colors.rose800,
+  },
+  actionButtonText: {
+    color: colors.rose900,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  actionButtonMuted: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.zinc100,
+    backgroundColor: colors.white,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  actionButtonMutedText: {
+    color: colors.zinc800,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  interestSentBadge: {
+    marginTop: 16,
+    borderRadius: 12,
+    backgroundColor: "#fef3c7",
+    borderWidth: 1,
+    borderColor: "#fde68a",
+    padding: 14,
+  },
+  interestSentBadgeText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#92400e",
+    textAlign: "center",
+  },
+  interestReceivedBadge: {
+    marginTop: 16,
+    borderRadius: 12,
+    backgroundColor: "#dbeafe",
+    borderWidth: 1,
+    borderColor: "#bfdbfe",
+    padding: 14,
+  },
+  interestReceivedBadgeText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#1e40af",
+    textAlign: "center",
+  },
+  connectedBadge: {
+    marginTop: 16,
+    borderRadius: 12,
+    backgroundColor: "#ecfdf5",
+    borderWidth: 1,
+    borderColor: "#86efac",
+    padding: 14,
+  },
+  connectedBadgeText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.emerald600,
+    textAlign: "center",
+  },
+  section: {
+    marginTop: 16,
+    backgroundColor: colors.white,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.rose100,
+    padding: 16,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: colors.zinc900,
+    marginBottom: 10,
+  },
+  row: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.zinc100,
+  },
+  rowLabel: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.zinc500,
+  },
+  rowValue: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.zinc900,
+    textAlign: "right",
+  },
+  muted: {
+    fontSize: 13,
+    color: colors.zinc600,
+    marginBottom: 10,
+  },
+  galleryGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  galleryPhoto: {
+    width: 96,
+    height: 96,
+    borderRadius: 12,
+  },
+});

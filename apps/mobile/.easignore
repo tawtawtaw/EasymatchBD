@@ -1,0 +1,13 @@
+# Trim EAS upload — native android/ios are regenerated on the build server
+android/
+ios/
+
+# Other apps in the monorepo
+apps/api/
+apps/web/
+
+# Dev / local artifacts
+**/.next/
+**/coverage/
+apps/api/uploads/
+**/*.log

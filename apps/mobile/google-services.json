@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "171854389136",
+    "project_id": "easymatchbdtest",
+    "storage_bucket": "easymatchbdtest.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:171854389136:android:1c53f4306a8df669dcdd15",
+        "android_client_info": {
+          "package_name": "com.easymatchbd.member"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAPYwnR2cXJAec6J46ETF7EQ4XyFeitlUM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

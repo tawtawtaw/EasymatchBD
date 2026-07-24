@@ -1,0 +1,41 @@
+{
+  "cli": {
+    "version": ">= 5.9.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "gradleCommand": ":app:assembleDebug",
+        "buildType": "apk"
+      },
+      "prebuildCommand": "node scripts/verify-google-services.mjs && npx expo prebuild --platform android --no-install"
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://easymatchbd.ngrok.dev/api/v1",
+        "EXPO_PUBLIC_WEB_URL": "https://easymatchbd.ngrok.dev",
+        "EXPO_PUBLIC_VIDEO_CALL_WEB_URL": "https://easymatchbd.ngrok.dev"
+      },
+      "android": {
+        "buildType": "apk"
+      },
+      "prebuildCommand": "node scripts/verify-google-services.mjs && npx expo prebuild --platform android --no-install"
+    },
+    "production": {
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "prebuildCommand": "node scripts/verify-google-services.mjs && npx expo prebuild --platform android --no-install"
+    }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "track": "internal"
+      }
+    }
+  }
+}

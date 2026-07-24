@@ -1,0 +1,34 @@
+html[data-easymatch-native-call="1"],
+html[data-easymatch-native-call="1"] body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: #09090b !important;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html[data-easymatch-native-call="1"] a:not([data-native-keep]) {
+  display: none !important;
+}
+
+html[data-easymatch-native-call="1"] .easymatch-hide-in-native {
+  display: none !important;
+}
+
+html[data-easymatch-native-call="1"] .easymatch-mobile-call-shell {
+  -webkit-overflow-scrolling: touch;
+  justify-content: flex-start;
+  padding-top: 10px;
+  padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+}
+
+html[data-easymatch-native-call="1"]
+  .easymatch-video-call-room--embedded
+  .lk-room-container {
+  height: auto !important;
+  min-height: 0 !important;
+}
+
+html[data-easymatch-native-call="1"] .lk-disconnect-button {
+  display: none !important;
+}

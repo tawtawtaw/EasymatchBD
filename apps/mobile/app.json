@@ -1,0 +1,91 @@
+{
+  "expo": {
+    "name": "EasymatchBD",
+    "slug": "easymatchbd-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "easymatchbd",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#881337"
+    },
+    "android": {
+      "package": "com.easymatchbd.member",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#881337"
+      },
+      "edgeToEdgeEnabled": true,
+      "usesCleartextTraffic": true,
+      "permissions": [
+        "CAMERA",
+        "READ_MEDIA_IMAGES",
+        "RECORD_AUDIO",
+        "MODIFY_AUDIO_SETTINGS",
+        "POST_NOTIFICATIONS"
+      ],
+      "queries": [
+        {
+          "scheme": "whatsapp"
+        },
+        {
+          "scheme": "tel"
+        },
+        {
+          "scheme": "mailto"
+        },
+        {
+          "package": "com.whatsapp"
+        }
+      ]
+    },
+    "ios": {
+      "infoPlist": {
+        "NSCameraUsageDescription": "EasymatchBD needs camera access to take profile photos, NID images, and for video calls.",
+        "NSMicrophoneUsageDescription": "EasymatchBD needs microphone access for video calls with your connections.",
+        "NSPhotoLibraryUsageDescription": "EasymatchBD needs access to your photos to upload profile and NID images.",
+        "NSUserNotificationsUsageDescription": "EasymatchBD sends notifications for new messages, interests, and video calls.",
+        "LSApplicationQueriesSchemes": [
+          "whatsapp",
+          "tel",
+          "mailto"
+        ]
+      }
+    },
+    "plugins": [
+      "expo-dev-client",
+      "@react-native-community/datetimepicker",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "EasymatchBD needs access to your photos to upload profile and NID images.",
+          "cameraPermission": "EasymatchBD needs camera access to take profile and NID photos."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "EasymatchBD needs camera access to take profile and NID photos.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#881337"
+        }
+      ]
+    ],
+    "extra": {
+      "apiBaseUrl": "",
+      "eas": {
+        "projectId": "0980635d-027a-4d94-80ee-8320c084d15a"
+      }
+    }
+  }
+}

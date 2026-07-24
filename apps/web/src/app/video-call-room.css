@@ -1,0 +1,54 @@
+/* Web: fixed video height so guest invite + controls stay visible below */
+.easymatch-video-call-room--web .easymatch-video-call-stage--web {
+  height: min(360px, 42vh);
+  min-height: 220px;
+  max-height: 360px;
+}
+
+/* Mobile app WebView: shorter video so guest invite fits below */
+.easymatch-video-call-room--embedded .easymatch-video-call-stage--embedded {
+  height: min(280px, 38vh);
+  min-height: 180px;
+  max-height: 280px;
+  flex: 0 0 auto;
+}
+
+.easymatch-video-call-room .lk-room-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+.easymatch-video-call-room--embedded .lk-room-container {
+  height: auto;
+  flex: 0 0 auto;
+}
+
+.easymatch-video-call-room--web .lk-room-container {
+  height: auto;
+}
+
+.easymatch-video-call-room .easymatch-video-call-stage .lk-grid-layout {
+  height: 100%;
+  min-height: 0;
+}
+
+.easymatch-video-call-room--web .lk-grid-layout.easymatch-pair-grid {
+  --lk-col-count: 2;
+  --lk-row-count: 1;
+}
+
+.easymatch-video-call-room .lk-participant-tile video,
+.easymatch-video-call-room .lk-participant-tile .lk-participant-media {
+  object-fit: cover;
+}
+
+.easymatch-media-controls button {
+  touch-action: manipulation;
+}
+
+.easymatch-guest-panel--mobile input,
+.easymatch-guest-panel--mobile select {
+  font-size: 16px;
+}

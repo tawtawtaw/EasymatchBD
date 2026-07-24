@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+.next/
+out/
+build/
+
+# Environment
+.env
+.env.local
+.env.*.local
+ngrok.yml
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Test / coverage
+coverage/
+
+# Prisma
+apps/api/prisma/migrations/**/migration_lock.toml
+
+# Uploaded media (local dev storage)
+apps/api/uploads/
+
+# Expo local cache
+.expo/
+
+# Microsoft Office lock/temp files
+~$*
+
+# Accidental empty file (do not commit)
+/git

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-hidden="true">
+  <defs>
+    <linearGradient id="bg3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ecfdf5"/>
+      <stop offset="45%" stop-color="#ffe4e6"/>
+      <stop offset="100%" stop-color="#fff7ed"/>
+    </linearGradient>
+    <linearGradient id="silhouette3" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#9f1239"/>
+      <stop offset="100%" stop-color="#581c87"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="900" fill="url(#bg3)"/>
+  <path d="M0 680 Q400 560 800 680 T1600 680 V900 H0 Z" fill="#ffffff" opacity="0.45"/>
+  <path d="M430 760c35-150 95-230 170-230s135 80 170 230H430z" fill="url(#silhouette3)" opacity="0.88"/>
+  <path d="M830 760c35-150 95-230 170-230s135 80 170 230H830z" fill="url(#silhouette3)" opacity="0.88"/>
+  <circle cx="600" cy="470" r="72" fill="url(#silhouette3)" opacity="0.88"/>
+  <circle cx="830" cy="470" r="72" fill="url(#silhouette3)" opacity="0.88"/>
+  <path d="M650 560 L750 500" stroke="#ffffff" stroke-width="16" stroke-linecap="round" opacity="0.55"/>
+  <path d="M780 500 L880 560" stroke="#ffffff" stroke-width="16" stroke-linecap="round" opacity="0.55"/>
+  <path d="M700 500 C760 430 870 430 930 500" fill="none" stroke="#047857" stroke-width="10" opacity="0.25"/>
+</svg>

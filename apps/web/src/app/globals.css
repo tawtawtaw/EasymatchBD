@@ -1,0 +1,131 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #09090b;
+  --muted: #3f3f46;
+  --border: #a1a1aa;
+  --input-bg: #ffffff;
+  --input-text: #09090b;
+  --card: #ffffff;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Shared high-contrast form styles */
+.field-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #18181b;
+}
+
+.field-input {
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid #a1a1aa;
+  background-color: #ffffff;
+  color: #09090b;
+  padding: 0.625rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.field-input::placeholder {
+  color: #71717a;
+  opacity: 1;
+}
+
+.field-input:focus {
+  outline: none;
+  border-color: #e11d48;
+  box-shadow: 0 0 0 3px rgb(251 113 133 / 0.35);
+}
+
+select.field-input {
+  cursor: pointer;
+}
+
+select.field-input option {
+  color: #09090b;
+  background-color: #ffffff;
+}
+
+textarea.field-input {
+  resize: vertical;
+  min-height: 5rem;
+}
+
+/* WhatsApp support — server-rendered so it works without client JS (mobile browsers) */
+.easymatch-whatsapp-fab {
+  position: fixed;
+  right: 1rem;
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  z-index: 9999;
+  display: inline-flex;
+  height: 3.5rem;
+  width: 3.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background-color: #059669;
+  color: #ffffff;
+  box-shadow:
+    0 10px 15px -3px rgb(0 0 0 / 0.1),
+    0 4px 6px -4px rgb(0 0 0 / 0.1);
+  text-decoration: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.easymatch-whatsapp-fab:active {
+  background-color: #047857;
+}
+
+@media (min-width: 640px) {
+  .easymatch-whatsapp-fab {
+    right: 1.5rem;
+    bottom: 1.5rem;
+  }
+}
+
+@media print {
+  header,
+  footer,
+  .no-print,
+  .easymatch-whatsapp-fab {
+    display: none !important;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #09090b !important;
+  }
+
+  .terms-print-header {
+    margin-bottom: 1.5rem;
+  }
+
+  .biodata-print-header {
+    margin-bottom: 1rem;
+  }
+
+  .biodata-print-document section {
+    break-inside: avoid;
+  }
+}

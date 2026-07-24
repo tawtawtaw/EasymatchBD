@@ -1,0 +1,1004 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  individual
+  parent_guardian
+  premium_member
+  marriage_consultant
+  support_agent
+  verification_officer
+  super_admin
+}
+
+enum StaffNotificationType {
+  verification_submission
+  complaint_submitted
+  consultant_case_queued
+  profile_deletion_request
+  complaint_assigned
+  consultant_case_assigned
+}
+
+enum SubscriptionPlan {
+  free
+  gold
+  platinum
+}
+
+enum PrivacyLevel {
+  public_discovery
+  basic_mutual_interest
+  profile_compatibility
+  serious_consideration
+}
+
+enum HeightUnit {
+  cm
+  ft_in
+}
+
+enum MediaReviewStatus {
+  pending
+  approved
+  rejected
+}
+
+enum ProfilePhotoType {
+  primary
+  gallery
+}
+
+enum NidDocumentSide {
+  front
+  back
+}
+
+enum ProfileCreationMode {
+  self
+  on_behalf
+}
+
+enum OnBehalfRelation {
+  my_son
+  my_daughter
+  my_relative
+  someone_else
+}
+
+enum NidDocumentSubject {
+  member
+  creator
+}
+
+model User {
+  id              String    @id @default(cuid())
+  phone           String?   @unique
+  phoneVerifiedAt DateTime?
+  email           String?   @unique
+  emailVerifiedAt DateTime?
+  passwordHash    String?
+  role            UserRole  @default(individual)
+  isActive        Boolean   @default(true)
+  termsAcceptedAt DateTime?
+  termsVersion    String?
+  termsDeclinedAt DateTime?
+  lastLoginAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  profile              Profile?
+  staffProfile         StaffProfile?
+  subscription         Subscription?
+  verificationAlerts   VerificationAlert[]
+  interestsSent        Interest[]          @relation("InterestSent")
+  interestsReceived    Interest[]          @relation("InterestReceived")
+  connectionsAsLow     Connection[]        @relation("ConnectionLow")
+  connectionsAsHigh    Connection[]        @relation("ConnectionHigh")
+  termsScheduled       TermsSettings[]     @relation("TermsScheduledBy")
+  termsAuditLogs       TermsAuditLog[]
+  deletionRequestsTarget    ProfileDeletionRequest[] @relation("DeletionTarget")
+  deletionRequestsRequested ProfileDeletionRequest[] @relation("DeletionRequestedBy")
+  deletionRequestsReviewed  ProfileDeletionRequest[] @relation("DeletionReviewedBy")
+  connectionMessagesSent    ConnectionMessage[]
+  connectionParticipantStates ConnectionParticipantState[]
+  videoCallsInitiated       VideoCall[]       @relation("VideoCallInitiator")
+  videoCallSignalsSent      VideoCallSignal[]
+  videoCallGuestsInvited    VideoCallGuest[]  @relation("VideoCallGuestInviter")
+  profileBookmarks          ProfileBookmark[]
+  membershipPayments        MembershipPayment[]
+  consultantPaymentsPaid    ConsultantPayment[]
+  consultantEngagementsRequested ConsultantEngagement[] @relation("ConsultantEngagementRequester")
+  consultantEngagementsAssigned  ConsultantEngagement[] @relation("ConsultantEngagementAssignee")
+  consultantMeetingsCreated      ConsultantMeeting[]    @relation("ConsultantMeetingCreator")
+  consultantCaseMessagesSent     ConsultantCaseMessage[]
+  consultantCaseMessagesReceived ConsultantCaseMessage[] @relation("ConsultantCaseMessageRecipient")
+  consultantCaseDiaryEntries     ConsultantCaseDiaryEntry[]
+  complaintsFiled                MemberComplaint[]       @relation("ComplaintReporter")
+  complaintsAssigned             MemberComplaint[]       @relation("ComplaintAssignee")
+  complaintMessagesSent          MemberComplaintMessage[]
+  complaintDiaryEntries            MemberComplaintDiaryEntry[]
+  staffActivityLogs              StaffActivityLog[]
+  pushTokens                     UserPushToken[]
+  staffNotificationsTargeted     StaffNotification[]     @relation("StaffNotificationTarget")
+  staffNotificationReads       StaffNotificationRead[]
+}
+
+model StaffNotification {
+  id           String                @id @default(cuid())
+  type         StaffNotificationType
+  audienceRole UserRole
+  targetUserId String?
+  title        String
+  body         String
+  linkPath     String
+  entityId     String?
+  createdAt    DateTime              @default(now())
+
+  targetUser User?                   @relation("StaffNotificationTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  reads      StaffNotificationRead[]
+
+  @@index([audienceRole, createdAt])
+  @@index([targetUserId, createdAt])
+  @@index([type, entityId, createdAt])
+}
+
+model StaffNotificationRead {
+  id             String   @id @default(cuid())
+  notificationId String
+  userId         String
+  readAt         DateTime @default(now())
+
+  notification StaffNotification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, userId])
+  @@index([userId])
+}
+
+model UserPushToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  platform  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Interest {
+  id          String         @id @default(cuid())
+  senderId    String
+  receiverId  String
+  sender      User           @relation("InterestSent", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver    User           @relation("InterestReceived", fields: [receiverId], references: [id], onDelete: Cascade)
+  status      InterestStatus @default(pending)
+  createdAt   DateTime       @default(now())
+  respondedAt DateTime?
+
+  @@unique([senderId, receiverId])
+  @@index([receiverId, status])
+  @@index([senderId])
+}
+
+model Connection {
+  id                   String   @id @default(cuid())
+  userLowId            String
+  userHighId           String
+  userLow              User     @relation("ConnectionLow", fields: [userLowId], references: [id], onDelete: Cascade)
+  userHigh             User     @relation("ConnectionHigh", fields: [userHighId], references: [id], onDelete: Cascade)
+  privacyLevel         Int      @default(1)
+  pendingUpgradeLevel  Int?
+  pendingUpgradeById   String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  messages             ConnectionMessage[]
+  participantStates    ConnectionParticipantState[]
+  videoCalls           VideoCall[]
+  consultantPayments   ConsultantPayment[]
+  consultantEngagements ConsultantEngagement[]
+
+  @@unique([userLowId, userHighId])
+  @@index([userLowId])
+  @@index([userHighId])
+}
+
+model ConnectionParticipantState {
+  connectionId String
+  userId       String
+  lastReadAt   DateTime?
+  connection   Connection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([connectionId, userId])
+  @@index([userId])
+}
+
+enum ConnectionMessageType {
+  text
+  image
+  file
+}
+
+model ConnectionMessage {
+  id           String     @id @default(cuid())
+  connectionId String
+  connection   Connection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  senderId     String
+  sender       User       @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  messageType  ConnectionMessageType @default(text)
+  body         String
+  editedAt     DateTime?
+  deletedAt    DateTime?
+  attachmentStorageKey String?
+  attachmentMimeType   String?
+  attachmentFileName   String?
+  createdAt    DateTime   @default(now())
+
+  @@index([connectionId, createdAt])
+  @@index([senderId])
+  @@index([connectionId, senderId, deletedAt])
+}
+
+enum InterestStatus {
+  pending
+  accepted
+  declined
+}
+
+enum VideoCallStatus {
+  scheduled
+  ringing
+  active
+  completed
+  cancelled
+  declined
+  missed
+}
+
+enum VideoCallSignalType {
+  offer
+  answer
+  ice
+}
+
+enum VideoCallGuestStatus {
+  pending_approval
+  approved
+  declined
+  joined
+  left
+  expired
+}
+
+model VideoCall {
+  id           String          @id @default(cuid())
+  connectionId String
+  connection   Connection      @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  initiatorId  String
+  initiator    User            @relation("VideoCallInitiator", fields: [initiatorId], references: [id], onDelete: Cascade)
+  scheduledAt  DateTime?
+  status       VideoCallStatus @default(ringing)
+  startedAt    DateTime?
+  endedAt      DateTime?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  signals      VideoCallSignal[]
+  guests       VideoCallGuest[]
+  consultantEngagementId String?             @unique
+  consultantEngagement   ConsultantEngagement? @relation(fields: [consultantEngagementId], references: [id], onDelete: SetNull)
+  consultantMeeting      ConsultantMeeting?
+
+  @@index([connectionId, status])
+  @@index([initiatorId])
+  @@index([scheduledAt])
+}
+
+model VideoCallGuest {
+  id                 String               @id @default(cuid())
+  videoCallId        String
+  videoCall          VideoCall            @relation(fields: [videoCallId], references: [id], onDelete: Cascade)
+  invitedById        String
+  invitedBy          User                 @relation("VideoCallGuestInviter", fields: [invitedById], references: [id], onDelete: Cascade)
+  guestName          String
+  relation           String?
+  token              String               @unique
+  status             VideoCallGuestStatus @default(pending_approval)
+  approvedByUserLow  Boolean              @default(false)
+  approvedByUserHigh Boolean              @default(false)
+  joinedAt           DateTime?
+  expiresAt          DateTime
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  @@index([videoCallId, status])
+  @@index([token])
+}
+
+model VideoCallSignal {
+  id          String              @id @default(cuid())
+  videoCallId String
+  videoCall   VideoCall           @relation(fields: [videoCallId], references: [id], onDelete: Cascade)
+  senderId    String
+  sender      User                @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  type        VideoCallSignalType
+  payload     Json
+  createdAt   DateTime            @default(now())
+
+  @@index([videoCallId, createdAt])
+  @@index([senderId])
+}
+
+enum ProfileDeletionRequestStatus {
+  pending
+  approved
+  rejected
+  cancelled
+}
+
+enum ProfileDeletionTargetKind {
+  member
+  staff
+}
+
+enum VerificationAlertType {
+  biodata_approved
+  biodata_rejected
+  nid_approved
+  nid_rejected
+  photo_approved_primary
+  photo_approved_gallery
+  photo_rejected_primary
+  photo_rejected_gallery
+  profile_fully_verified
+}
+
+model VerificationAlert {
+  id             String                @id @default(cuid())
+  userId         String
+  user           User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  alertType      VerificationAlertType
+  officerMessage String?
+  contextKey     String?
+  readAt         DateTime?
+  createdAt      DateTime              @default(now())
+
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
+}
+
+model StaffProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  fullName          String?
+  email             String?
+  employeeId        String?
+  designation       String?
+  officeDivision    String?
+  officeDistrict    String?
+  officeAddressLine String?
+  notes             String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Profile {
+  id          String @id @default(cuid())
+  userId      String @unique
+  profileCode String @unique
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  fullName       String?
+  gender         String?
+  dateOfBirth    DateTime?
+  maritalStatus  String?
+  divorceDetails String?
+  childrenCount  Int?
+  heightUnit     HeightUnit @default(cm)
+  heightCm       Int?
+  weightKg       Int?
+  complexion     String?
+  hasDisability  Boolean   @default(false)
+  disabilityInfo String?
+  religion       String?
+  hasBeard       String?
+  prayerPractice String?
+  hijabPractice  String?
+  smokingHabit   String?
+
+  expectedMarriageTimeline    String?
+  dowryExpectation            String?
+  weddingCeremonyPreference   String?
+  expectedParenthoodTimeline  String?
+  livingArrangements          String?
+  livingArrangementsOther     String?
+  expectedKabinAmountMinBdt   Int?
+  expectedKabinAmountMaxBdt   Int?
+
+  highestDegree     String?
+  educationMedium   String?
+  additionalEducationQualifications String?
+  institution       String?
+  educationYear     Int?
+  educationSubject  String?
+  occupation        String?
+  company           String?
+  designation       String?
+  monthlyIncomeRange String?
+
+  currentCountry      String  @default("Bangladesh")
+  currentDivision     String?
+  currentDistrict     String?
+  currentUpazila      String?
+  currentCityTown     String?
+  currentAddressLine  String?
+
+  permanentCountry      String?
+  permanentDivision     String?
+  permanentDistrict     String?
+  permanentUpazila      String?
+  permanentCityTown     String?
+  permanentAddressLine  String?
+  permanentSameAsCurrent Boolean @default(false)
+
+  biography   String?
+  hobbies     String[]
+  interests   String?
+  introduction String?
+
+  isVerified                 Boolean              @default(false)
+  isPaused                   Boolean              @default(false)
+  pausedAt                   DateTime?
+  verifiedOnBehalf           Boolean              @default(false)
+  creationMode               ProfileCreationMode?
+  onBehalfRelation           OnBehalfRelation?
+  nidVerifiedAt              DateTime?
+  creatorNidVerifiedAt       DateTime?
+  profileBiodataReviewStatus MediaReviewStatus?
+  profileBiodataReviewedAt   DateTime?
+  profileBiodataApprovedSnapshot Json?
+
+  familyInfo        FamilyInfo?
+  siblings          Sibling[]
+  paternalRelatives PaternalRelative[]
+  maternalRelatives MaternalRelative[]
+  partnerPreference PartnerPreference?
+  photos            ProfilePhoto[]
+  nidDocuments      NidDocument[]
+  bookmarks         ProfileBookmark[]
+  complaintsAgainst MemberComplaint[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isVerified, gender, updatedAt])
+  @@index([isVerified, updatedAt])
+}
+
+model ProfileBookmark {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, profileId])
+  @@index([userId, createdAt])
+  @@index([profileId])
+}
+
+model ProfileDeletionRequest {
+  id            String                       @id @default(cuid())
+  targetUserId  String
+  targetUser    User                         @relation("DeletionTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  targetKind    ProfileDeletionTargetKind
+  profileId     String?
+  reason        String?
+  status        ProfileDeletionRequestStatus @default(pending)
+  requestedById String
+  requestedBy   User                         @relation("DeletionRequestedBy", fields: [requestedById], references: [id])
+  reviewedById  String?
+  reviewedBy    User?                        @relation("DeletionReviewedBy", fields: [reviewedById], references: [id])
+  reviewNote    String?
+  requestedAt   DateTime                     @default(now())
+  reviewedAt    DateTime?
+
+  @@index([status, requestedAt])
+  @@index([targetUserId])
+  @@index([requestedById])
+}
+
+model ProfilePhoto {
+  id         String            @id @default(cuid())
+  profileId  String
+  profile    Profile           @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  type       ProfilePhotoType  @default(gallery)
+  storageKey String
+  mimeType   String
+  fileSize   Int
+  sortOrder  Int               @default(0)
+  status     MediaReviewStatus @default(pending)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  @@index([profileId])
+}
+
+model NidDocument {
+  id          String            @id @default(cuid())
+  profileId   String
+  profile     Profile           @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  side        NidDocumentSide
+  subject     NidDocumentSubject @default(member)
+  storageKey  String
+  mimeType    String
+  fileSize    Int
+  status      MediaReviewStatus @default(pending)
+  submittedAt DateTime          @default(now())
+  reviewedAt  DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@unique([profileId, side, subject])
+  @@index([profileId])
+}
+
+model FamilyInfo {
+  id        String  @id @default(cuid())
+  profileId String  @unique
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  fatherName       String?
+  fatherIsAlive    String?
+  fatherEducation  String?
+  fatherProfession String?
+  motherName       String?
+  motherIsAlive    String?
+  motherEducation  String?
+  motherProfession String?
+  familyType       String?
+  familyStatus     String?
+  familyValues     String?
+  familyAssets     String?
+}
+
+model Sibling {
+  id        String  @id @default(cuid())
+  profileId String
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  relationship      String?
+  name              String?
+  education         String?
+  profession        String?
+  maritalStatus     String?
+  spouseName        String?
+  spouseEducation   String?
+  spouseProfession  String?
+}
+
+model PaternalRelative {
+  id         String  @id @default(cuid())
+  profileId  String
+  profile    Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  relation   String?
+  name       String?
+  education  String?
+  profession String?
+}
+
+model MaternalRelative {
+  id         String  @id @default(cuid())
+  profileId  String
+  profile    Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  relation   String?
+  name       String?
+  education  String?
+  profession String?
+}
+
+model PartnerPreference {
+  id        String  @id @default(cuid())
+  profileId String  @unique
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  ageMin              Int?
+  ageMax              Int?
+  heightUnit          HeightUnit @default(cm)
+  heightMinCm         Int?
+  heightMaxCm         Int?
+  weightMinKg         Int?
+  weightMaxKg         Int?
+  preferredDistricts  String[]
+  minimumEducation    String?
+  preferredProfession String[]
+  preferredReligion   String?
+  beardPreference     String?
+  prayerPreference    String?
+  hijabPreference     String?
+  maritalStatusPref   String[]
+  additionalNotes     String?
+}
+
+model ProfileFieldPrivacy {
+  fieldKey        String   @id
+  section         String
+  isShareable     Boolean  @default(true)
+  minPrivacyLevel Int      @default(0)
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([section])
+}
+
+model DropdownOption {
+  id          String   @id @default(cuid())
+  category    String
+  value       String
+  label       String
+  labelBn     String?
+  parentValue String?
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  isSystem    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([category, value])
+  @@index([category])
+}
+
+model Subscription {
+  id       String           @id @default(cuid())
+  userId   String           @unique
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan     SubscriptionPlan @default(free)
+  startsAt DateTime         @default(now())
+  endsAt   DateTime?
+  isActive Boolean          @default(true)
+}
+
+enum MembershipPaymentStatus {
+  pending
+  validated
+  failed
+  cancelled
+}
+
+model MembershipPayment {
+  id           String                   @id @default(cuid())
+  userId       String
+  user         User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan         SubscriptionPlan
+  tranId       String                   @unique
+  amountBdt    Decimal                  @db.Decimal(10, 2)
+  currency     String                   @default("BDT")
+  durationDays Int
+  status       MembershipPaymentStatus  @default(pending)
+  valId        String?                  @unique
+  sessionKey   String?
+  gatewayUrl   String?
+  sslStatus    String?
+  sslResponse  Json?
+  validatedAt  DateTime?
+  subscriptionAppliedAt DateTime?
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status])
+}
+
+model MembershipTariff {
+  id            String           @id @default(cuid())
+  plan          SubscriptionPlan @unique
+  labelEn       String
+  labelBn       String?
+  priceBdt      Decimal          @db.Decimal(10, 2)
+  currency      String           @default("BDT")
+  durationDays  Int              @default(30)
+  isActive      Boolean          @default(true)
+  sortOrder     Int              @default(0)
+  descriptionEn String?
+  descriptionBn String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+}
+
+enum ConsultantServiceType {
+  profile_assessment
+  compatibility_guidance
+  family_mediation
+  meeting_coordination
+  marriage_planning
+}
+
+model ConsultantTariff {
+  id            String                @id @default(cuid())
+  serviceType   ConsultantServiceType @unique
+  labelEn       String
+  labelBn       String?
+  priceBdt      Decimal               @db.Decimal(10, 2)
+  currency      String                @default("BDT")
+  isActive      Boolean               @default(true)
+  sortOrder     Int                   @default(0)
+  descriptionEn String?
+  descriptionBn String?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+}
+
+enum ConsultantPaymentStatus {
+  pending
+  validated
+  failed
+  cancelled
+}
+
+enum ConsultantEngagementStatus {
+  queued
+  assigned
+  in_progress
+  completed
+  cancelled
+}
+
+model ConsultantPayment {
+  id             String                  @id @default(cuid())
+  userId         String
+  user           User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connectionId   String
+  connection     Connection              @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  serviceType    ConsultantServiceType
+  serviceLabelEn String
+  tranId         String                  @unique
+  amountBdt      Decimal                 @db.Decimal(10, 2)
+  currency       String                  @default("BDT")
+  status         ConsultantPaymentStatus @default(pending)
+  valId          String?                 @unique
+  sessionKey     String?
+  gatewayUrl     String?
+  sslStatus      String?
+  sslResponse    Json?
+  validatedAt    DateTime?
+  memberNotes    String?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  engagement     ConsultantEngagement?
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([connectionId])
+  @@index([status])
+}
+
+model ConsultantEngagement {
+  id                   String                     @id @default(cuid())
+  connectionId         String
+  connection           Connection                 @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  serviceType          ConsultantServiceType
+  serviceLabelEn       String
+  amountBdt            Decimal                    @db.Decimal(10, 2)
+  currency             String                     @default("BDT")
+  requestedById        String
+  requestedBy          User                       @relation("ConsultantEngagementRequester", fields: [requestedById], references: [id], onDelete: Cascade)
+  paymentId            String                     @unique
+  payment              ConsultantPayment          @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  status               ConsultantEngagementStatus @default(queued)
+  assignedConsultantId String?
+  assignedConsultant   User?                      @relation("ConsultantEngagementAssignee", fields: [assignedConsultantId], references: [id], onDelete: SetNull)
+  memberNotes          String?
+  createdAt            DateTime                   @default(now())
+  updatedAt            DateTime                   @updatedAt
+  meetings             ConsultantMeeting[]
+  caseMessages         ConsultantCaseMessage[]
+  diaryEntries         ConsultantCaseDiaryEntry[]
+  linkedVideoCall      VideoCall?
+
+  @@index([connectionId, createdAt(sort: Desc)])
+  @@index([status])
+  @@index([assignedConsultantId])
+}
+
+enum ConsultantMeetingStatus {
+  scheduled
+  completed
+  cancelled
+}
+
+model ConsultantMeeting {
+  id           String                  @id @default(cuid())
+  engagementId String
+  engagement   ConsultantEngagement    @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  scheduledAt  DateTime
+  agenda       String?
+  videoCallId  String?                 @unique
+  videoCall    VideoCall?              @relation(fields: [videoCallId], references: [id], onDelete: SetNull)
+  createdById  String
+  createdBy    User                    @relation("ConsultantMeetingCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  status       ConsultantMeetingStatus @default(scheduled)
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+
+  @@index([engagementId, scheduledAt(sort: Desc)])
+  @@index([status])
+}
+
+model ConsultantCaseMessage {
+  id           String               @id @default(cuid())
+  engagementId String
+  engagement   ConsultantEngagement @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  senderId     String
+  sender       User                 @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  recipientId  String?
+  recipient    User?                @relation("ConsultantCaseMessageRecipient", fields: [recipientId], references: [id], onDelete: SetNull)
+  body         String
+  createdAt    DateTime             @default(now())
+
+  @@index([engagementId, createdAt(sort: Asc)])
+  @@index([recipientId])
+}
+
+model ConsultantCaseDiaryEntry {
+  id           String               @id @default(cuid())
+  engagementId String
+  engagement   ConsultantEngagement @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  authorId     String
+  author       User                 @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  body         String
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  @@index([engagementId, createdAt(sort: Desc)])
+}
+
+enum MemberComplaintCategory {
+  misrepresentation
+  harassment
+  fraud
+  inappropriate_behavior
+  other
+}
+
+enum MemberComplaintStatus {
+  submitted
+  assigned
+  in_progress
+  resolved
+  dismissed
+  cancelled
+}
+
+model MemberComplaint {
+  id                   String                  @id @default(cuid())
+  reporterId           String
+  reporter             User                    @relation("ComplaintReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  targetProfileId      String
+  targetProfile        Profile                 @relation(fields: [targetProfileId], references: [id], onDelete: Cascade)
+  category             MemberComplaintCategory
+  description          String
+  status               MemberComplaintStatus   @default(submitted)
+  assignedConsultantId String?
+  assignedConsultant   User?                   @relation("ComplaintAssignee", fields: [assignedConsultantId], references: [id], onDelete: SetNull)
+  resolutionNote       String?
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  resolvedAt           DateTime?
+  messages             MemberComplaintMessage[]
+  diaryEntries         MemberComplaintDiaryEntry[]
+
+  @@index([reporterId, createdAt(sort: Desc)])
+  @@index([targetProfileId])
+  @@index([status])
+  @@index([assignedConsultantId])
+}
+
+model MemberComplaintMessage {
+  id          String          @id @default(cuid())
+  complaintId String
+  complaint   MemberComplaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  senderId    String
+  sender      User            @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  body        String
+  isPrivate   Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+
+  @@index([complaintId, createdAt(sort: Asc)])
+}
+
+model MemberComplaintDiaryEntry {
+  id          String          @id @default(cuid())
+  complaintId String
+  complaint   MemberComplaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  authorId    String
+  author      User            @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  body        String
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([complaintId, createdAt(sort: Desc)])
+}
+
+model TermsSettings {
+  id                   String    @id @default("singleton")
+  version              String
+  effectiveDateEn      String
+  effectiveDateBn      String
+  sectionsEn           Json
+  sectionsBn           Json
+  publishedAt          DateTime
+  draftVersion         String?
+  draftEffectiveDateEn String?
+  draftEffectiveDateBn String?
+  draftSectionsEn      Json?
+  draftSectionsBn      Json?
+  scheduledPublishAt   DateTime?
+  scheduledByUserId    String?
+  scheduledBy          User?     @relation("TermsScheduledBy", fields: [scheduledByUserId], references: [id], onDelete: SetNull)
+  updatedAt            DateTime  @updatedAt
+}
+
+enum TermsAuditAction {
+  published
+  scheduled
+  schedule_cancelled
+}
+
+enum StaffActivityCategory {
+  admin
+  verification
+  consultant
+  complaints
+}
+
+model StaffActivityLog {
+  id         String                @id @default(cuid())
+  actorId    String
+  actor      User                  @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  actorRole  UserRole
+  category   StaffActivityCategory
+  action     String
+  summary    String
+  httpMethod String?
+  path       String?
+  entityType String?
+  entityId   String?
+  metadata   Json?
+  createdAt  DateTime              @default(now())
+  expiresAt  DateTime
+
+  @@index([createdAt(sort: Desc)])
+  @@index([expiresAt])
+  @@index([actorId, createdAt(sort: Desc)])
+  @@index([category, createdAt(sort: Desc)])
+}
+
+model TermsAuditLog {
+  id              String           @id @default(cuid())
+  action          TermsAuditAction
+  version         String
+  effectiveDateEn String?
+  effectiveDateBn String?
+  scheduledFor    DateTime?
+  performedById   String?
+  performedBy     User?            @relation(fields: [performedById], references: [id], onDelete: SetNull)
+  performedAt     DateTime         @default(now())
+
+  @@index([performedAt(sort: Desc)])
+}
