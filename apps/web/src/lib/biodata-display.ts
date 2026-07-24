@@ -32,7 +32,7 @@ export const BIODATA_PRIVACY_LABEL_ALIASES: Record<string, string> = {
   preferredReligion: "partner_religion",
 };
 
-export const KNOWN_PRIVACY_FIELD_KEYS = new Set(
+export const KNOWN_PRIVACY_FIELD_KEYS = new Set<string>(
   Object.values(PROFILE_PRIVACY_FIELDS),
 );
 

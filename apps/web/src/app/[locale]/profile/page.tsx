@@ -725,7 +725,7 @@ export default function ProfilePage() {
       getMyProfile(token),
       getVerificationFeedback(token),
     ]);
-    setProfile(p);
+    setProfile(p as Profile);
     setVerificationFeedback(feedback);
   }, []);
 
@@ -815,6 +815,7 @@ export default function ProfilePage() {
 
   async function handleSave(e: FormEvent) {
     e.preventDefault();
+    if (tab === "photos") return;
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
     if (!token) return;
 
@@ -967,6 +968,8 @@ export default function ProfilePage() {
           maritalStatusPref: partner.maritalStatusPref,
           additionalNotes: partner.additionalNotes || undefined,
         });
+      } else {
+        return;
       }
 
       setProfile(updated);
