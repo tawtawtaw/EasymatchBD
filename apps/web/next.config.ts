@@ -1,12 +1,15 @@
 import { EASYMATCH_API_PORT } from "@easymatch/shared";
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
+import path from "node:path";
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
 const ngrokDevOrigin = process.env.NGROK_DEV_ORIGIN?.trim();
 
 const nextConfig: NextConfig = {
+  output: "standalone",
+  outputFileTracingRoot: path.join(__dirname, "../../"),
   transpilePackages: ["@easymatch/shared"],
   typescript: {
     // Pre-existing strict TS issues; dev uses `next dev` without blocking on these.

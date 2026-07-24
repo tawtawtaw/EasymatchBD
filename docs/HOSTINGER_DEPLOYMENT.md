@@ -22,10 +22,11 @@ Database (Supabase) and Redis (Upstash) stay external — configure via env vars
 | Setting | Value |
 |---------|--------|
 | Node.js | **20** |
-| Install | `npm ci` |
-| Build | `npm run build -w @easymatch/shared && npm run build -w @easymatch/web` |
-| Start | `npm run start -w @easymatch/web` |
-| PORT | Set automatically by Hostinger — do **not** hardcode `4100` |
+| Install | `npm ci --include=optional` |
+| Build | `npm run build:hostinger-web` |
+| Start | `npm start` |
+| Entry file (if asked) | `scripts/hostinger-start.mjs` |
+| Output directory | `apps/web/.next/standalone` |
 
 ### Web environment variables
 
