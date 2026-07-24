@@ -19,6 +19,8 @@
     "tunnel": "node scripts/tunnel.mjs start",
     "stop": "npm run kill-ports",
     "build": "npm run build -w @easymatch/shared && npm run build -w @easymatch/api && npm run build -w @easymatch/web",
+    "build:hostinger-web": "npm run build -w @easymatch/shared && npm run build -w @easymatch/web",
+    "start:hostinger-web": "npm run start -w @easymatch/web",
     "lint": "npm run lint -w @easymatch/web && npm run lint -w @easymatch/api",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down"
