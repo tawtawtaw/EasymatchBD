@@ -21,6 +21,10 @@ const nextConfig: NextConfig = {
   // Lets Next dev accept requests via ngrok (e.g. easymatchbd.ngrok.dev).
   ...(ngrokDevOrigin ? { allowedDevOrigins: [ngrokDevOrigin] } : {}),
   async rewrites() {
+    // Production calls the API directly via NEXT_PUBLIC_API_URL (see api-base-url.ts).
+    if (process.env.NEXT_PUBLIC_API_URL?.trim()) {
+      return [];
+    }
     return [
       {
         source: "/api/v1/:path*",
