@@ -37,13 +37,16 @@ async function listenExpressApp(
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       await new Promise<void>((resolve, reject) => {
-        const server = expressApp.listen(port, isDev ? undefined : '0.0.0.0', () => {
+        const onListening = () => {
           Logger.log(
             `Listening on ${isDev ? 'localhost' : '0.0.0.0'}:${port} (initializing…)`,
             'Bootstrap',
           );
           resolve();
-        });
+        };
+        const server = isDev
+          ? expressApp.listen(port, onListening)
+          : expressApp.listen(port, '0.0.0.0', onListening);
         server.on('error', reject);
       });
       return;
