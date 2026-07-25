@@ -6,16 +6,74 @@ process.env.HOSTNAME = process.env.HOSTNAME || "0.0.0.0";
 const root = __dirname;
 console.log("[easymatch] Entry server.js cwd:", root);
 
+function fileExists(candidate) {
+  return fs.existsSync(candidate);
+}
+
+function detectRuntime() {
+  const forced = process.env.EASYMATCH_RUNTIME?.trim().toLowerCase();
+  if (forced === "web" || forced === "api") {
+    return forced;
+  }
+
+  const webCandidates = [
+    path.join(root, "hostinger-deploy/apps/web/server.js"),
+    path.join(root, "apps/web/server.js"),
+  ];
+  const apiCandidates = [
+    path.join(root, "hostinger-api-deploy/dist/src/main.js"),
+    path.join(root, "api-runtime/dist/src/main.js"),
+  ];
+
+  const hasWeb = webCandidates.some(fileExists);
+  const hasApi = apiCandidates.some(fileExists);
+
+  if (hasWeb && !hasApi) {
+    return "web";
+  }
+  if (hasApi && !hasWeb) {
+    return "api";
+  }
+  if (hasWeb && hasApi) {
+    console.warn(
+      "[easymatch] Both web and API bundles found. Set EASYMATCH_RUNTIME=web or api on this Hostinger site.",
+    );
+    return "web";
+  }
+
+  return null;
+}
+
+function startWeb() {
+  const candidates = [
+    path.join(root, "hostinger-deploy/apps/web/server.js"),
+    path.join(root, "apps/web/server.js"),
+    path.join(root, "hostinger-deploy/apps/web/.next/standalone/apps/web/server.js"),
+    path.join(root, "standalone/apps/web/server.js"),
+    path.join(root, "apps/web/.next/standalone/apps/web/server.js"),
+    path.join(root, ".next/standalone/apps/web/server.js"),
+  ];
+
+  const serverFile = candidates.find(fileExists);
+  if (!serverFile) {
+    return false;
+  }
+
+  console.log("[easymatch-web] Loading standalone server in-process:", serverFile);
+  process.chdir(path.dirname(serverFile));
+  require(serverFile);
+  return true;
+}
+
 function startApi() {
   const deployRoots = [
-    root,
-    path.join(root, "api-runtime"),
     path.join(root, "hostinger-api-deploy"),
+    path.join(root, "api-runtime"),
   ];
 
   for (const deployRoot of deployRoots) {
     const mainFile = path.join(deployRoot, "dist/src/main.js");
-    if (!fs.existsSync(mainFile)) {
+    if (!fileExists(mainFile)) {
       continue;
     }
 
@@ -28,34 +86,24 @@ function startApi() {
   return false;
 }
 
-function startWeb() {
-  const candidates = [
-    path.join(root, "apps/web/server.js"),
-    path.join(root, "hostinger-deploy/apps/web/server.js"),
-    path.join(root, "standalone/apps/web/server.js"),
-    path.join(root, "apps/web/.next/standalone/apps/web/server.js"),
-    path.join(root, ".next/standalone/apps/web/server.js"),
-  ];
+const runtime = detectRuntime();
+console.log("[easymatch] Runtime mode:", runtime || "unknown");
 
-  const serverFile = candidates.find((candidate) => fs.existsSync(candidate));
-  if (!serverFile) {
-    return false;
+if (runtime === "web") {
+  if (!startWeb()) {
+    console.error("[easymatch] Web bundle not found under", root);
+    process.exit(1);
   }
-
-  console.log("[easymatch-web] Loading standalone server in-process:", serverFile);
-  process.chdir(path.dirname(serverFile));
-  require(serverFile);
-  return true;
-}
-
-if (startApi()) {
-  // API site
+} else if (runtime === "api") {
+  if (!startApi()) {
+    console.error("[easymatch] API bundle not found under", root);
+    process.exit(1);
+  }
 } else if (startWeb()) {
-  // Web site
+  console.warn("[easymatch] Falling back to web startup");
+} else if (startApi()) {
+  console.warn("[easymatch] Falling back to API startup");
 } else {
-  console.error("[easymatch] No API or web entry found under", root);
-  for (const dir of ["dist/src/main.js", "hostinger-api-deploy/dist/src/main.js", "api-runtime/dist/src/main.js"]) {
-    console.error(" - missing", path.join(root, dir));
-  }
+  console.error("[easymatch] No web or API entry found under", root);
   process.exit(1);
 }

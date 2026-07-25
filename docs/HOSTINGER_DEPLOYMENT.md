@@ -21,7 +21,7 @@ External services: **Supabase** (PostgreSQL), **Upstash** (Redis).
 | Build command | `npm run build:hostinger-web` |
 | Output directory | `hostinger-deploy` |
 | Entry file | `server.js` |
-| Environment | `NODE_ENV=production` |
+| Environment | `NODE_ENV=production`, **`EASYMATCH_RUNTIME=web`** |
 
 After the API is live, add on the **web** site (Settings → Environment variables):
 
@@ -46,6 +46,7 @@ In hPanel: **Websites → Add Website → Node.js Web App → GitHub** (same rep
 | Output directory | **`hostinger-api-deploy`** |
 | Entry file | **`server.js`** |
 | Domain | **`api.easymatchbd.com`** |
+| Environment | **`EASYMATCH_RUNTIME=api`**, `NODE_ENV=production`, plus variables in §3 |
 
 Hostinger runs **`npm install` automatically** before the build — there is no separate install command to set. The postbuild copies runtime `node_modules` from the monorepo into `hostinger-api-deploy/`.
 

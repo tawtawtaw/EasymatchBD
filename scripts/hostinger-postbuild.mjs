@@ -32,9 +32,25 @@ cpSync(
 
 writeFileSync(
   path.join(deployDir, "server.js"),
-  `const path = require("node:path");
-const startHostingerStandalone = require("./hostinger-entry.cjs");
-startHostingerStandalone(path.join(__dirname));
+  `process.env.HOSTNAME = process.env.HOSTNAME || "0.0.0.0";
+const path = require("node:path");
+const fs = require("node:fs");
+
+const deployDir = __dirname;
+const candidates = [
+  path.join(deployDir, "apps/web/server.js"),
+  path.join(deployDir, "apps/web/.next/standalone/apps/web/server.js"),
+];
+
+const serverFile = candidates.find((candidate) => fs.existsSync(candidate));
+if (!serverFile) {
+  console.error("[easymatch-web] Standalone server not found under", deployDir);
+  process.exit(1);
+}
+
+console.log("[easymatch-web] Loading standalone server in-process:", serverFile);
+process.chdir(path.dirname(serverFile));
+require(serverFile);
 `,
 );
 
