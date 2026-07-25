@@ -11,6 +11,9 @@ const nextConfig: NextConfig = {
   output: "standalone",
   outputFileTracingRoot: path.join(__dirname, "../../"),
   transpilePackages: ["@easymatch/shared"],
+  experimental: {
+    preloadEntriesOnStart: false,
+  },
   typescript: {
     // Pre-existing strict TS issues; dev uses `next dev` without blocking on these.
     ignoreBuildErrors: true,
