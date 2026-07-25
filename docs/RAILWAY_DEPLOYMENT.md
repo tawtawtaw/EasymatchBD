@@ -57,13 +57,54 @@ Replace `api` with your API service name if different. **Redeploy web** after ch
 ## API environment variables
 
 - `NODE_ENV=production`
-- `DATABASE_URL`, `DIRECT_URL` (Supabase)
+- `DATABASE_URL`, `DIRECT_URL` (Supabase — see below)
 - `REDIS_URL` (Upstash)
 - `JWT_SECRET`, `JWT_EXPIRES_IN`
 - `CORS_ORIGIN` — web URL(s), comma-separated
 - `WEB_PUBLIC_URL` — public web URL
 
-## After first successful API deploy
+### Supabase on Railway (IPv4)
+
+Railway cannot reach `db.[ref].supabase.co:6543` on the free tier — that endpoint is **IPv6-only**.
+
+In Supabase → **Connect** → copy the **Transaction pooler** (Supavisor) URL for `DATABASE_URL`:
+
+```env
+DATABASE_URL=postgresql://postgres.jrecnorpwmdlpbkffmng:PASSWORD@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true&sslmode=require&connect_timeout=30
+```
+
+For migrations (`DIRECT_URL` and `prisma migrate deploy`), use **Session pooler** (port **5432**, same Supavisor host):
+
+```env
+DIRECT_URL=postgresql://postgres.jrecnorpwmdlpbkffmng:PASSWORD@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres?sslmode=require&connect_timeout=30
+```
+
+Notes:
+
+- Username is `postgres.jrecnorpwmdlpbkffmng` (not plain `postgres`) on Supavisor URLs.
+- URL-encode special characters in the password (`@` → `%40`).
+- Wake the project in Supabase if it is **Paused**.
+
+## Troubleshooting: API crashes with Supabase P1001
+
+**Local `prisma migrate deploy` can succeed while Railway fails.** Your PC uses `apps/api/.env` (often `db.*.supabase.co:5432`). Railway uses **Variables on the API service** — they are separate.
+
+### Checklist
+
+1. **Supabase dashboard** — project must not be **Paused** (click Restore if needed).
+2. **Railway → API → Variables** — open `DATABASE_URL` and check the hostname:
+   - ❌ `db.jrecnorpwmdlpbkffmng.supabase.co` → will crash on Railway
+   - ✅ `aws-0-ap-southeast-1.pooler.supabase.com` (or similar `*.pooler.supabase.com`)
+3. Set **both** on Railway (copy fresh strings from Supabase → **Connect**):
+   - `DATABASE_URL` → **Transaction pooler**, port **6543**, user `postgres.jrecnorpwmdlpbkffmng`
+   - `DIRECT_URL` → **Session pooler**, port **5432**, same user/host
+4. Password: URL-encode `@` as `%40` in the connection string.
+5. **Redeploy API** after changing variables.
+6. **Deploy logs** — after redeploy, look for:
+   - `DATABASE_URL target: aws-0-....pooler.supabase.com:6543` → correct
+   - `Warning: db.*.supabase.co` → still wrong; fix variables
+
+Do **not** copy `DATABASE_URL` from local `.env` to Railway unless it already uses the `pooler.supabase.com` host.
 
 Run migrations once (Railway shell):
 
