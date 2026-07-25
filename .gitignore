@@ -9,6 +9,7 @@ build/
 hostinger-app/
 hostinger-deploy/
 hostinger-api-deploy/
+api-runtime/
 public/
 next.config.mjs
 

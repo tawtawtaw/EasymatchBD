@@ -129,5 +129,14 @@ if (!copyIfExists(".prisma")) {
   console.warn("[hostinger-api] Missing generated .prisma client — run prisma generate before postbuild");
 }
 
+const apiRuntimeDir = path.join(root, "api-runtime");
+rmSync(apiRuntimeDir, { recursive: true, force: true });
+cpSync(deployDir, apiRuntimeDir, { recursive: true });
+mkdirSync(path.join(deployDir, "scripts"), { recursive: true });
+cpSync(
+  path.join(root, "scripts/hostinger-entry.cjs"),
+  path.join(deployDir, "scripts/hostinger-entry.cjs"),
+);
+
 console.log("");
 console.log("=== Hostinger API bundle ready: hostinger-api-deploy/ ===");
