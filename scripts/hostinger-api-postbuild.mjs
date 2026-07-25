@@ -1,6 +1,7 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import apiEntrySource from "./hostinger-api-entry.cjs";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const apiDir = path.join(root, "apps/api");
@@ -103,20 +104,12 @@ writeFileSync(
   ),
 );
 
-writeFileSync(
-  path.join(deployDir, "server.js"),
-  `if (global.__EASYMATCH_ENTRY_LOADED) {
-  console.log("[easymatch-api] Duplicate entry load skipped");
-  return;
-}
-global.__EASYMATCH_ENTRY_LOADED = true;
+writeFileSync(path.join(deployDir, "server.js"), apiEntrySource());
 
-process.env.HOSTNAME = process.env.HOSTNAME || "0.0.0.0";
-process.chdir(__dirname);
-console.log("[easymatch-api] Starting on port", process.env.PORT || "3000");
-require("./dist/src/main.js");
-`,
-);
+if (process.platform === "linux") {
+  writeFileSync(path.join(root, "server.js"), apiEntrySource());
+  console.log("[hostinger-api] Installed API entry at repo root server.js");
+}
 
 console.log("Copying runtime node_modules into hostinger-api-deploy...");
 for (const dep of Object.keys(apiPkg.dependencies)) {

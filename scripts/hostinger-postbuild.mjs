@@ -1,6 +1,7 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import webEntrySource from "./hostinger-web-entry.cjs";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const webDir = path.join(root, "apps/web");
@@ -57,46 +58,11 @@ cpSync(
   path.join(deployDir, "hostinger-entry.cjs"),
 );
 
-writeFileSync(
-  path.join(deployDir, "server.js"),
-  `if (global.__EASYMATCH_WEB_BUNDLE_LOADED) {
-  console.log("[easymatch-web] Duplicate bundle load skipped");
-  return;
-}
-global.__EASYMATCH_WEB_BUNDLE_LOADED = true;
+writeFileSync(path.join(deployDir, "server.js"), webEntrySource());
 
-process.env.HOSTNAME = process.env.HOSTNAME || "0.0.0.0";
-const path = require("node:path");
-const fs = require("node:fs");
-
-const deployDir = __dirname;
-const candidates = [
-  path.join(deployDir, "apps/web/server.js"),
-  path.join(deployDir, "apps/web/.next/standalone/apps/web/server.js"),
-];
-
-const serverFile = candidates.find((candidate) => fs.existsSync(candidate));
-if (!serverFile) {
-  console.error("[easymatch-web] Standalone server not found under", deployDir);
-  process.exit(1);
-}
-
-console.log("[easymatch-web] Loading standalone server in-process:", serverFile);
-process.chdir(path.dirname(serverFile));
-require(serverFile);
-`,
-);
-
-const standaloneServer = path.join(deployDir, "apps/web/server.js");
-if (existsSync(standaloneServer)) {
-  const guard = `if (global.__EASYMATCH_NEXT_STARTED) { return; }
-global.__EASYMATCH_NEXT_STARTED = true;
-
-`;
-  const current = readFileSync(standaloneServer, "utf8");
-  if (!current.includes("__EASYMATCH_NEXT_STARTED")) {
-    writeFileSync(standaloneServer, guard + current);
-  }
+if (process.platform === "linux") {
+  writeFileSync(path.join(root, "server.js"), webEntrySource());
+  console.log("[hostinger-web] Installed web entry at repo root server.js");
 }
 
 writeFileSync(
