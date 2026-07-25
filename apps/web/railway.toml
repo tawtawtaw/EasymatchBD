@@ -1,0 +1,7 @@
+[build]
+builder = "RAILPACK"
+buildCommand = "node scripts/railway-web-build.mjs"
+
+[deploy]
+startCommand = "npm run start -w @easymatch/web"
+restartPolicyType = "ON_FAILURE"

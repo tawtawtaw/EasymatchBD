@@ -6,6 +6,7 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
+    "prebuild": "npm run build -w @easymatch/shared && node ../../scripts/hostinger-prisma-generate.mjs",
     "build": "nest build",
     "build:hostinger": "node ../../scripts/hostinger-prisma-generate.mjs && tsc -p tsconfig.build.json",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",

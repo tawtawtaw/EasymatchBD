@@ -1,0 +1,8 @@
+[build]
+builder = "RAILPACK"
+buildCommand = "node scripts/railway-api-build.mjs"
+
+[deploy]
+startCommand = "npm run start:prod -w @easymatch/api"
+healthcheckPath = "/api/v1/health"
+restartPolicyType = "ON_FAILURE"

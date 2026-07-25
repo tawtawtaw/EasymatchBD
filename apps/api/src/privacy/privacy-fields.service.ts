@@ -14,7 +14,7 @@ export class PrivacyFieldsService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async listAll() {
+  async listAll(): Promise<ReturnType<PrivacyFieldsService['toDto']>[]> {
     if (this.listCache) {
       return this.listCache;
     }
@@ -23,8 +23,9 @@ export class PrivacyFieldsService {
     const rows = await this.prisma.profileFieldPrivacy.findMany({
       orderBy: [{ section: 'asc' }, { sortOrder: 'asc' }],
     });
-    this.listCache = rows.map((row) => this.toDto(row));
-    return this.listCache;
+    const mapped = rows.map((row) => this.toDto(row));
+    this.listCache = mapped;
+    return mapped;
   }
 
   async getFullNameRule() {
