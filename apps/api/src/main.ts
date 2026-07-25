@@ -70,6 +70,7 @@ async function listenOnPort(
 }
 
 async function bootstrap() {
+  Logger.log("Bootstrapping Easymatch API…", "Bootstrap");
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
   const isDev =
@@ -124,7 +125,7 @@ async function bootstrap() {
 
   await listenOnPort(app, port, isDev);
 
-  Logger.log(`API ready on http://localhost:${port}/api/v1`, 'Bootstrap');
+  Logger.log(`API ready on 0.0.0.0:${port}/api/v1`, "Bootstrap");
 
   if (isDev) {
     const officerCount = (config.get<string>('VERIFICATION_OFFICER_PHONES', '') || '')

@@ -82,6 +82,10 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
+    void this.ensureRedisReady();
+  }
+
+  private async ensureRedisReady() {
     try {
       await this.pingWithTimeout(8_000);
       this.redisReady = true;
@@ -91,7 +95,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         this.disableRedisClient(message);
         return;
       }
-      throw err;
+      this.logger.error(`Redis unavailable at startup: ${message}`);
     }
   }
 

@@ -4,6 +4,7 @@ const path = require("node:path");
 process.env.HOSTNAME = process.env.HOSTNAME || "0.0.0.0";
 
 const root = __dirname;
+console.log("[easymatch] Entry server.js cwd:", root);
 
 function startApi() {
   const deployRoots = [
