@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -27,4 +27,21 @@ if (existsSync(standaloneWebDir)) {
 rmSync(rootNextDir, { recursive: true, force: true });
 cpSync(webNextDir, rootNextDir, { recursive: true });
 
-console.log("Prepared .next for Hostinger (includes standalone runtime)");
+cpSync(path.join(root, "app.js"), path.join(rootNextDir, "app.js"));
+
+writeFileSync(
+  path.join(rootNextDir, "package.json"),
+  JSON.stringify(
+    {
+      name: "easymatch-web-runtime",
+      private: true,
+      main: "app.js",
+      scripts: { start: "node app.js" },
+      engines: { node: "20.x" },
+    },
+    null,
+    2,
+  ),
+);
+
+console.log("Prepared .next for Hostinger (includes standalone runtime + app.js launcher)");

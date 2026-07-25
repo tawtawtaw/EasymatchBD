@@ -2,7 +2,7 @@
   "name": "easymatch-bd",
   "version": "0.1.0",
   "private": true,
-  "main": "server.js",
+  "main": "app.js",
   "engines": {
     "node": "20.x"
   },
@@ -27,7 +27,7 @@
     "prebuild:hostinger-web": "node scripts/hostinger-prebuild.mjs",
     "build:hostinger-web": "npm run build -w @easymatch/shared && npm run build -w @easymatch/web && node scripts/hostinger-postbuild.mjs",
     "install:hostinger": "npm ci --include=optional",
-    "start": "node server.js",
+    "start": "node app.js",
     "lint": "npm run lint -w @easymatch/web && npm run lint -w @easymatch/api",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down"

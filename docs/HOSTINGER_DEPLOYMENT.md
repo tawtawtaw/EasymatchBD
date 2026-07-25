@@ -30,7 +30,7 @@ Hostinger defaults should be:
 
 - Build: `npm run build` → runs web-only monorepo build via root `package.json`
 - Output: `.next` → postbuild copies `apps/web/.next` to repo root
-- Start: `npm run start -- -p $PORT` → runs `next start` in `@easymatch/web`
+- Start: `npm run start -- -p $PORT` → runs `node app.js` → `next start` in `@easymatch/web`
 
 **Do not set a custom output directory** (`hostinger-app`, `apps/web/.next`, etc.). Custom outputs are treated as static files → **403 Forbidden**.
 
@@ -56,7 +56,20 @@ cd apps/api && npx prisma migrate deploy
 
 ---
 
-## Fix for HTTP 403 Forbidden
+## Fix for HTTP 503 Service Unavailable
+
+503 means Hostinger’s proxy is up but the **Node process is not running** (or crashed on start).
+
+| Cause | Fix |
+|-------|-----|
+| Latest code not deployed | Push `master`, then **Redeploy** in hPanel |
+| Wrong start command | Root `npm start` runs `node app.js` (standalone server) |
+| Output dir is `.next` only | Postbuild copies `app.js` + `package.json` into `.next/` |
+| App crash on boot | Check **Runtime logs** in hPanel for `[easymatch] Starting` or errors |
+
+If runtime logs show `next start` errors, recreate the site with **Entry file** = `app.js` (set only at creation time).
+
+---
 
 | Cause | Fix |
 |-------|-----|
