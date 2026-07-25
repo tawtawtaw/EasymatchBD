@@ -2,15 +2,32 @@ module.exports = function buildHostingerWebServer(nextConfigLiteral) {
   return `"use strict";
 
 if (global.__EASYMATCH_WEB_SERVER_STARTED) {
-  console.log("[easymatch-web] Server bootstrap already ran in pid", process.pid);
+  console.log("[easymatch-web] Already bootstrapped in pid", process.pid);
   return;
 }
 global.__EASYMATCH_WEB_SERVER_STARTED = true;
 
+if (process.env.NEXT_PRIVATE_WORKER) {
+  console.log("[easymatch-web] Skipping Next worker subprocess on pid", process.pid);
+  return;
+}
+
 const fs = require("node:fs");
+const http = require("node:http");
 const path = require("node:path");
 
 process.env.HOSTNAME = process.env.HOSTNAME || "127.0.0.1";
+
+const originalListen = http.Server.prototype.listen;
+let listenCount = 0;
+http.Server.prototype.listen = function patchedListen(...args) {
+  listenCount += 1;
+  if (listenCount > 1) {
+    console.log("[easymatch-web] Blocked duplicate listen attempt", listenCount);
+    return this;
+  }
+  return originalListen.apply(this, args);
+};
 
 function findAppDir() {
   const candidates = [
@@ -72,34 +89,58 @@ if (!acquireSingletonLock(lockFile)) {
   process.exit(0);
 }
 
-process.chdir(appDir);
-process.env.NODE_ENV = "production";
+async function boot() {
+  process.chdir(appDir);
+  process.env.NODE_ENV = "production";
 
-const currentPort = Number.parseInt(process.env.PORT, 10) || 3000;
-const hostname = process.env.HOSTNAME;
-const nextConfig = ${nextConfigLiteral};
-process.env.__NEXT_PRIVATE_STANDALONE_CONFIG = JSON.stringify(nextConfig);
+  const currentPort = Number.parseInt(process.env.PORT, 10) || 3000;
+  const hostname = process.env.HOSTNAME;
+  const nextConfig = ${nextConfigLiteral};
+  process.env.__NEXT_PRIVATE_STANDALONE_CONFIG = JSON.stringify(nextConfig);
 
-console.log(
-  "[easymatch-web] Booting Next on",
-  hostname + ":" + currentPort,
-  "pid",
-  process.pid,
-  "dir",
-  appDir,
-);
+  let handlersReady = false;
+  let requestHandler = (req, res) => {
+    res.statusCode = 503;
+    res.setHeader("Content-Type", "text/plain");
+    res.end("Easymatch web is starting");
+  };
+  let upgradeHandler = (req, socket) => {
+    socket.destroy();
+  };
 
-require("next");
-const { startServer } = require("next/dist/server/lib/start-server");
+  const server = http.createServer((req, res) => requestHandler(req, res));
+  server.on("upgrade", (req, socket, head) => upgradeHandler(req, socket, head));
 
-startServer({
-  dir: appDir,
-  isDev: false,
-  config: nextConfig,
-  hostname,
-  port: currentPort,
-  allowRetry: false,
-}).catch((err) => {
+  await new Promise((resolve, reject) => {
+    server.listen(currentPort, hostname, () => resolve());
+    server.once("error", reject);
+  });
+
+  console.log(
+    "[easymatch-web] Listening on",
+    hostname + ":" + currentPort,
+    "pid",
+    process.pid,
+  );
+
+  require("next");
+  const { getRequestHandlers } = require("next/dist/server/lib/start-server");
+  const handlers = await getRequestHandlers({
+    dir: appDir,
+    port: currentPort,
+    hostname,
+    isDev: false,
+    quiet: true,
+  });
+
+  requestHandler = handlers.requestHandler;
+  upgradeHandler = handlers.upgradeHandler;
+  handlersReady = true;
+
+  console.log("[easymatch-web] Next handlers ready on pid", process.pid);
+}
+
+boot().catch((err) => {
   console.error("[easymatch-web] Fatal startup error:", err);
   process.exit(1);
 });
