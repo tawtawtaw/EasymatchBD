@@ -25,6 +25,33 @@ cpSync(path.join(webDir, "public"), path.join(standaloneWebDir, "public"), {
 
 rmSync(deployDir, { recursive: true, force: true });
 cpSync(standaloneDir, deployDir, { recursive: true });
+
+/** Standalone file tracing can omit internal Next files on Linux (e.g. encode-cache-tag.js). */
+function syncRootPackage(packageName) {
+  const src = path.join(root, "node_modules", packageName);
+  const dest = path.join(deployDir, "node_modules", packageName);
+  if (!existsSync(src)) {
+    console.warn("[hostinger-web] Missing root package for sync:", packageName);
+    return;
+  }
+  mkdirSync(path.dirname(dest), { recursive: true });
+  cpSync(src, dest, { recursive: true });
+  console.log("[hostinger-web] Synced", packageName, "into deploy bundle");
+}
+
+for (const pkg of ["next", "@next/env"]) {
+  syncRootPackage(pkg);
+}
+
+const requiredNextFile = path.join(
+  deployDir,
+  "node_modules/next/dist/server/lib/encode-cache-tag.js",
+);
+if (!existsSync(requiredNextFile)) {
+  console.error("[hostinger-web] Missing required Next.js runtime file:", requiredNextFile);
+  process.exit(1);
+}
+
 cpSync(
   path.join(root, "scripts/hostinger-entry.cjs"),
   path.join(deployDir, "hostinger-entry.cjs"),
@@ -32,11 +59,11 @@ cpSync(
 
 writeFileSync(
   path.join(deployDir, "server.js"),
-  `if (global.__EASYMATCH_ENTRY_LOADED) {
-  console.log("[easymatch-web] Duplicate entry load skipped");
+  `if (global.__EASYMATCH_WEB_BUNDLE_LOADED) {
+  console.log("[easymatch-web] Duplicate bundle load skipped");
   return;
 }
-global.__EASYMATCH_ENTRY_LOADED = true;
+global.__EASYMATCH_WEB_BUNDLE_LOADED = true;
 
 process.env.HOSTNAME = process.env.HOSTNAME || "0.0.0.0";
 const path = require("node:path");
