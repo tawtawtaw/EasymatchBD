@@ -82,9 +82,10 @@ async function bootstrap() {
   Logger.log('Bootstrapping Easymatch API…', 'Bootstrap');
 
   const expressApp = express();
+  let healthStatus: 'starting' | 'ok' = 'starting';
   expressApp.get('/api/v1/health', (_req, res) => {
     res.json({
-      status: 'starting',
+      status: healthStatus,
       timestamp: new Date().toISOString(),
     });
   });
@@ -150,6 +151,7 @@ async function bootstrap() {
 
   await app.init();
 
+  healthStatus = 'ok';
   Logger.log(`API ready on 0.0.0.0:${port}/api/v1`, 'Bootstrap');
 
   if (isDevRuntime) {
@@ -184,4 +186,10 @@ async function bootstrap() {
   }
 }
 
-bootstrap();
+bootstrap().catch((error) => {
+  Logger.error(
+    error instanceof Error ? error.stack ?? error.message : String(error),
+    'Bootstrap',
+  );
+  process.exit(1);
+});
