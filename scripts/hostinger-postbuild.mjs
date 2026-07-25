@@ -1,7 +1,7 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import webEntrySource from "./hostinger-web-entry.cjs";
+import buildHostingerWebServer from "./hostinger-web-server.cjs";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const webDir = path.join(root, "apps/web");
@@ -9,6 +9,63 @@ const webNextDir = path.join(webDir, ".next");
 const standaloneDir = path.join(webNextDir, "standalone");
 const standaloneWebDir = path.join(standaloneDir, "apps/web");
 const deployDir = path.join(root, "hostinger-deploy");
+
+function extractNextConfigLiteral(serverJsContent) {
+  const marker = "const nextConfig = ";
+  const start = serverJsContent.indexOf(marker);
+  if (start < 0) {
+    throw new Error("Could not find nextConfig in standalone server.js");
+  }
+
+  let index = start + marker.length;
+  if (serverJsContent[index] !== "{") {
+    throw new Error("Unexpected nextConfig format in standalone server.js");
+  }
+
+  let depth = 0;
+  let inString = false;
+  let stringQuote = "";
+  let escaped = false;
+
+  for (; index < serverJsContent.length; index += 1) {
+    const char = serverJsContent[index];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (char === "\\") {
+        escaped = true;
+        continue;
+      }
+      if (char === stringQuote) {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === '"' || char === "'") {
+      inString = true;
+      stringQuote = char;
+      continue;
+    }
+
+    if (char === "{") {
+      depth += 1;
+      continue;
+    }
+
+    if (char === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return serverJsContent.slice(start + marker.length, index + 1);
+      }
+    }
+  }
+
+  throw new Error("Could not parse nextConfig object from standalone server.js");
+}
 
 if (!existsSync(standaloneWebDir)) {
   console.error("Missing standalone build at", standaloneWebDir);
@@ -53,27 +110,25 @@ if (!existsSync(requiredNextFile)) {
   process.exit(1);
 }
 
-cpSync(
-  path.join(root, "scripts/hostinger-entry.cjs"),
-  path.join(deployDir, "hostinger-entry.cjs"),
+const standaloneServerPath = path.join(deployDir, "apps/web/server.js");
+const standaloneServerSource = readFileSync(standaloneServerPath, "utf8");
+const nextConfigLiteral = extractNextConfigLiteral(standaloneServerSource);
+const generatedServer = buildHostingerWebServer(nextConfigLiteral);
+
+writeFileSync(path.join(deployDir, "server.js"), generatedServer);
+writeFileSync(
+  standaloneServerPath,
+  `"use strict";
+if (global.__EASYMATCH_WEB_SERVER_STARTED) {
+  return;
+}
+console.error("[easymatch-web] Do not load apps/web/server.js directly; use server.js");
+process.exit(1);
+`,
 );
 
-writeFileSync(path.join(deployDir, "server.js"), webEntrySource());
-
-const standaloneServer = path.join(deployDir, "apps/web/server.js");
-if (existsSync(standaloneServer)) {
-  const guard = `if (global.__EASYMATCH_NEXT_STARTED) { return; }
-global.__EASYMATCH_NEXT_STARTED = true;
-
-`;
-  const current = readFileSync(standaloneServer, "utf8");
-  if (!current.includes("__EASYMATCH_NEXT_STARTED")) {
-    writeFileSync(standaloneServer, guard + current);
-  }
-}
-
 if (process.platform === "linux") {
-  writeFileSync(path.join(root, "server.js"), webEntrySource());
+  writeFileSync(path.join(root, "server.js"), generatedServer);
   console.log("[hostinger-web] Installed web entry at repo root server.js");
 }
 
