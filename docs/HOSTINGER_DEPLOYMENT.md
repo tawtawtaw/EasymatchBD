@@ -60,20 +60,11 @@ cd apps/api && npx prisma migrate deploy
 
 503 means Hostinger’s proxy is up but the **Node process is not running** (or crashed on start).
 
-503 with `Cannot find module 'next'` in `/nodejs/server.js` means Hostinger runs its **default Next.js `server.js`** inside the output folder, which has **no `node_modules`**.
+503 with `Cannot find module 'next'` at `/nodejs/server.js:16` means Hostinger injects its **own** Next.js `server.js` at the **repo root** (`nodejs/`), not inside our build output. That script calls `require('next')`, but root `package.json` had no `next` dependency (only `apps/web` did).
 
-Postbuild now turns the `.next` output into a **mini Next.js app**:
+**Fix:** `next`, `react`, and `react-dom` are declared in **root** `package.json`. Postbuild copies `apps/web/.next` → root `.next/` and adds `next.config.mjs` + `public/` at repo root so Hostinger’s default server can boot.
 
-```
-.next/          → copied to Hostinger nodejs/
-  server.js     → requires('next') — works once node_modules exists
-  package.json  → next, react, react-dom
-  node_modules/ → npm install during build (Linux)
-  public/
-  .next/        → nested build output (BUILD_ID, static, server, …)
-```
-
-After redeploy, runtime logs should show `[easymatch] Next.js ready on 0.0.0.0:…` instead of `Cannot find module 'next'`.
+After redeploy, runtime logs should show Next.js starting — not `Cannot find module 'next'`.
 
 ---
 
