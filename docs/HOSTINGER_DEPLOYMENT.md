@@ -13,32 +13,28 @@ Database (Supabase) and Redis (Upstash) stay external — configure via env vars
 
 ---
 
-## Web app settings (hPanel)
+## Web app settings (hPanel) — IMPORTANT
 
 **Repository:** `tawtawtaw/EasymatchBD`  
 **Branch:** `master`  
-**Root directory:** `/` (repo root — required for workspaces)
+**Root directory:** `./` (repo root — required for workspaces)
 
 | Setting | Value |
 |---------|--------|
-| Node.js | **20** |
-| Install | `npm ci --include=optional` |
-| Build | `npm run build:hostinger-web` |
-| Output directory | `hostinger-app` |
-| Start | `node server.js` (if asked; Next.js preset may set this automatically) |
-| Entry file (if asked) | `server.js` |
-| Root directory | `./` |
+| Framework preset | **Next.js** (never **Other**) |
+| Node.js | **20.x** |
+| Build and output | **Default for Next.js** — do **not** customize |
+| Environment | `NODE_ENV=production` |
 
-### Web environment variables
+Hostinger defaults should be:
 
-```env
-NODE_ENV=production
-PORT=<leave Hostinger default / auto>
-NEXT_PUBLIC_API_URL=https://api.easymatchbd.com/api/v1
-NEXT_PUBLIC_WHATSAPP_SUPPORT_NUMBER=01XXXXXXXXX
-```
+- Build: `npm run build` → runs web-only monorepo build via root `package.json`
+- Output: `.next` → postbuild copies `apps/web/.next` to repo root
+- Start: `npm run start -- -p $PORT` → runs `next start` in `@easymatch/web`
 
-Point the domain to this Node.js app (not legacy PHP/static hosting).
+**Do not set a custom output directory** (`hostinger-app`, `apps/web/.next`, etc.). Custom outputs are treated as static files → **403 Forbidden**.
+
+Settings can only be chosen **before the first deploy**. To change them later, delete the website and recreate it.
 
 ---
 
@@ -58,69 +54,25 @@ After first deploy, run once (SSH or Hostinger terminal):
 cd apps/api && npx prisma migrate deploy
 ```
 
-```env
-NODE_ENV=production
-CORS_ORIGIN=https://easymatchbd.com,https://www.easymatchbd.com
-WEB_PUBLIC_URL=https://easymatchbd.com
-DATABASE_URL=...
-DIRECT_URL=...
-REDIS_URL=...
-JWT_SECRET=...
-```
-
 ---
 
 ## Fix for HTTP 403 Forbidden
 
-A **403 on Hostinger** usually means the **Node process is not running** or the **domain still points at old static/PHP hosting**, not your Node app.
+| Cause | Fix |
+|-------|-----|
+| Framework **Other** | Recreate site with **Next.js** preset |
+| Custom output directory | Recreate using **Default for Next.js** only |
+| Domain on WordPress / static site | Attach domain to Node.js app |
+| Node not running | Use defaults so Hostinger runs `npm start` |
 
-### Checklist
+### Quick test after deploy
 
-1. **Deployment logs** (hPanel → your Node app → Deployments / Logs)
-   - Build must finish with **success**
-   - Look for `next build` completing without errors
+1. `https://YOUR-TEMP-URL.hostingersite.com/hostinger-health.txt` → should show `Hostinger deploy OK`
+2. `https://YOUR-TEMP-URL.hostingersite.com/en` → Easymatch home page
 
-2. **Start command**
-   - Use: `npm run start -w @easymatch/web`
-   - App must listen on **`0.0.0.0`** and **`process.env.PORT`** (fixed in `apps/web/package.json`)
+If (1) works but (2) is 403/404, Node routing issue — open Hostinger live chat and ask them to verify the Node.js process is running.
 
-3. **Wrong hosting type**
-   - Domain must be attached to the **Node.js Web App**, not an empty website folder
-   - Remove/disable old PHP site on the same domain if it conflicts
-
-4. **Monorepo build**
-   - Build **shared** before web:  
-     `npm run build -w @easymatch/shared && npm run build -w @easymatch/web`
-   - Install must run at **repo root** (`npm ci`), not only inside `apps/web`
-
-5. **Test URLs**
-   - Home redirects to locale: try `https://yourdomain.com/en` (not only `/`)
-   - Temporary Hostinger URL from hPanel (before DNS) — test that first
-
-6. **Cloudflare / WAF**
-   - If the domain uses Cloudflare “Checking your browser”, that is not a 403 from Next.js
-   - Pause Cloudflare proxy briefly to test origin, or allow Hostinger IP
-
-7. **API not required for first page load**
-   - Home page degrades if API is down (empty dropdowns) but should still **render** — if you see 403, the web process itself is likely down
-
-### Common mistakes
-
-| Mistake | Symptom |
-|---------|---------|
-| Framework: **Other** | 403 Forbidden |
-| Output: `apps/web/.next/standalone/apps/web` | 403 — missing parent `node_modules` |
-| Output: `hostinger-app` | Correct flat bundle (includes `node_modules`) |
-| Start: `next start -p 4100` only | 403/502 — wrong port |
-| Build: `npm run build` (includes API) | Build fails (`nest: command not found`) |
-
----
-
-## Git auto-deploy
-
-hPanel → Node app → **Connect GitHub** → enable deploy on push to `master`.
-
-After changing start/build settings or `package.json`, **Redeploy** manually once, then push to Git for future updates.
+If (1) also 403, domain is not pointing at the Node.js app.
 
 ---
 
@@ -129,8 +81,8 @@ After changing start/build settings or `package.json`, **Redeploy** manually onc
 ```bash
 cd EasymatchBD
 npm ci
-npm run build -w @easymatch/shared && npm run build -w @easymatch/web
-PORT=4100 npm run start -w @easymatch/web
+npm run build
+PORT=4100 npm start
 ```
 
 Open http://localhost:4100/en
