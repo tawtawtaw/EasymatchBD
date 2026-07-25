@@ -1,4 +1,3 @@
-import { execSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,7 +7,66 @@ const apiDir = path.join(root, "apps/api");
 const apiDist = path.join(apiDir, "dist");
 const deployDir = path.join(root, "hostinger-api-deploy");
 const sharedDir = path.join(root, "packages/shared");
+const deployModules = path.join(deployDir, "node_modules");
 const mainFile = path.join(apiDist, "src/main.js");
+
+const moduleRoots = [
+  path.join(root, "node_modules"),
+  path.join(apiDir, "node_modules"),
+  path.join(sharedDir, "node_modules"),
+];
+
+function resolveModulePath(packageName) {
+  for (const base of moduleRoots) {
+    const candidate = path.join(base, packageName);
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+function copyPackageTree(packageName, visited = new Set()) {
+  if (visited.has(packageName)) {
+    return;
+  }
+  visited.add(packageName);
+
+  const src = resolveModulePath(packageName);
+  if (!src) {
+    console.warn("[hostinger-api] Missing module:", packageName);
+    return;
+  }
+
+  const dest = path.join(deployModules, packageName);
+  mkdirSync(path.dirname(dest), { recursive: true });
+  cpSync(src, dest, { recursive: true });
+
+  const pkgJsonPath = path.join(src, "package.json");
+  if (!existsSync(pkgJsonPath)) {
+    return;
+  }
+
+  const pkg = JSON.parse(readFileSync(pkgJsonPath, "utf8"));
+  const deps = { ...pkg.dependencies, ...pkg.optionalDependencies };
+  for (const dep of Object.keys(deps)) {
+    copyPackageTree(dep, visited);
+  }
+}
+
+function copyIfExists(relativePath) {
+  for (const base of moduleRoots) {
+    const src = path.join(base, relativePath);
+    if (!existsSync(src)) {
+      continue;
+    }
+    const dest = path.join(deployModules, relativePath);
+    mkdirSync(path.dirname(dest), { recursive: true });
+    cpSync(src, dest, { recursive: true });
+    return true;
+  }
+  return false;
+}
 
 if (!existsSync(mainFile)) {
   console.error("Missing API build at", mainFile);
@@ -19,6 +77,7 @@ rmSync(deployDir, { recursive: true, force: true });
 mkdirSync(deployDir, { recursive: true });
 mkdirSync(path.join(deployDir, "uploads"), { recursive: true });
 mkdirSync(path.join(deployDir, "packages/shared"), { recursive: true });
+mkdirSync(deployModules, { recursive: true });
 
 cpSync(apiDist, path.join(deployDir, "dist"), { recursive: true });
 cpSync(path.join(apiDir, "prisma"), path.join(deployDir, "prisma"), { recursive: true });
@@ -28,7 +87,6 @@ cpSync(path.join(sharedDir, "dist"), path.join(deployDir, "packages/shared/dist"
 cpSync(path.join(sharedDir, "package.json"), path.join(deployDir, "packages/shared/package.json"));
 
 const apiPkg = JSON.parse(readFileSync(path.join(apiDir, "package.json"), "utf8"));
-const prismaVersion = (apiPkg.devDependencies?.prisma ?? "6.19.0").replace(/^[\^~]/, "");
 
 writeFileSync(
   path.join(deployDir, "package.json"),
@@ -39,11 +97,6 @@ writeFileSync(
       main: "server.js",
       engines: { node: "20.x" },
       scripts: { start: "node server.js" },
-      dependencies: {
-        ...apiPkg.dependencies,
-        "@easymatch/shared": "file:./packages/shared",
-        prisma: prismaVersion,
-      },
     },
     null,
     2,
@@ -60,32 +113,22 @@ require("./dist/src/main.js");
 `,
 );
 
-if (process.platform === "linux") {
-  console.log("Installing API runtime dependencies in hostinger-api-deploy...");
-  const buildEnv = {
-    ...process.env,
-    DATABASE_URL:
-      process.env.DATABASE_URL ||
-      "postgresql://build:build@127.0.0.1:5432/build?schema=public",
-    DIRECT_URL:
-      process.env.DIRECT_URL ||
-      "postgresql://build:build@127.0.0.1:5432/build?schema=public",
-  };
-  execSync("npm install --omit=dev --no-audit --no-fund", {
-    cwd: deployDir,
-    stdio: "inherit",
-  });
-  execSync("npx prisma generate", { cwd: deployDir, stdio: "inherit", env: buildEnv });
-} else {
-  console.log("Skipping npm install (Hostinger Linux build will install deps)");
+console.log("Copying runtime node_modules into hostinger-api-deploy...");
+for (const dep of Object.keys(apiPkg.dependencies)) {
+  if (dep === "@easymatch/shared") {
+    continue;
+  }
+  copyPackageTree(dep);
+}
+
+mkdirSync(path.join(deployModules, "@easymatch"), { recursive: true });
+cpSync(path.join(deployDir, "packages/shared"), path.join(deployModules, "@easymatch/shared"), {
+  recursive: true,
+});
+
+if (!copyIfExists(".prisma")) {
+  console.warn("[hostinger-api] Missing generated .prisma client — run prisma generate before postbuild");
 }
 
 console.log("");
 console.log("=== Hostinger API bundle ready: hostinger-api-deploy/ ===");
-console.log("Create a second Node.js site with:");
-console.log("  Framework preset:  Other");
-console.log("  Build command:     npm run build:hostinger-api");
-console.log("  Output directory:  hostinger-api-deploy");
-console.log("  Entry file:        server.js");
-console.log("  Domain:            api.easymatchbd.com");
-console.log("");

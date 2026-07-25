@@ -45,8 +45,9 @@ In hPanel: **Websites → Add Website → Node.js Web App → GitHub** (same rep
 | Build command | `npm run build:hostinger-api` |
 | Output directory | **`hostinger-api-deploy`** |
 | Entry file | **`server.js`** |
-| **Install command** | **`npm ci`** (must include dev/build deps — do not use production-only install) |
 | Domain | **`api.easymatchbd.com`** |
+
+Hostinger runs **`npm install` automatically** before the build — there is no separate install command to set. The postbuild copies runtime `node_modules` from the monorepo into `hostinger-api-deploy/`.
 
 Build log should end with:
 
