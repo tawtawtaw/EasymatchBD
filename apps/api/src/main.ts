@@ -3,13 +3,13 @@ import {
   EASYMATCH_WEB_URL,
 } from '@easymatch/shared';
 import {
-  type INestApplication,
   Logger,
   ValidationPipe,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
-import type { NextFunction, Request, Response } from 'express';
+import { ExpressAdapter } from '@nestjs/platform-express';
+import express, { type NextFunction, type Request, type Response } from 'express';
 import { AppModule } from './app.module';
 import { freeDevPort } from './dev-port.util';
 
@@ -27,8 +27,8 @@ function devRequestLogger() {
   };
 }
 
-async function listenOnPort(
-  app: INestApplication,
+async function listenExpressApp(
+  expressApp: express.Express,
   port: number,
   isDev: boolean,
 ) {
@@ -36,11 +36,16 @@ async function listenOnPort(
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      if (isDev) {
-        await app.listen(port);
-      } else {
-        await app.listen(port, "0.0.0.0");
-      }
+      await new Promise<void>((resolve, reject) => {
+        const server = expressApp.listen(port, isDev ? undefined : '0.0.0.0', () => {
+          Logger.log(
+            `Listening on ${isDev ? 'localhost' : '0.0.0.0'}:${port} (initializing…)`,
+            'Bootstrap',
+          );
+          resolve();
+        });
+        server.on('error', reject);
+      });
       return;
     } catch (error) {
       const err = error as NodeJS.ErrnoException;
@@ -70,12 +75,28 @@ async function listenOnPort(
 }
 
 async function bootstrap() {
-  Logger.log("Bootstrapping Easymatch API…", "Bootstrap");
-  const app = await NestFactory.create(AppModule);
+  Logger.log('Bootstrapping Easymatch API…', 'Bootstrap');
+
+  const expressApp = express();
+  expressApp.get('/api/v1/health', (_req, res) => {
+    res.json({
+      status: 'starting',
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  const port = Number(process.env.PORT) || EASYMATCH_API_PORT;
+  const isDev = process.env.NODE_ENV !== 'production';
+
+  await listenExpressApp(expressApp, port, isDev);
+
+  const app = await NestFactory.create(
+    AppModule,
+    new ExpressAdapter(expressApp),
+  );
   const config = app.get(ConfigService);
-  const isDev =
+  const isDevRuntime =
     config.get<string>('NODE_ENV', 'development') !== 'production';
-  const port = config.get<number>('PORT', EASYMATCH_API_PORT);
 
   let shuttingDown = false;
   const shutdown = async (signal: string) => {
@@ -119,15 +140,15 @@ async function bootstrap() {
     ],
   });
 
-  if (isDev) {
+  if (isDevRuntime) {
     app.use(devRequestLogger());
   }
 
-  await listenOnPort(app, port, isDev);
+  await app.init();
 
-  Logger.log(`API ready on 0.0.0.0:${port}/api/v1`, "Bootstrap");
+  Logger.log(`API ready on 0.0.0.0:${port}/api/v1`, 'Bootstrap');
 
-  if (isDev) {
+  if (isDevRuntime) {
     const officerCount = (config.get<string>('VERIFICATION_OFFICER_PHONES', '') || '')
       .split(',')
       .map((value) => value.trim())

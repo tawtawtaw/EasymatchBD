@@ -29,8 +29,11 @@ export class StaffAuditService implements OnModuleInit {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async onModuleInit() {
-    await this.purgeExpired();
+  onModuleInit() {
+    void this.purgeExpired().catch((err) => {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Staff audit purge skipped at startup (${message})`);
+    });
   }
 
   private retentionDate(from = new Date()) {

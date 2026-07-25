@@ -80,7 +80,15 @@ export class LegalService implements OnModuleInit, OnModuleDestroy {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async onModuleInit() {
+  onModuleInit() {
+    void this.initializeAtStartup();
+
+    this.scheduleTimer = setInterval(() => {
+      void this.processScheduledPublishIfDue();
+    }, SCHEDULE_CHECK_MS);
+  }
+
+  private async initializeAtStartup() {
     try {
       await this.ensureSeeded();
       await this.refreshVersionCache();
@@ -91,10 +99,6 @@ export class LegalService implements OnModuleInit, OnModuleDestroy {
       );
       this.cachedVersion = DEFAULT_TERMS_VERSION;
     }
-
-    this.scheduleTimer = setInterval(() => {
-      void this.processScheduledPublishIfDue();
-    }, SCHEDULE_CHECK_MS);
   }
 
   onModuleDestroy() {
