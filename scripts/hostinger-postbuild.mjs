@@ -60,6 +60,18 @@ cpSync(
 
 writeFileSync(path.join(deployDir, "server.js"), webEntrySource());
 
+const standaloneServer = path.join(deployDir, "apps/web/server.js");
+if (existsSync(standaloneServer)) {
+  const guard = `if (global.__EASYMATCH_NEXT_STARTED) { return; }
+global.__EASYMATCH_NEXT_STARTED = true;
+
+`;
+  const current = readFileSync(standaloneServer, "utf8");
+  if (!current.includes("__EASYMATCH_NEXT_STARTED")) {
+    writeFileSync(standaloneServer, guard + current);
+  }
+}
+
 if (process.platform === "linux") {
   writeFileSync(path.join(root, "server.js"), webEntrySource());
   console.log("[hostinger-web] Installed web entry at repo root server.js");

@@ -1,7 +1,14 @@
 module.exports = function webEntrySource() {
   return `"use strict";
 
-process.env.HOSTNAME = process.env.HOSTNAME || "0.0.0.0";
+if (global.__EASYMATCH_WEB_ENTRY_STARTED) {
+  console.log("[easymatch-web] Duplicate entry skipped");
+  return;
+}
+global.__EASYMATCH_WEB_ENTRY_STARTED = true;
+
+// LiteSpeed lsnode proxies to 127.0.0.1 and allows only one listen() call.
+process.env.HOSTNAME = process.env.HOSTNAME || "127.0.0.1";
 
 const path = require("node:path");
 const fs = require("node:fs");
@@ -26,6 +33,8 @@ if (!serverFile) {
 console.log(
   "[easymatch-web] Starting on port",
   process.env.PORT || 3000,
+  "host:",
+  process.env.HOSTNAME,
   "file:",
   serverFile,
 );

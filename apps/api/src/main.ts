@@ -39,14 +39,14 @@ async function listenExpressApp(
       await new Promise<void>((resolve, reject) => {
         const onListening = () => {
           Logger.log(
-            `Listening on ${isDev ? 'localhost' : '0.0.0.0'}:${port} (initializing…)`,
+            `Listening on ${isDev ? 'localhost' : process.env.HOSTNAME || '127.0.0.1'}:${port} (initializing…)`,
             'Bootstrap',
           );
           resolve();
         };
         const server = isDev
           ? expressApp.listen(port, onListening)
-          : expressApp.listen(port, '0.0.0.0', onListening);
+          : expressApp.listen(port, process.env.HOSTNAME || '127.0.0.1', onListening);
         server.on('error', reject);
       });
       return;
