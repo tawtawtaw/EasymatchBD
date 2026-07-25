@@ -106,7 +106,6 @@ writeFileSync(
 writeFileSync(
   path.join(deployDir, "server.js"),
   `process.env.HOSTNAME = process.env.HOSTNAME || "0.0.0.0";
-const path = require("node:path");
 process.chdir(__dirname);
 console.log("[easymatch-api] Starting on port", process.env.PORT || "3000");
 require("./dist/src/main.js");
