@@ -27,7 +27,7 @@
     "prebuild:hostinger-web": "node scripts/hostinger-prebuild.mjs",
     "build:hostinger-web": "npm run build -w @easymatch/shared && npm run build -w @easymatch/web && node scripts/hostinger-postbuild.mjs",
     "install:hostinger": "npm ci --include=optional",
-    "start": "npm run start -w @easymatch/web",
+    "start": "node server.js",
     "lint": "npm run lint -w @easymatch/web && npm run lint -w @easymatch/api",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down"

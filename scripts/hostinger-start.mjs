@@ -1,47 +1,40 @@
-import { spawn } from "node:child_process";
-import { createRequire } from "node:module";
 import { existsSync } from "node:fs";
+import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const port = process.env.PORT?.trim() || "4100";
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const webDir = path.join(root, "apps/web");
-const standaloneServer = path.join(
-  webDir,
-  ".next/standalone/apps/web/server.js",
-);
+
+const standaloneCandidates = [
+  path.join(root, ".next/standalone/apps/web/server.js"),
+  path.join(webDir, ".next/standalone/apps/web/server.js"),
+];
 
 process.env.HOSTNAME = "0.0.0.0";
 process.env.PORT = port;
 
-function startStandalone() {
-  console.log("[hostinger] Starting Next.js standalone server on port", port);
-  return spawn(process.execPath, [standaloneServer], {
-    cwd: path.dirname(standaloneServer),
-    stdio: "inherit",
-    env: process.env,
-  });
+const standaloneServer = standaloneCandidates.find((candidate) =>
+  existsSync(candidate),
+);
+
+if (!standaloneServer) {
+  console.error("[hostinger] Standalone server.js not found. Checked:");
+  for (const candidate of standaloneCandidates) {
+    console.error(" -", candidate);
+  }
+  process.exit(1);
 }
 
-function startNextCli() {
-  console.log("[hostinger] Standalone missing; falling back to next start on port", port);
-  const require = createRequire(path.join(webDir, "package.json"));
-  const nextBin = require.resolve("next/dist/bin/next");
-  return spawn(
-    process.execPath,
-    [nextBin, "start", "-H", "0.0.0.0", "-p", port],
-    {
-      cwd: webDir,
-      stdio: "inherit",
-      env: process.env,
-    },
-  );
-}
+console.log("[hostinger] Starting standalone server:", standaloneServer);
+console.log("[hostinger] Listening on 0.0.0.0:" + port);
 
-const child = existsSync(standaloneServer)
-  ? startStandalone()
-  : startNextCli();
+const child = spawn(process.execPath, [standaloneServer], {
+  cwd: path.dirname(standaloneServer),
+  stdio: "inherit",
+  env: process.env,
+});
 
 child.on("exit", (code, signal) => {
   if (signal) {
