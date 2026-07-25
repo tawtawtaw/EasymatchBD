@@ -1,6 +1,5 @@
 import { execSync } from 'node:child_process';
 import { Logger } from '@nestjs/common';
-import killPort from 'kill-port';
 
 /** Free a dev port when a stale Nest/Node process is still listening (common on Windows). */
 export async function freeDevPort(port: number): Promise<boolean> {
@@ -11,6 +10,7 @@ export async function freeDevPort(port: number): Promise<boolean> {
   const currentPid = process.pid;
 
   try {
+    const { default: killPort } = await import('kill-port');
     await killPort(port, 'tcp');
     await sleep(process.platform === 'win32' ? 800 : 400);
     return true;
