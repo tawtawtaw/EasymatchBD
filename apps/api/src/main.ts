@@ -36,7 +36,11 @@ async function listenOnPort(
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      await app.listen(port);
+      if (isDev) {
+        await app.listen(port);
+      } else {
+        await app.listen(port, "0.0.0.0");
+      }
       return;
     } catch (error) {
       const err = error as NodeJS.ErrnoException;

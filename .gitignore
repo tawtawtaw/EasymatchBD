@@ -8,6 +8,7 @@ out/
 build/
 hostinger-app/
 hostinger-deploy/
+hostinger-api-deploy/
 public/
 next.config.mjs
 

@@ -1,90 +1,167 @@
 # Hostinger deployment — EasymatchBD
 
-EasymatchBD is an **npm workspaces monorepo**. Hostinger’s **Next.js framework preset does not work** for this repo — it injects its own `server.js` that requires `next`, but the runtime folder has no `node_modules`. That causes permanent **503 / Cannot find module 'next'** and **cannot be fixed by redeploying alone**.
+Production setup uses **two Hostinger Node.js websites** from the same GitHub repo.
 
-## Required: delete site and recreate
+| Site | Domain | Build script |
+|------|--------|--------------|
+| Web | `easymatchbd.com` | `npm run build:hostinger-web` |
+| API | `api.easymatchbd.com` | `npm run build:hostinger-api` |
 
-Settings can only be chosen **before the first deploy**. To fix 503, **delete the current Node.js website** and create a new one with **exactly** these values:
+External services: **Supabase** (PostgreSQL), **Upstash** (Redis).
+
+---
+
+## 1. Web app (done)
 
 | Setting | Value |
 |---------|--------|
-| Framework preset | **Other** (never Next.js) |
+| Framework preset | **Other** |
 | Node.js | **20.x** |
 | Root directory | `./` |
 | Build command | `npm run build:hostinger-web` |
-| Output directory | **`hostinger-deploy`** |
-| Entry file | **`server.js`** |
+| Output directory | `hostinger-deploy` |
+| Entry file | `server.js` |
 | Environment | `NODE_ENV=production` |
 
-After deploy, the build log must end with:
+After the API is live, add on the **web** site (Settings → Environment variables):
+
+| Variable | Value |
+|----------|--------|
+| `NEXT_PUBLIC_API_URL` | `https://api.easymatchbd.com/api/v1` |
+
+Then **Redeploy** the web app.
+
+---
+
+## 2. API app (next step)
+
+In hPanel: **Websites → Add Website → Node.js Web App → GitHub** (same repo `EasymatchBD`, branch `master`).
+
+| Setting | Value |
+|---------|--------|
+| Framework preset | **Other** |
+| Node.js | **20.x** |
+| Root directory | `./` |
+| Build command | `npm run build:hostinger-api` |
+| Output directory | **`hostinger-api-deploy`** |
+| Entry file | **`server.js`** |
+| Domain | **`api.easymatchbd.com`** |
+
+Build log should end with:
 
 ```
-=== Hostinger deploy bundle ready: hostinger-deploy/ ===
+=== Hostinger API bundle ready: hostinger-api-deploy/ ===
 ```
 
 Runtime logs should show:
 
 ```
-[easymatch] Loading standalone server in-process: .../apps/web/server.js
-▲ Next.js ...
-✓ Ready
+[easymatch-api] Starting on port ...
+API ready on http://localhost:.../api/v1
 ```
 
-**Do not spawn a child process** from the entry file — Hostinger requires `listen()` in the same process as `server.js`.
+Test: `https://api.easymatchbd.com/api/v1/health`
 
-Test:
+### DNS (Namecheap)
 
-1. `https://YOUR-URL/hostinger-health.txt` → `Hostinger deploy OK`
-2. `https://YOUR-URL/en` → home page
+Add a subdomain pointing to Hostinger (or use **Connect domain** in hPanel):
 
----
-
-## Why Next.js preset fails
-
-| What happens | Result |
-|--------------|--------|
-| Hostinger Next.js preset | Injects `server.js` at line 16: `require('next')` |
-| Runtime `nodejs/` folder | No `node_modules` (only build output copied) |
-| Our custom `server.js` | Ignored — Hostinger uses its template |
-| Monorepo | `next` lives in `apps/web`, not at deploy root |
-
-The **`hostinger-deploy/`** folder is a **self-contained standalone bundle** (includes traced `node_modules`). With **Framework: Other** and **Entry: server.js**, Hostinger runs our launcher, which does **not** call `require('next')`.
+| Type | Host | Value |
+|------|------|--------|
+| **CNAME** | `api` | Hostinger target (from hPanel) or `easymatchbd.com` |
 
 ---
 
-## Two Hostinger apps (later)
+## 3. API environment variables
 
-| Site | Domain | Purpose |
-|------|--------|---------|
-| Web | `easymatchbd.com` | This guide |
-| API | `api.easymatchbd.com` | NestJS (`apps/api`) |
+In hPanel → API website → **Environment variables**. Copy values from your local `apps/api/.env` (never commit `.env`).
 
-Database (Supabase) and Redis (Upstash) stay external — configure via env vars in hPanel.
+### Required
 
-### API app settings (second website)
+| Variable | Example / notes |
+|----------|-----------------|
+| `NODE_ENV` | `production` |
+| `PORT` | Leave unset — Hostinger injects this |
+| `CORS_ORIGIN` | `https://easymatchbd.com,https://www.easymatchbd.com` |
+| `WEB_PUBLIC_URL` | `https://easymatchbd.com` |
+| `DATABASE_URL` | Supabase pooled URL (port **6543**, `pgbouncer=true`) |
+| `DIRECT_URL` | Supabase direct URL (port **5432**, for migrations) |
+| `REDIS_URL` | Upstash `rediss://...` URL |
+| `JWT_SECRET` | Long random string (32+ chars) |
 
-| Setting | Value |
-|---------|--------|
-| Framework | **Other** or NestJS |
-| Build | `npm run build -w @easymatch/shared && npm run prisma:generate -w @easymatch/api && npm run build -w @easymatch/api` |
-| Start / Entry | `node apps/api/dist/main.js` or `npm run start:prod -w @easymatch/api` |
+### Staff sign-in (BD mobile numbers)
 
-After first API deploy:
+| Variable | Example |
+|----------|---------|
+| `SUPER_ADMIN_PHONES` | `017XXXXXXXX` |
+| `VERIFICATION_OFFICER_PHONES` | `017XXXXXXXX` |
+| `MARRIAGE_CONSULTANT_PHONES` | (optional) |
+
+### Optional (enable when ready)
+
+| Variable | Purpose |
+|----------|---------|
+| `SSLCOMMERZ_STORE_ID` | Payments |
+| `SSLCOMMERZ_STORE_PASSWORD` | Payments |
+| `SSLCOMMERZ_IS_LIVE` | `false` for sandbox |
+| `LIVEKIT_URL` | Video calls |
+| `LIVEKIT_API_KEY` | Video calls |
+| `LIVEKIT_API_SECRET` | Video calls |
+
+---
+
+## 4. Database migrations (once)
+
+After the first successful API deploy, run migrations once via **hPanel → Advanced → SSH** or **Terminal**:
 
 ```bash
-cd apps/api && npx prisma migrate deploy
+cd hostinger-api-deploy
+npx prisma migrate deploy
 ```
 
-Set `NEXT_PUBLIC_API_URL` on the web app after the API is live.
+If SSH cwd is the repo root after deploy:
+
+```bash
+cd /home/.../domains/api.easymatchbd.com/nodejs
+npx prisma migrate deploy
+```
 
 ---
 
-## Local smoke test (before Hostinger)
+## 5. Final checklist
+
+- [ ] `https://easymatchbd.com/en` — home page styled correctly
+- [ ] `https://api.easymatchbd.com/api/v1/health` — returns JSON `{ "status": "ok" }` or similar
+- [ ] Web env `NEXT_PUBLIC_API_URL` set and web redeployed
+- [ ] Login / OTP flow works end-to-end
+- [ ] Prisma migrations applied
+
+---
+
+## Troubleshooting
+
+### Web 503 / Cannot find module 'next'
+
+Recreate web site with **Framework: Other**, output `hostinger-deploy`, entry `server.js`. Do **not** use the Next.js preset.
+
+### API 503 / listen() timeout
+
+Entry file must be `server.js` in `hostinger-api-deploy` — it loads NestJS **in-process** (no child spawn).
+
+### Web loads but login fails
+
+Check `NEXT_PUBLIC_API_URL` on the web app and `CORS_ORIGIN` on the API include both `https://easymatchbd.com` and `https://www.easymatchbd.com`.
+
+---
+
+## Local smoke tests
 
 ```bash
+# Web
 npm run build:hostinger-web
-cd hostinger-deploy
-PORT=4100 node server.js
-```
+cd hostinger-deploy && PORT=4100 node server.js
 
-Open http://localhost:4100/en
+# API
+npm run build:hostinger-api
+cd hostinger-api-deploy && PORT=4101 node server.js
+```
