@@ -24,9 +24,10 @@ Database (Supabase) and Redis (Upstash) stay external — configure via env vars
 | Node.js | **20** |
 | Install | `npm ci --include=optional` |
 | Build | `npm run build:hostinger-web` |
-| Start | `npm start` |
-| Entry file (if asked) | `scripts/hostinger-start.mjs` |
-| Output directory | `apps/web/.next/standalone` |
+| Output directory | `hostinger-app` |
+| Start | `node server.js` (if asked; Next.js preset may set this automatically) |
+| Entry file (if asked) | `server.js` |
+| Root directory | `./` |
 
 ### Web environment variables
 
@@ -107,10 +108,11 @@ A **403 on Hostinger** usually means the **Node process is not running** or the 
 
 | Mistake | Symptom |
 |---------|---------|
-| Start: `next start -p 4100` only | Proxy cannot reach app → 403/502 |
-| Root directory: `apps/web` only | `@easymatch/shared` build fails |
-| Only API deployed on main domain | 403 or wrong app |
-| Forgot `npm ci` at monorepo root | Build fails |
+| Framework: **Other** | 403 Forbidden |
+| Output: `apps/web/.next/standalone/apps/web` | 403 — missing parent `node_modules` |
+| Output: `hostinger-app` | Correct flat bundle (includes `node_modules`) |
+| Start: `next start -p 4100` only | 403/502 — wrong port |
+| Build: `npm run build` (includes API) | Build fails (`nest: command not found`) |
 
 ---
 
