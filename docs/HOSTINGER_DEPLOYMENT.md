@@ -25,8 +25,12 @@ After deploy, the build log must end with:
 Runtime logs should show:
 
 ```
-[easymatch] Starting standalone server on port ...
+[easymatch] Loading standalone server in-process: .../apps/web/server.js
+▲ Next.js ...
+✓ Ready
 ```
+
+**Do not spawn a child process** from the entry file — Hostinger requires `listen()` in the same process as `server.js`.
 
 Test:
 

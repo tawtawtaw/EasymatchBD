@@ -25,32 +25,16 @@ cpSync(path.join(webDir, "public"), path.join(standaloneWebDir, "public"), {
 
 rmSync(deployDir, { recursive: true, force: true });
 cpSync(standaloneDir, deployDir, { recursive: true });
+cpSync(
+  path.join(root, "scripts/hostinger-entry.cjs"),
+  path.join(deployDir, "hostinger-entry.cjs"),
+);
 
 writeFileSync(
   path.join(deployDir, "server.js"),
-  `const { spawn } = require("node:child_process");
-const path = require("node:path");
-
-const port = process.env.PORT || "3000";
-process.env.HOSTNAME = "0.0.0.0";
-process.env.PORT = String(port);
-
-const serverFile = path.join(__dirname, "apps/web/server.js");
-console.log("[easymatch] Starting standalone server on port", port);
-
-const child = spawn(process.execPath, [serverFile], {
-  cwd: path.join(__dirname, "apps/web"),
-  stdio: "inherit",
-  env: process.env,
-});
-
-child.on("exit", (code, signal) => {
-  if (signal) {
-    process.kill(process.pid, signal);
-    return;
-  }
-  process.exit(code ?? 1);
-});
+  `const path = require("node:path");
+const startHostingerStandalone = require("./hostinger-entry.cjs");
+startHostingerStandalone(path.join(__dirname));
 `,
 );
 
