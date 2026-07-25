@@ -45,6 +45,7 @@ In hPanel: **Websites → Add Website → Node.js Web App → GitHub** (same rep
 | Build command | `npm run build:hostinger-api` |
 | Output directory | **`hostinger-api-deploy`** |
 | Entry file | **`server.js`** |
+| **Install command** | **`npm ci`** (must include dev/build deps — do not use production-only install) |
 | Domain | **`api.easymatchbd.com`** |
 
 Build log should end with:

@@ -62,11 +62,20 @@ require("./dist/src/main.js");
 
 if (process.platform === "linux") {
   console.log("Installing API runtime dependencies in hostinger-api-deploy...");
+  const buildEnv = {
+    ...process.env,
+    DATABASE_URL:
+      process.env.DATABASE_URL ||
+      "postgresql://build:build@127.0.0.1:5432/build?schema=public",
+    DIRECT_URL:
+      process.env.DIRECT_URL ||
+      "postgresql://build:build@127.0.0.1:5432/build?schema=public",
+  };
   execSync("npm install --omit=dev --no-audit --no-fund", {
     cwd: deployDir,
     stdio: "inherit",
   });
-  execSync("npx prisma generate", { cwd: deployDir, stdio: "inherit" });
+  execSync("npx prisma generate", { cwd: deployDir, stdio: "inherit", env: buildEnv });
 } else {
   console.log("Skipping npm install (Hostinger Linux build will install deps)");
 }
