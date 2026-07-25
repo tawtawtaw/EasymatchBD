@@ -40,26 +40,25 @@ function startNextWorkspace() {
   onChildExit(child);
 }
 
-const webDir = path.join(root, "apps/web");
-const hasWorkspace = existsSync(path.join(webDir, "package.json")) && existsSync(path.join(webDir, ".next"));
+const standaloneCandidates = [
+  path.join(root, "standalone/apps/web/server.js"),
+  path.join(root, ".next/standalone/apps/web/server.js"),
+  path.join(root, "apps/web/.next/standalone/apps/web/server.js"),
+];
 
-if (hasWorkspace) {
+const standaloneServer = standaloneCandidates.find((candidate) => existsSync(candidate));
+
+if (standaloneServer) {
+  startStandalone(standaloneServer);
+} else if (
+  existsSync(path.join(root, "apps/web/package.json")) &&
+  existsSync(path.join(root, "apps/web/.next"))
+) {
   startNextWorkspace();
 } else {
-  const standaloneCandidates = [
-    path.join(root, "standalone/apps/web/server.js"),
-    path.join(root, ".next/standalone/apps/web/server.js"),
-    path.join(root, "apps/web/.next/standalone/apps/web/server.js"),
-  ];
-  const serverFile = standaloneCandidates.find((candidate) => existsSync(candidate));
-
-  if (!serverFile) {
-    console.error("[easymatch] No server entry found. Checked:");
-    for (const candidate of standaloneCandidates) {
-      console.error(" -", candidate);
-    }
-    process.exit(1);
+  console.error("[easymatch] No server entry found. Checked:");
+  for (const candidate of standaloneCandidates) {
+    console.error(" -", candidate);
   }
-
-  startStandalone(serverFile);
+  process.exit(1);
 }

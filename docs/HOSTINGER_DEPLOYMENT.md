@@ -60,14 +60,13 @@ cd apps/api && npx prisma migrate deploy
 
 503 means Hostinger’s proxy is up but the **Node process is not running** (or crashed on start).
 
+503 with `Cannot find module 'next'` in `/nodejs/server.js` means Hostinger runs **`server.js`** inside the **`.next` output folder**, which has **no `node_modules`**. Postbuild now writes **`.next/server.js`** (standalone launcher, no `next` require).
+
 | Cause | Fix |
 |-------|-----|
-| Latest code not deployed | Push `master`, then **Redeploy** in hPanel |
-| Wrong start command | Root `npm start` runs `node app.js` (standalone server) |
-| Output dir is `.next` only | Postbuild copies `app.js` + `package.json` into `.next/` |
-| App crash on boot | Check **Runtime logs** in hPanel for `[easymatch] Starting` or errors |
-
-If runtime logs show `next start` errors, recreate the site with **Entry file** = `app.js` (set only at creation time).
+| Hostinger runs `nodejs/server.js` | Postbuild copies launcher to `.next/server.js` |
+| Output folder has no `node_modules` | Launcher starts `.next/standalone/apps/web/server.js` instead |
+| Default Hostinger template requires `next` | Overridden by our standalone launcher |
 
 ---
 
