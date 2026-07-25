@@ -1,98 +1,86 @@
 # Hostinger deployment — EasymatchBD
 
-EasymatchBD is an **npm workspaces monorepo** (web + API + mobile). Hostinger **Node.js Web Apps** deploy **one app per website**.
+EasymatchBD is an **npm workspaces monorepo**. Hostinger’s **Next.js framework preset does not work** for this repo — it injects its own `server.js` that requires `next`, but the runtime folder has no `node_modules`. That causes permanent **503 / Cannot find module 'next'** and **cannot be fixed by redeploying alone**.
 
-## Recommended: two Hostinger Node.js apps
+## Required: delete site and recreate
 
-| Site | Domain (example) | Purpose |
-|------|------------------|---------|
-| Web | `easymatchbd.com` | Next.js (`apps/web`) |
+Settings can only be chosen **before the first deploy**. To fix 503, **delete the current Node.js website** and create a new one with **exactly** these values:
+
+| Setting | Value |
+|---------|--------|
+| Framework preset | **Other** (never Next.js) |
+| Node.js | **20.x** |
+| Root directory | `./` |
+| Build command | `npm run build:hostinger-web` |
+| Output directory | **`hostinger-deploy`** |
+| Entry file | **`server.js`** |
+| Environment | `NODE_ENV=production` |
+
+After deploy, the build log must end with:
+
+```
+=== Hostinger deploy bundle ready: hostinger-deploy/ ===
+```
+
+Runtime logs should show:
+
+```
+[easymatch] Starting standalone server on port ...
+```
+
+Test:
+
+1. `https://YOUR-URL/hostinger-health.txt` → `Hostinger deploy OK`
+2. `https://YOUR-URL/en` → home page
+
+---
+
+## Why Next.js preset fails
+
+| What happens | Result |
+|--------------|--------|
+| Hostinger Next.js preset | Injects `server.js` at line 16: `require('next')` |
+| Runtime `nodejs/` folder | No `node_modules` (only build output copied) |
+| Our custom `server.js` | Ignored — Hostinger uses its template |
+| Monorepo | `next` lives in `apps/web`, not at deploy root |
+
+The **`hostinger-deploy/`** folder is a **self-contained standalone bundle** (includes traced `node_modules`). With **Framework: Other** and **Entry: server.js**, Hostinger runs our launcher, which does **not** call `require('next')`.
+
+---
+
+## Two Hostinger apps (later)
+
+| Site | Domain | Purpose |
+|------|--------|---------|
+| Web | `easymatchbd.com` | This guide |
 | API | `api.easymatchbd.com` | NestJS (`apps/api`) |
 
 Database (Supabase) and Redis (Upstash) stay external — configure via env vars in hPanel.
 
----
-
-## Web app settings (hPanel) — IMPORTANT
-
-**Repository:** `tawtawtaw/EasymatchBD`  
-**Branch:** `master`  
-**Root directory:** `./` (repo root — required for workspaces)
+### API app settings (second website)
 
 | Setting | Value |
 |---------|--------|
-| Framework preset | **Next.js** (never **Other**) |
-| Node.js | **20.x** |
-| Build and output | **Default for Next.js** — do **not** customize |
-| Environment | `NODE_ENV=production` |
-
-Hostinger defaults should be:
-
-- Build: `npm run build` → runs web-only monorepo build via root `package.json`
-- Output: `.next` → postbuild copies `apps/web/.next` to repo root
-- Start: `npm run start -- -p $PORT` → runs `node app.js` → `next start` in `@easymatch/web`
-
-**Do not set a custom output directory** (`hostinger-app`, `apps/web/.next`, etc.). Custom outputs are treated as static files → **403 Forbidden**.
-
-Settings can only be chosen **before the first deploy**. To change them later, delete the website and recreate it.
-
----
-
-## API app settings (second website)
-
-| Setting | Value |
-|---------|--------|
-| Install | `npm ci` |
+| Framework | **Other** or NestJS |
 | Build | `npm run build -w @easymatch/shared && npm run prisma:generate -w @easymatch/api && npm run build -w @easymatch/api` |
-| Start | `npm run start:prod -w @easymatch/api` |
+| Start / Entry | `node apps/api/dist/main.js` or `npm run start:prod -w @easymatch/api` |
 
-Copy production values from `apps/api/.env.example` (never commit `.env`).
-
-After first deploy, run once (SSH or Hostinger terminal):
+After first API deploy:
 
 ```bash
 cd apps/api && npx prisma migrate deploy
 ```
 
----
-
-## Fix for HTTP 503 Service Unavailable
-
-503 means Hostinger’s proxy is up but the **Node process is not running** (or crashed on start).
-
-503 with `Cannot find module 'next'` at `/nodejs/server.js:16` means Hostinger injects its **own** Next.js `server.js` at the **repo root** (`nodejs/`), not inside our build output. That script calls `require('next')`, but root `package.json` had no `next` dependency (only `apps/web` did).
-
-**Fix:** `next`, `react`, and `react-dom` are declared in **root** `package.json`. Postbuild copies `apps/web/.next` → root `.next/` and adds `next.config.mjs` + `public/` at repo root so Hostinger’s default server can boot.
-
-After redeploy, runtime logs should show Next.js starting — not `Cannot find module 'next'`.
+Set `NEXT_PUBLIC_API_URL` on the web app after the API is live.
 
 ---
 
-| Cause | Fix |
-|-------|-----|
-| Framework **Other** | Recreate site with **Next.js** preset |
-| Custom output directory | Recreate using **Default for Next.js** only |
-| Domain on WordPress / static site | Attach domain to Node.js app |
-| Node not running | Use defaults so Hostinger runs `npm start` |
-
-### Quick test after deploy
-
-1. `https://YOUR-TEMP-URL.hostingersite.com/hostinger-health.txt` → should show `Hostinger deploy OK`
-2. `https://YOUR-TEMP-URL.hostingersite.com/en` → Easymatch home page
-
-If (1) works but (2) is 403/404, Node routing issue — open Hostinger live chat and ask them to verify the Node.js process is running.
-
-If (1) also 403, domain is not pointing at the Node.js app.
-
----
-
-## Local production smoke test (before Hostinger)
+## Local smoke test (before Hostinger)
 
 ```bash
-cd EasymatchBD
-npm ci
-npm run build
-PORT=4100 npm start
+npm run build:hostinger-web
+cd hostinger-deploy
+PORT=4100 node server.js
 ```
 
 Open http://localhost:4100/en
