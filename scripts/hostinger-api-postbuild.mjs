@@ -105,7 +105,13 @@ writeFileSync(
 
 writeFileSync(
   path.join(deployDir, "server.js"),
-  `process.env.HOSTNAME = process.env.HOSTNAME || "0.0.0.0";
+  `if (global.__EASYMATCH_ENTRY_LOADED) {
+  console.log("[easymatch-api] Duplicate entry load skipped");
+  return;
+}
+global.__EASYMATCH_ENTRY_LOADED = true;
+
+process.env.HOSTNAME = process.env.HOSTNAME || "0.0.0.0";
 process.chdir(__dirname);
 console.log("[easymatch-api] Starting on port", process.env.PORT || "3000");
 require("./dist/src/main.js");

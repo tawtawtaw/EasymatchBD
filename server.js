@@ -1,3 +1,9 @@
+if (global.__EASYMATCH_ENTRY_LOADED) {
+  console.log("[easymatch] Duplicate entry load skipped");
+  return;
+}
+global.__EASYMATCH_ENTRY_LOADED = true;
+
 const fs = require("node:fs");
 const path = require("node:path");
 

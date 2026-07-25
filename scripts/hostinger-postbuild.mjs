@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -32,7 +32,13 @@ cpSync(
 
 writeFileSync(
   path.join(deployDir, "server.js"),
-  `process.env.HOSTNAME = process.env.HOSTNAME || "0.0.0.0";
+  `if (global.__EASYMATCH_ENTRY_LOADED) {
+  console.log("[easymatch-web] Duplicate entry load skipped");
+  return;
+}
+global.__EASYMATCH_ENTRY_LOADED = true;
+
+process.env.HOSTNAME = process.env.HOSTNAME || "0.0.0.0";
 const path = require("node:path");
 const fs = require("node:fs");
 
@@ -53,6 +59,18 @@ process.chdir(path.dirname(serverFile));
 require(serverFile);
 `,
 );
+
+const standaloneServer = path.join(deployDir, "apps/web/server.js");
+if (existsSync(standaloneServer)) {
+  const guard = `if (global.__EASYMATCH_NEXT_STARTED) { return; }
+global.__EASYMATCH_NEXT_STARTED = true;
+
+`;
+  const current = readFileSync(standaloneServer, "utf8");
+  if (!current.includes("__EASYMATCH_NEXT_STARTED")) {
+    writeFileSync(standaloneServer, guard + current);
+  }
+}
 
 writeFileSync(
   path.join(deployDir, "package.json"),
