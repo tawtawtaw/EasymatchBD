@@ -11,6 +11,7 @@ import { NestFactory } from '@nestjs/core';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { AppModule } from './app.module';
+import { assertProductionEnv, logBootstrapEnv } from './bootstrap-env';
 import { freeDevPort } from './dev-port.util';
 
 function devRequestLogger() {
@@ -80,6 +81,8 @@ async function listenExpressApp(
 
 async function bootstrap() {
   Logger.log('Bootstrapping Easymatch API…', 'Bootstrap');
+  logBootstrapEnv();
+  assertProductionEnv();
 
   const expressApp = express();
   let healthStatus: 'starting' | 'ok' = 'starting';
