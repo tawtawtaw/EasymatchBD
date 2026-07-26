@@ -124,6 +124,31 @@ Run migrations once (Railway shell):
 cd apps/api && npx prisma migrate deploy
 ```
 
+## Profile photos / PDFs (upload storage)
+
+Uploads live on the **API server disk** (`apps/api/uploads/` locally). Supabase only stores metadata. Railway deploys start with an **empty** uploads folder, so existing photos/PDFs from local dev do not appear until you copy them.
+
+### Production setup
+
+1. **API service → Volumes** → mount at `/data/uploads`
+2. **API variable:** `UPLOAD_DIR=/data/uploads`
+3. Redeploy API
+
+### Migrate files from your PC
+
+```bash
+node scripts/pack-local-uploads.mjs
+```
+
+Upload `apps/api/uploads-railway-sync.tar.gz` to a temporary URL, then **Railway API shell**:
+
+```bash
+curl -L -o /tmp/uploads.tar.gz "YOUR_PUBLIC_URL"
+tar -xzf /tmp/uploads.tar.gz -C /data/uploads
+```
+
+Restart API and refresh the web app.
+
 ## Custom domains
 
 1. API: `api.easymatchbd.com`
