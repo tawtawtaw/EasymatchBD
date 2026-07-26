@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import WebSocket from 'ws';
 
 function resolveSecretKey() {
   return (
@@ -32,6 +33,7 @@ if (!url || !secretKey || !bucket) {
 
 const client = createClient(url, secretKey, {
   auth: { persistSession: false, autoRefreshToken: false },
+  realtime: { transport: WebSocket },
 });
 
 const { data, error } = await client.storage.from(bucket).list('', { limit: 20 });

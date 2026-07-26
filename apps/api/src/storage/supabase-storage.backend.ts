@@ -1,5 +1,6 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { Readable } from 'stream';
+import { createSupabaseServerClient } from './supabase-client';
 import { buildStorageKey, normalizeStorageKey } from './storage.utils';
 import type { StorageBackend, StorageCategory } from './storage.types';
 
@@ -14,12 +15,7 @@ export class SupabaseStorageBackend implements StorageBackend {
   private readonly client: SupabaseClient;
 
   constructor(private readonly config: SupabaseStorageConfig) {
-    this.client = createClient(config.url, config.secretKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-    });
+    this.client = createSupabaseServerClient(config.url, config.secretKey);
   }
 
   async save(
