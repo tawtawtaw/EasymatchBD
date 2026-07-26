@@ -307,7 +307,7 @@ export class MediaService {
         }
       }
 
-      const storageKey = this.storage.save(userId, 'photos', file.buffer, file.mimetype);
+      const storageKey = await this.storage.save(userId, 'photos', file.buffer, file.mimetype);
       const photo = await this.prisma.profilePhoto.create({
         data: {
           profileId: profile.id,
@@ -329,7 +329,7 @@ export class MediaService {
       return this.toPhotoDto(photo);
     }
 
-    const storageKey = this.storage.save(userId, 'photos', file.buffer, file.mimetype);
+    const storageKey = await this.storage.save(userId, 'photos', file.buffer, file.mimetype);
     const photo = await this.prisma.profilePhoto.create({
       data: {
         profileId: profile.id,
@@ -432,11 +432,11 @@ export class MediaService {
     });
 
     if (existing) {
-      this.storage.delete(existing.storageKey);
+      await this.storage.delete(existing.storageKey);
       await this.prisma.nidDocument.delete({ where: { id: existing.id } });
     }
 
-    const storageKey = this.storage.save(userId, 'nid', file.buffer, file.mimetype);
+    const storageKey = await this.storage.save(userId, 'nid', file.buffer, file.mimetype);
     const document = await this.prisma.nidDocument.create({
       data: {
         profileId: profile.id,
@@ -500,7 +500,7 @@ export class MediaService {
       throw new NotFoundException('NID document not found');
     }
 
-    this.storage.delete(existing.storageKey);
+    await this.storage.delete(existing.storageKey);
     await this.prisma.nidDocument.delete({ where: { id: existing.id } });
 
     this.invalidateMediaSummaryCache(userId);
@@ -512,11 +512,11 @@ export class MediaService {
     const photo = await this.prisma.profilePhoto.findFirst({
       where: { id: photoId, profileId: profile.id },
     });
-    if (!photo || !this.storage.exists(photo.storageKey)) {
+    if (!photo || !(await this.storage.exists(photo.storageKey))) {
       throw new NotFoundException('Photo not found');
     }
     return {
-      stream: this.storage.createReadStream(photo.storageKey),
+      stream: await this.storage.createReadStream(photo.storageKey),
       mimeType: photo.mimeType,
     };
   }
@@ -536,11 +536,11 @@ export class MediaService {
         },
       },
     });
-    if (!document || !this.storage.exists(document.storageKey)) {
+    if (!document || !(await this.storage.exists(document.storageKey))) {
       throw new NotFoundException('NID document not found');
     }
     return {
-      stream: this.storage.createReadStream(document.storageKey),
+      stream: await this.storage.createReadStream(document.storageKey),
       mimeType: document.mimeType,
     };
   }
@@ -552,7 +552,7 @@ export class MediaService {
     if (!photo) {
       throw new NotFoundException('Photo not found');
     }
-    this.storage.delete(photo.storageKey);
+    await this.storage.delete(photo.storageKey);
     await this.prisma.profilePhoto.delete({ where: { id: photo.id } });
   }
 

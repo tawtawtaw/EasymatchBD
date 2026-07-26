@@ -202,10 +202,10 @@ export class AdminProfileDeletionsService {
     }
 
     for (const photo of user.profile?.photos ?? []) {
-      this.storage.delete(photo.storageKey);
+      await this.storage.delete(photo.storageKey);
     }
     for (const document of user.profile?.nidDocuments ?? []) {
-      this.storage.delete(document.storageKey);
+      await this.storage.delete(document.storageKey);
     }
 
     await tx.interest.updateMany({

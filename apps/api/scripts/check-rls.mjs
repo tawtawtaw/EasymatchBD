@@ -49,6 +49,9 @@ const tablesAfterBaseline = [
   'MemberComplaintMessage',
   'MemberComplaintDiaryEntry',
   'StaffActivityLog',
+  'UserPushToken',
+  'StaffNotification',
+  'StaffNotificationRead',
 ];
 
 console.log(`Public tables: ${tables.length}, RLS off: ${noRls.length}`);

@@ -126,15 +126,36 @@ cd apps/api && npx prisma migrate deploy
 
 ## Profile photos / PDFs (upload storage)
 
-Uploads live on the **API server disk** (`apps/api/uploads/` locally). Supabase only stores metadata. Railway deploys start with an **empty** uploads folder, so existing photos/PDFs from local dev do not appear until you copy them.
+Uploads are stored by the API via `StorageService`:
 
-### Production setup
+- **`STORAGE_BACKEND=local`** (default): files on disk (`UPLOAD_DIR`, e.g. `apps/api/uploads/` locally).
+- **`STORAGE_BACKEND=supabase`**: private Supabase Storage bucket (recommended for Railway production).
+
+Supabase only stores file metadata in Postgres; bytes live in Storage or on disk depending on backend.
+
+### Production (Supabase Storage — recommended)
+
+1. Create a **private** bucket (e.g. `profile-media`) with **5 MB** file size limit and MIME types: `image/jpeg`, `image/png`, `image/webp`, `application/pdf`.
+2. **API variables:**
+
+```env
+STORAGE_BACKEND=supabase
+SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+SUPABASE_SECRET_KEY=sb_secret_...
+SUPABASE_STORAGE_BUCKET=profile-media
+```
+
+3. Redeploy API. Startup log should show: `Storage backend: supabase (bucket=profile-media)`.
+
+The Railway volume / `UPLOAD_DIR` is optional when using Supabase. Existing files on disk are still readable as a fallback until you re-upload.
+
+### Production (local disk — legacy)
 
 1. **API service → Volumes** → mount at `/data/uploads`
 2. **API variable:** `UPLOAD_DIR=/data/uploads`
 3. Redeploy API
 
-### Migrate files from your PC
+### Migrate files from your PC (local disk only)
 
 ```bash
 node scripts/pack-local-uploads.mjs

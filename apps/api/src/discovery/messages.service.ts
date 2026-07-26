@@ -582,7 +582,7 @@ export class MessagesService {
         ? ConnectionMessageType.image
         : ConnectionMessageType.file;
 
-    const storageKey = this.storage.save(
+    const storageKey = await this.storage.save(
       userId,
       'messages',
       file.buffer,
@@ -609,7 +609,7 @@ export class MessagesService {
 
       return this.serializeMessage(message, userId, null);
     } catch (error) {
-      this.storage.delete(storageKey);
+      await this.storage.delete(storageKey);
       throw error;
     }
   }
@@ -713,12 +713,12 @@ export class MessagesService {
       throw new NotFoundException('Attachment not found');
     }
 
-    if (!this.storage.exists(message.attachmentStorageKey)) {
+    if (!(await this.storage.exists(message.attachmentStorageKey))) {
       throw new NotFoundException('Attachment file missing');
     }
 
     return {
-      stream: this.storage.createReadStream(message.attachmentStorageKey),
+      stream: await this.storage.createReadStream(message.attachmentStorageKey),
       mimeType: message.attachmentMimeType ?? 'application/octet-stream',
       fileName: message.attachmentFileName ?? 'attachment',
     };

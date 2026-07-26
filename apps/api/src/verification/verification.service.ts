@@ -585,12 +585,12 @@ export class VerificationService {
       include: { profile: { select: { userId: true } } },
     });
 
-    if (!photo || !this.storage.exists(photo.storageKey)) {
+    if (!photo || !(await this.storage.exists(photo.storageKey))) {
       throw new NotFoundException('Photo not found');
     }
 
     return {
-      stream: this.storage.createReadStream(photo.storageKey),
+      stream: await this.storage.createReadStream(photo.storageKey),
       mimeType: photo.mimeType,
     };
   }
@@ -606,12 +606,12 @@ export class VerificationService {
       },
     });
 
-    if (!document || !this.storage.exists(document.storageKey)) {
+    if (!document || !(await this.storage.exists(document.storageKey))) {
       throw new NotFoundException('NID document not found');
     }
 
     return {
-      stream: this.storage.createReadStream(document.storageKey),
+      stream: await this.storage.createReadStream(document.storageKey),
       mimeType: document.mimeType,
     };
   }

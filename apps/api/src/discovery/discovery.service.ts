@@ -639,12 +639,12 @@ export class DiscoveryService implements OnModuleInit {
         },
         select: { storageKey: true, mimeType: true },
       });
-      if (!photo || !this.storage.exists(photo.storageKey)) {
+      if (!photo || !(await this.storage.exists(photo.storageKey))) {
         throw new NotFoundException('Photo not found');
       }
 
       return {
-        stream: this.storage.createReadStream(photo.storageKey),
+        stream: await this.storage.createReadStream(photo.storageKey),
         mimeType: photo.mimeType,
       };
     }
@@ -677,12 +677,12 @@ export class DiscoveryService implements OnModuleInit {
       (item) =>
         item.id === photoId && item.status === MediaReviewStatus.approved,
     );
-    if (!photo || !this.storage.exists(photo.storageKey)) {
+    if (!photo || !(await this.storage.exists(photo.storageKey))) {
       throw new NotFoundException('Photo not found');
     }
 
     return {
-      stream: this.storage.createReadStream(photo.storageKey),
+      stream: await this.storage.createReadStream(photo.storageKey),
       mimeType: photo.mimeType,
     };
   }
