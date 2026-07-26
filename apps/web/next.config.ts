@@ -1,9 +1,11 @@
-import { EASYMATCH_API_PORT } from "@easymatch/shared";
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
 import path from "node:path";
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
+
+/** Dev-only rewrite target when NEXT_PUBLIC_API_URL is unset (matches @easymatch/shared). */
+const LOCAL_API_PORT = 4101;
 
 const ngrokDevOrigin = process.env.NGROK_DEV_ORIGIN?.trim();
 
@@ -28,7 +30,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/api/v1/:path*",
-        destination: `http://127.0.0.1:${EASYMATCH_API_PORT}/api/v1/:path*`,
+        destination: `http://127.0.0.1:${LOCAL_API_PORT}/api/v1/:path*`,
       },
     ];
   },

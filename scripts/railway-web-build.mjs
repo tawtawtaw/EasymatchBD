@@ -24,4 +24,18 @@ function run(command, cwd = root) {
 }
 
 run("npm run build -w @easymatch/shared");
+
+const sharedMain = path.join(sharedDir, "dist", "index.js");
+if (!fs.existsSync(sharedMain)) {
+  console.error(
+    [
+      "",
+      "Railway web build: packages/shared/dist/index.js is missing after build.",
+      "Check that @easymatch/shared compiled successfully.",
+      "",
+    ].join("\n"),
+  );
+  process.exit(1);
+}
+
 run("npm run build -w @easymatch/web");

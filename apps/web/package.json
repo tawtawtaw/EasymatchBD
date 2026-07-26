@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "prebuild": "npm run build -w @easymatch/shared",
     "predev": "node scripts/validate-messages-json.mjs",
     "dev": "next dev -p 4100 -H 0.0.0.0 --webpack",
     "build": "next build",
