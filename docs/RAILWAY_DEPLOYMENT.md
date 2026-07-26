@@ -62,6 +62,7 @@ Replace `api` with your API service name if different. **Redeploy web** after ch
 - `JWT_SECRET`, `JWT_EXPIRES_IN`
 - `CORS_ORIGIN` — web URL(s), comma-separated
 - `WEB_PUBLIC_URL` — public web URL
+- `EXPOSE_OTP_IN_RESPONSE=true` — **staging only** until SMS is integrated; shows OTP on the login page
 
 ### Supabase on Railway — use Supavisor (recommended)
 

@@ -5,6 +5,7 @@ import {
   HttpStatus,
   Inject,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -70,11 +71,13 @@ const EDITOR_BOOTSTRAP_STALE_TTL_MS = 180_000;
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
   private readonly otpTtlSeconds: number;
   private readonly otpRateLimit: number;
   private readonly otpRateWindowSeconds: number;
   private readonly trustedDeviceDays: number;
   private readonly isDev: boolean;
+  private readonly exposeOtpInResponse: boolean;
   private readonly sessionCache = new Map<
     string,
     {
@@ -138,6 +141,15 @@ export class AuthService {
     );
     this.trustedDeviceDays = this.config.get<number>('TRUSTED_DEVICE_DAYS', 30);
     this.isDev = this.config.get<string>('NODE_ENV', 'development') !== 'production';
+    this.exposeOtpInResponse =
+      this.isDev ||
+      this.config.get<string>('EXPOSE_OTP_IN_RESPONSE', '').toLowerCase() === 'true';
+
+    if (this.exposeOtpInResponse && !this.isDev) {
+      this.logger.warn(
+        'EXPOSE_OTP_IN_RESPONSE is enabled — OTP codes are included in API responses. Remove before public launch.',
+      );
+    }
   }
 
   async sendOtp(rawPhone: string, purpose: AuthOtpPurpose = 'member') {
@@ -174,7 +186,7 @@ export class AuthService {
       expiresInSeconds: this.otpTtlSeconds,
     };
 
-    if (this.isDev) {
+    if (this.exposeOtpInResponse) {
       response.devOtp = code;
     }
 
