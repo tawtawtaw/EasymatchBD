@@ -15,8 +15,14 @@ export async function apiFetch(
       ...init,
     });
   } catch {
+    const isLocalDev =
+      typeof window !== "undefined" &&
+      (window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1");
     throw new Error(
-      `Cannot reach the API server. Make sure both apps are running (npm run dev) and the API is on http://localhost:${EASYMATCH_API_PORT}`,
+      isLocalDev
+        ? `Cannot reach the API server. Make sure both apps are running (npm run dev) and the API is on http://localhost:${EASYMATCH_API_PORT}`
+        : "Cannot reach the API server. The API may be restarting — try again in a minute.",
     );
   }
 }

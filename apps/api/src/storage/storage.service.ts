@@ -14,46 +14,61 @@ import type { StorageBackendKind, StorageCategory } from './storage.types';
 @Injectable()
 export class StorageService implements OnModuleInit {
   private readonly logger = new Logger(StorageService.name);
-  private readonly backendKind: StorageBackendKind;
-  private readonly primary: LocalStorageBackend | SupabaseStorageBackend;
-  private readonly localFallback: LocalStorageBackend | null;
+  private primary!: LocalStorageBackend | SupabaseStorageBackend;
+  private localFallback: LocalStorageBackend | null = null;
 
   constructor(private readonly config: ConfigService) {
-    this.backendKind = this.resolveBackendKind();
     const uploadRoot = resolveLocalUploadRoot(
       this.config.get<string>('UPLOAD_DIR'),
     );
-
-    if (this.backendKind === 'supabase') {
-      const url = this.config.get<string>('SUPABASE_URL')?.trim();
-      const secretKey = resolveSupabaseSecretKey(
-        this.config.get<string>('SUPABASE_SECRET_KEY'),
-        this.config.get<string>('SUPABASE_SERVICE_ROLE_KEY'),
-      );
-      const bucket = this.config.get<string>('SUPABASE_STORAGE_BUCKET')?.trim();
-      if (!url || !secretKey || !bucket) {
-        throw new Error(
-          'STORAGE_BACKEND=supabase requires SUPABASE_URL, SUPABASE_SECRET_KEY (or SUPABASE_SERVICE_ROLE_KEY), and SUPABASE_STORAGE_BUCKET',
-        );
-      }
-      this.primary = new SupabaseStorageBackend({ url, secretKey, bucket });
-      this.localFallback = new LocalStorageBackend(uploadRoot);
-    } else {
-      this.primary = new LocalStorageBackend(uploadRoot);
-      this.localFallback = null;
-    }
+    this.primary = new LocalStorageBackend(uploadRoot);
   }
 
   onModuleInit(): void {
-    if (this.backendKind === 'supabase') {
-      const bucket = this.config.get<string>('SUPABASE_STORAGE_BUCKET')?.trim();
-      this.logger.log(`Storage backend: supabase (bucket=${bucket})`);
-      return;
-    }
+    const requested = this.resolveRequestedBackend();
     const uploadRoot = resolveLocalUploadRoot(
       this.config.get<string>('UPLOAD_DIR'),
     );
-    this.logger.log(`Storage backend: local (${uploadRoot})`);
+    const local = new LocalStorageBackend(uploadRoot);
+
+    if (requested !== 'supabase') {
+      this.primary = local;
+      this.logger.log(`Storage backend: local (${uploadRoot})`);
+      return;
+    }
+
+    const url = this.config.get<string>('SUPABASE_URL')?.trim();
+    const secretKey = resolveSupabaseSecretKey(
+      this.config.get<string>('SUPABASE_SECRET_KEY'),
+      this.config.get<string>('SUPABASE_SERVICE_ROLE_KEY'),
+    );
+    const bucket = this.config.get<string>('SUPABASE_STORAGE_BUCKET')?.trim();
+    const missing: string[] = [];
+    if (!url) {
+      missing.push('SUPABASE_URL');
+    }
+    if (!secretKey) {
+      missing.push('SUPABASE_SECRET_KEY (or SUPABASE_SERVICE_ROLE_KEY)');
+    }
+    if (!bucket) {
+      missing.push('SUPABASE_STORAGE_BUCKET');
+    }
+
+    if (missing.length > 0) {
+      this.logger.error(
+        `STORAGE_BACKEND=supabase but missing ${missing.join(', ')}. Falling back to local disk at ${uploadRoot}.`,
+      );
+      this.primary = local;
+      return;
+    }
+
+    this.primary = new SupabaseStorageBackend({
+      url: url!,
+      secretKey: secretKey!,
+      bucket: bucket!,
+    });
+    this.localFallback = local;
+    this.logger.log(`Storage backend: supabase (bucket=${bucket})`);
   }
 
   async save(
@@ -86,7 +101,7 @@ export class StorageService implements OnModuleInit {
     return await this.primary.createReadStream(storageKey);
   }
 
-  private resolveBackendKind(): StorageBackendKind {
+  private resolveRequestedBackend(): StorageBackendKind {
     const configured = this.config
       .get<string>('STORAGE_BACKEND')
       ?.trim()
