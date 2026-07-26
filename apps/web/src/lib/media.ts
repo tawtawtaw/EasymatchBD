@@ -1,7 +1,9 @@
-import { EASYMATCH_API_URL } from "@easymatch/shared";
 import { dedupeRequest } from "@/lib/api";
+import { getApiBaseUrl } from "@/lib/api-base-url";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? EASYMATCH_API_URL;
+function apiUrl(): string {
+  return getApiBaseUrl();
+}
 
 export type MediaReviewStatus = "pending" | "approved" | "rejected";
 export type ProfilePhotoType = "primary" | "gallery";
@@ -110,7 +112,7 @@ export async function getVerificationFeedback(token: string) {
   return dedupeRequest(
     `verification-feedback:${token}`,
     async () => {
-      const res = await fetch(`${API_URL}/profiles/me/verification/feedback`, {
+      const res = await fetch(`${apiUrl()}/profiles/me/verification/feedback`, {
         headers: authOnlyHeaders(token),
       });
       return parseResponse<VerificationFeedback>(res);
@@ -123,7 +125,7 @@ export async function dismissVerificationAlerts(
   token: string,
   alertIds?: string[],
 ) {
-  const res = await fetch(`${API_URL}/profiles/me/verification/alerts/dismiss`, {
+  const res = await fetch(`${apiUrl()}/profiles/me/verification/alerts/dismiss`, {
     method: "POST",
     headers: {
       ...authOnlyHeaders(token),
@@ -135,7 +137,7 @@ export async function dismissVerificationAlerts(
 }
 
 export async function submitForVerification(token: string) {
-  const res = await fetch(`${API_URL}/profiles/me/verification/submit`, {
+  const res = await fetch(`${apiUrl()}/profiles/me/verification/submit`, {
     method: "POST",
     headers: authOnlyHeaders(token),
   });
@@ -150,7 +152,7 @@ export async function getProfileMedia(token: string) {
   return dedupeRequest(
     `profile-media:${token}`,
     async () => {
-      const res = await fetch(`${API_URL}/profiles/me/media`, {
+      const res = await fetch(`${apiUrl()}/profiles/me/media`, {
         headers: authOnlyHeaders(token),
       });
       return parseResponse<ProfileMedia>(res);
@@ -171,7 +173,7 @@ export async function uploadProfilePhoto(
   if (gallerySlot) {
     params.set("slot", gallerySlot);
   }
-  const res = await fetch(`${API_URL}/profiles/me/photos?${params.toString()}`, {
+  const res = await fetch(`${apiUrl()}/profiles/me/photos?${params.toString()}`, {
     method: "POST",
     headers: authOnlyHeaders(token),
     body: form,
@@ -180,7 +182,7 @@ export async function uploadProfilePhoto(
 }
 
 export async function deleteProfilePhoto(token: string, photoId: string) {
-  const res = await fetch(`${API_URL}/profiles/me/photos/${photoId}`, {
+  const res = await fetch(`${apiUrl()}/profiles/me/photos/${photoId}`, {
     method: "DELETE",
     headers: authOnlyHeaders(token),
   });
@@ -188,7 +190,7 @@ export async function deleteProfilePhoto(token: string, photoId: string) {
 }
 
 export async function setPrimaryPhoto(token: string, photoId: string) {
-  const res = await fetch(`${API_URL}/profiles/me/photos/${photoId}/primary`, {
+  const res = await fetch(`${apiUrl()}/profiles/me/photos/${photoId}/primary`, {
     method: "PUT",
     headers: authOnlyHeaders(token),
   });
@@ -204,7 +206,7 @@ export async function uploadNidDocument(
   const form = new FormData();
   form.append("file", file);
   const res = await fetch(
-    `${API_URL}/profiles/me/nid?side=${side}&subject=${subject}`,
+    `${apiUrl()}/profiles/me/nid?side=${side}&subject=${subject}`,
     {
     method: "POST",
     headers: authOnlyHeaders(token),
@@ -219,7 +221,7 @@ export async function deleteNidDocument(
   subject: NidDocumentSubject = "member",
 ) {
   const res = await fetch(
-    `${API_URL}/profiles/me/nid/${side}?subject=${subject}`,
+    `${apiUrl()}/profiles/me/nid/${side}?subject=${subject}`,
     {
     method: "DELETE",
     headers: authOnlyHeaders(token),
@@ -238,7 +240,7 @@ export async function fetchAuthenticatedBlob(
   if (cached) return cached;
 
   const request = (async () => {
-    const res = await fetch(`${API_URL}${path}`, {
+    const res = await fetch(`${apiUrl()}${path}`, {
       headers: authOnlyHeaders(token),
     });
     if (!res.ok) {

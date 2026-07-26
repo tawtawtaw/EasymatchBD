@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createReadStream, existsSync, mkdirSync, unlinkSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { isAbsolute, join } from 'path';
 import { randomUUID } from 'crypto';
 
 @Injectable()
@@ -9,9 +9,11 @@ export class StorageService {
   private readonly uploadRoot: string;
 
   constructor(private readonly config: ConfigService) {
-    const configured = this.config.get<string>('UPLOAD_DIR');
+    const configured = this.config.get<string>('UPLOAD_DIR')?.trim();
     this.uploadRoot = configured
-      ? join(process.cwd(), configured)
+      ? isAbsolute(configured)
+        ? configured
+        : join(process.cwd(), configured)
       : join(process.cwd(), 'uploads');
     if (!existsSync(this.uploadRoot)) {
       mkdirSync(this.uploadRoot, { recursive: true });
