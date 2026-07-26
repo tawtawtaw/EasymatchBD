@@ -45,6 +45,20 @@ import { PushNotificationService } from '../push/push-notification.service';
 
 const OTP_KEY_PREFIX = 'otp:';
 const OTP_RATE_KEY_PREFIX = 'otp:rate:';
+
+function readEnv(config: ConfigService, key: string): string {
+  return (config.get<string>(key) ?? process.env[key] ?? '').trim();
+}
+
+function isTruthyEnv(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  return normalized === 'true' || normalized === '1' || normalized === 'yes';
+}
+
+function isExplicitlyFalseEnv(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  return normalized === 'false' || normalized === '0' || normalized === 'no';
+}
 const DEVICE_KEY_PREFIX = 'auth:device:';
 const SESSION_CACHE_TTL_MS = 60_000;
 const SESSION_STALE_TTL_MS = 180_000;
@@ -141,13 +155,20 @@ export class AuthService {
     );
     this.trustedDeviceDays = this.config.get<number>('TRUSTED_DEVICE_DAYS', 30);
     this.isDev = this.config.get<string>('NODE_ENV', 'development') !== 'production';
+
+    const exposeOtpSetting = readEnv(this.config, 'EXPOSE_OTP_IN_RESPONSE');
+    const smsProvider = readEnv(this.config, 'SMS_PROVIDER').toLowerCase() || 'console';
+    const usesConsoleSms = smsProvider === 'console';
+
     this.exposeOtpInResponse =
-      this.isDev ||
-      this.config.get<string>('EXPOSE_OTP_IN_RESPONSE', '').toLowerCase() === 'true';
+      !isExplicitlyFalseEnv(exposeOtpSetting) &&
+      (this.isDev || isTruthyEnv(exposeOtpSetting) || usesConsoleSms);
 
     if (this.exposeOtpInResponse && !this.isDev) {
       this.logger.warn(
-        'EXPOSE_OTP_IN_RESPONSE is enabled — OTP codes are included in API responses. Remove before public launch.',
+        usesConsoleSms
+          ? 'Console SMS provider active — OTP codes are included in API responses until a real SMS provider is configured. Set EXPOSE_OTP_IN_RESPONSE=false to hide.'
+          : 'EXPOSE_OTP_IN_RESPONSE is enabled — OTP codes are included in API responses. Remove before public launch.',
       );
     }
   }
