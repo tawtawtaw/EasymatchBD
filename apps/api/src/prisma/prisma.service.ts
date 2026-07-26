@@ -10,7 +10,12 @@ export class PrismaService
 
   async onModuleInit() {
     this.logDatabaseTarget();
-    void this.connectWithRetry();
+    const connected = await this.connectWithRetry();
+    if (!connected && process.env.NODE_ENV === 'production') {
+      throw new Error(
+        'Database connection failed in production. Check Railway DATABASE_URL (use Supabase Transaction pooler / Supavisor on aws-0-*.pooler.supabase.com:6543).',
+      );
+    }
   }
 
   private logDatabaseTarget() {
@@ -29,32 +34,36 @@ export class PrismaService
 
       if (/^db\.[a-z0-9]+\.supabase\.co$/i.test(host)) {
         this.logger.warn(
-          'DATABASE_URL uses db.*.supabase.co — Railway (IPv4) often cannot reach this. Use Supabase Connect → Transaction pooler (aws-0-*.pooler.supabase.com:6543) on Railway.',
+          'DATABASE_URL uses db.*.supabase.co. If connection fails on Railway, switch to Supabase Connect → Transaction pooler (aws-0-*.pooler.supabase.com:6543, user postgres.[project-ref]).',
         );
+      } else if (/\.pooler\.supabase\.com$/i.test(host)) {
+        this.logger.log('Using Supavisor pooler (IPv4-compatible).');
       }
     } catch {
       this.logger.warn('DATABASE_URL is set but could not be parsed for logging');
     }
   }
 
-  private async connectWithRetry() {
-    const maxAttempts = 5;
+  private async connectWithRetry(): Promise<boolean> {
+    const maxAttempts = 8;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         await this.$connect();
         this.logger.log('Database connection established');
-        return;
+        return true;
       } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
         if (attempt === maxAttempts) {
-          this.logger.error('Failed to connect after retries', err);
-          return;
+          this.logger.error(`Failed to connect after ${maxAttempts} attempts: ${message}`);
+          return false;
         }
         this.logger.warn(
-          `Database connect attempt ${attempt}/${maxAttempts} failed; retrying…`,
+          `Database connect attempt ${attempt}/${maxAttempts} failed (${message}); retrying…`,
         );
         await new Promise((resolve) => setTimeout(resolve, attempt * 2_000));
       }
     }
+    return false;
   }
 
   async onModuleDestroy() {

@@ -31,6 +31,7 @@
     "build:all": "npm run build -w @easymatch/shared && npm run build -w @easymatch/api && npm run build -w @easymatch/web",
     "build:railway-api": "node scripts/railway-api-build.mjs",
     "build:railway-web": "node scripts/railway-web-build.mjs",
+    "test:railway-db": "node scripts/railway-test-db.mjs",
     "prebuild:hostinger-web": "node scripts/hostinger-prebuild.mjs",
     "build:hostinger-web": "npm run build -w @easymatch/shared && npm run build -w @easymatch/web && node scripts/hostinger-postbuild.mjs",
     "build:hostinger-api": "npm run build -w @easymatch/shared && npm run build:hostinger -w @easymatch/api && node scripts/hostinger-api-postbuild.mjs",

@@ -63,19 +63,20 @@ Replace `api` with your API service name if different. **Redeploy web** after ch
 - `CORS_ORIGIN` — web URL(s), comma-separated
 - `WEB_PUBLIC_URL` — public web URL
 
-### Supabase on Railway (IPv4)
+### Supabase on Railway — use Supavisor (recommended)
 
-Railway cannot reach `db.[ref].supabase.co:6543` on the free tier — that endpoint is **IPv6-only**.
+**The IPv4 add-on fixes `db.*.supabase.co` only.** Railway is most reliable with the **shared Supavisor pooler**, which is **always IPv4** on every Supabase plan (free or paid).
 
-In Supabase → **Connect** → copy the **Transaction pooler** (Supavisor) URL for `DATABASE_URL`:
+In Supabase → **Connect**:
+
+1. **`DATABASE_URL`** → **Transaction pooler** (port **6543**)
+2. **`DIRECT_URL`** → **Session pooler** (port **5432**, same `*.pooler.supabase.com` host)
+
+Example shape (copy yours from the dashboard — region/host may differ):
 
 ```env
 DATABASE_URL=postgresql://postgres.jrecnorpwmdlpbkffmng:PASSWORD@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true&sslmode=require&connect_timeout=30
-```
 
-For migrations (`DIRECT_URL` and `prisma migrate deploy`), use **Session pooler** (port **5432**, same Supavisor host):
-
-```env
 DIRECT_URL=postgresql://postgres.jrecnorpwmdlpbkffmng:PASSWORD@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres?sslmode=require&connect_timeout=30
 ```
 
@@ -83,7 +84,17 @@ Notes:
 
 - Username is `postgres.jrecnorpwmdlpbkffmng` (not plain `postgres`) on Supavisor URLs.
 - URL-encode special characters in the password (`@` → `%40`).
-- Wake the project in Supabase if it is **Paused**.
+- Do **not** copy from local `apps/api/.env` unless it already uses `pooler.supabase.com`.
+
+**Test on Railway** (API shell):
+
+```bash
+cd apps/api && node ../../scripts/railway-test-db.mjs
+```
+
+### Paid IPv4 add-on (optional alternative)
+
+If you enabled the IPv4 add-on, `db.[ref].supabase.co:5432` can work from Railway after DNS propagates (can take a few minutes). If it still fails, **switch to Supavisor** above — do not wait on the add-on alone.
 
 ## Troubleshooting: API crashes with Supabase P1001
 
