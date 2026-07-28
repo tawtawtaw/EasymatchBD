@@ -58,22 +58,42 @@ export type PublicPlatformStats = {
   verifiedProfileCount: number;
 };
 
-export async function getPublicPlatformStats(options?: {
+type PublicFetchOptions = {
   revalidate?: number;
-}): Promise<PublicPlatformStats> {
-  if (options?.revalidate != null) {
-    const res = await fetch(`${getApiBaseUrl()}/public/stats`, {
-      next: { revalidate: options.revalidate },
+  fetchTimeoutMs?: number;
+};
+
+async function fetchPublicApi(
+  url: string,
+  options?: PublicFetchOptions,
+): Promise<Response> {
+  const timeoutMs = options?.fetchTimeoutMs ?? 15_000;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, {
+      signal: controller.signal,
+      ...(options?.revalidate != null
+        ? { next: { revalidate: options.revalidate } }
+        : { cache: "no-store" as const }),
     });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export async function getPublicPlatformStats(
+  options?: PublicFetchOptions,
+): Promise<PublicPlatformStats> {
+  if (options?.revalidate != null) {
+    const res = await fetchPublicApi(`${getApiBaseUrl()}/public/stats`, options);
     return readJsonResponse(res);
   }
 
   return dedupeRequest(
     "public-platform-stats",
     async () => {
-      const res = await fetch(`${getApiBaseUrl()}/public/stats`, {
-        cache: "no-store",
-      });
+      const res = await fetchPublicApi(`${getApiBaseUrl()}/public/stats`, options);
       return readJsonResponse<PublicPlatformStats>(res);
     },
     60_000,
@@ -83,7 +103,7 @@ export async function getPublicPlatformStats(options?: {
 export async function listPublicProfiles(
   filters: DiscoveryFilters,
   limit = PUBLIC_BROWSE_DEFAULT_LIMIT,
-  options?: { skipTotal?: boolean },
+  options?: { skipTotal?: boolean; fetchTimeoutMs?: number },
 ): Promise<{
   items: PublicBrowseListItem[];
   total: number;
@@ -91,9 +111,9 @@ export async function listPublicProfiles(
   browseLevel: number;
 }> {
   const params = filtersToSearchParams(filters, limit, options);
-  const res = await fetch(
+  const res = await fetchPublicApi(
     `${getApiBaseUrl()}/public/profiles?${params.toString()}`,
-    { next: { revalidate: 30 } },
+    { revalidate: 30, fetchTimeoutMs: options?.fetchTimeoutMs },
   );
   return readJsonResponse(res);
 }
