@@ -9,10 +9,22 @@ const LOCAL_API_PORT = 4101;
 
 const ngrokDevOrigin = process.env.NGROK_DEV_ORIGIN?.trim();
 
+/** Accept either var on Railway; Next inlines NEXT_PUBLIC_* at build time. */
+const whatsappSupportNumber =
+  process.env.WHATSAPP_SUPPORT_NUMBER?.trim() ||
+  process.env.NEXT_PUBLIC_WHATSAPP_SUPPORT_NUMBER?.trim();
+
 const nextConfig: NextConfig = {
   output: "standalone",
   outputFileTracingRoot: path.join(__dirname, "../../"),
   transpilePackages: ["@easymatch/shared"],
+  ...(whatsappSupportNumber
+    ? {
+        env: {
+          NEXT_PUBLIC_WHATSAPP_SUPPORT_NUMBER: whatsappSupportNumber,
+        },
+      }
+    : {}),
   experimental: {
     preloadEntriesOnStart: false,
   },

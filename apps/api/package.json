@@ -12,7 +12,7 @@
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "prestart:dev": "npm run build -w @easymatch/shared",
     "start": "nest start",
-    "start:dev": "nest build && concurrently -k -n build,run -c yellow,cyan \"nest build --watch\" \"npx wait-on dist/src/main.js && nodemon --quiet --watch dist/src/main.js --ext js --delay 2.5 --signal SIGTERM dist/src/main.js\"",
+    "start:dev": "npx nest build && npx concurrently -k -n build,run -c yellow,cyan \"npx nest build --watch\" \"npx wait-on dist/src/main.js && nodemon --quiet --watch dist/src/main.js --ext js --delay 2.5 --signal SIGTERM dist/src/main.js\"",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/src/main.js",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",

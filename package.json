@@ -16,11 +16,11 @@
     "react-dom": "19.2.4"
   },
   "scripts": {
-    "kill-ports": "kill-port 4100 4101",
+    "kill-ports": "npx kill-port 4100 4101",
     "predev": "npm run kill-ports && npm run build -w @easymatch/shared",
-    "dev": "concurrently -n api,web -c green,blue \"npm run start:dev -w @easymatch/api\" \"npx wait-on -t 120000 http-get://127.0.0.1:4101/api/v1/health && npm run dev -w @easymatch/web\"",
-    "dev:web": "kill-port 4100 && npm run dev -w @easymatch/web",
-    "dev:api": "kill-port 4101 && npm run start:dev -w @easymatch/api",
+    "dev": "node scripts/dev.mjs",
+    "dev:web": "npx kill-port 4100 && npm run dev -w @easymatch/web",
+    "dev:api": "npx kill-port 4101 && npm run start:dev -w @easymatch/api",
     "dev:mobile": "npm run start -w @easymatch/mobile",
     "dev:mobile:tunnel": "npm run start:tunnel -w @easymatch/mobile",
     "tunnel:status": "node scripts/tunnel.mjs status",

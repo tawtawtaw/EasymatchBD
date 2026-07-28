@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Link } from "@/i18n/routing";
 import { FacebookIcon } from "@/components/FacebookIcon";
@@ -17,6 +18,7 @@ export default async function ContactPage({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
+  await connection();
   const t = await getTranslations("contactPage");
   const whatsappHref = buildWhatsAppSupportHref(t("whatsappMessage"));
   const contactEmail = getContactEmail();

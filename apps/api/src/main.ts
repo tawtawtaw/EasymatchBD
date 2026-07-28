@@ -93,7 +93,10 @@ async function bootstrap() {
     });
   });
 
-  const port = Number(process.env.PORT) || EASYMATCH_API_PORT;
+  const port =
+    process.env.NODE_ENV !== 'production'
+      ? EASYMATCH_API_PORT
+      : Number(process.env.PORT) || EASYMATCH_API_PORT;
   const isDev = process.env.NODE_ENV !== 'production';
 
   await listenExpressApp(expressApp, port, isDev);

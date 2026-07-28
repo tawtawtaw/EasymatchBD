@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { getTranslations } from "next-intl/server";
 import { WhatsAppIcon } from "@/components/WhatsAppIcon";
 import { WhatsAppSupportPanel } from "@/components/WhatsAppSupportPanel";
@@ -10,6 +11,7 @@ import {
 export const WHATSAPP_SUPPORT_FAB_ID = "easymatch-whatsapp-fab";
 
 export async function WhatsAppSupport() {
+  await connection();
   const phoneDigits = normalizeWhatsAppPhoneDigits(
     resolveWhatsAppSupportNumber(),
   );

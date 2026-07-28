@@ -54,6 +54,26 @@ NEXT_PUBLIC_API_URL=https://${{api.RAILWAY_PUBLIC_DOMAIN}}/api/v1
 
 Replace `api` with your API service name if different. **Redeploy web** after changing any `NEXT_PUBLIC_*` variable.
 
+## Web: WhatsApp support button
+
+The green WhatsApp FAB and contact/footer links need a support number on the **web** service (not the API):
+
+```env
+WHATSAPP_SUPPORT_NUMBER=+8801730321717
+```
+
+`WHATSAPP_SUPPORT_NUMBER` is read at **runtime** on the server (no rebuild needed after changing it — restart/redeploy is enough).
+
+You can also use `NEXT_PUBLIC_WHATSAPP_SUPPORT_NUMBER` (same value), but that is baked in at **build** time — if you only set it after deploy, you must **redeploy web** for the button to appear.
+
+Optional disable:
+
+```env
+WHATSAPP_SUPPORT_ENABLED=false
+```
+
+If the button is missing on production, check Railway → **web** → **Variables**, set the number, then redeploy. Build logs warn when the variable is unset.
+
 ## API environment variables
 
 - `NODE_ENV=production`

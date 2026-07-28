@@ -25,6 +25,20 @@ function run(command, cwd = root) {
 
 run("npm run build -w @easymatch/shared");
 
+const whatsappNumber =
+  process.env.WHATSAPP_SUPPORT_NUMBER?.trim() ||
+  process.env.NEXT_PUBLIC_WHATSAPP_SUPPORT_NUMBER?.trim();
+if (!whatsappNumber) {
+  console.warn(
+    [
+      "",
+      "Railway web build: WHATSAPP_SUPPORT_NUMBER is unset.",
+      "The WhatsApp support button and contact links will not appear until you set it on the web service and redeploy.",
+      "",
+    ].join("\n"),
+  );
+}
+
 const sharedMain = path.join(sharedDir, "dist", "index.js");
 if (!fs.existsSync(sharedMain)) {
   console.error(

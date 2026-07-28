@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/routing";
 import { FacebookIcon } from "@/components/FacebookIcon";
@@ -11,6 +12,7 @@ import {
 } from "@/lib/site-social";
 
 export async function SiteFooter() {
+  await connection();
   const t = await getTranslations("footer");
   const whatsappHref = buildWhatsAppSupportHref(t("whatsappMessage"));
   const facebookHref = getFacebookPageUrl();

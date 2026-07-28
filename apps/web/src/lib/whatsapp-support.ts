@@ -20,20 +20,32 @@ export function normalizeWhatsAppPhoneDigits(
   }
 }
 
+function getWhatsAppSupportNumberRaw(): string | undefined {
+  const raw =
+    process.env.WHATSAPP_SUPPORT_NUMBER?.trim() ||
+    process.env.NEXT_PUBLIC_WHATSAPP_SUPPORT_NUMBER?.trim();
+  return raw || undefined;
+}
+
+function isWhatsAppSupportDisabled(): boolean {
+  if (process.env.WHATSAPP_SUPPORT_ENABLED === "false") return true;
+  if (process.env.NEXT_PUBLIC_WHATSAPP_SUPPORT_ENABLED === "false") return true;
+  return false;
+}
+
 export function getWhatsAppSupportPhoneDigits(): string | null {
-  return normalizeWhatsAppPhoneDigits(
-    process.env.NEXT_PUBLIC_WHATSAPP_SUPPORT_NUMBER,
-  );
+  if (isWhatsAppSupportDisabled()) return null;
+  return normalizeWhatsAppPhoneDigits(getWhatsAppSupportNumberRaw());
 }
 
 export function isWhatsAppSupportEnabled(
   configuredNumber?: string | null,
 ) {
-  if (process.env.NEXT_PUBLIC_WHATSAPP_SUPPORT_ENABLED === "false") {
+  if (isWhatsAppSupportDisabled()) {
     return false;
   }
   return normalizeWhatsAppPhoneDigits(
-    configuredNumber ?? process.env.NEXT_PUBLIC_WHATSAPP_SUPPORT_NUMBER,
+    configuredNumber ?? getWhatsAppSupportNumberRaw(),
   ) !== null;
 }
 
@@ -42,10 +54,10 @@ export function buildWhatsAppChatUrl(phoneDigits: string, message: string) {
 }
 
 export function resolveWhatsAppSupportNumber(): string | null {
-  if (process.env.NEXT_PUBLIC_WHATSAPP_SUPPORT_ENABLED === "false") {
+  if (isWhatsAppSupportDisabled()) {
     return null;
   }
-  const raw = process.env.NEXT_PUBLIC_WHATSAPP_SUPPORT_NUMBER?.trim();
+  const raw = getWhatsAppSupportNumberRaw();
   if (!raw) return null;
   return normalizeWhatsAppPhoneDigits(raw) ? raw : null;
 }
