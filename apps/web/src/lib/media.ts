@@ -1,5 +1,6 @@
 import { dedupeRequest } from "@/lib/api";
 import { getApiBaseUrl } from "@/lib/api-base-url";
+import { readJsonResponse } from "@/lib/parse-response";
 
 function apiUrl(): string {
   return getApiBaseUrl();
@@ -90,18 +91,35 @@ export const MAX_NID_BYTES = 5 * 1024 * 1024;
 const PHOTO_ACCEPT = "image/jpeg,image/png,image/webp";
 const NID_ACCEPT = "image/jpeg,image/png,image/webp,application/pdf";
 
-async function parseResponse<T>(res: Response): Promise<T> {
-  const data = (await res.json()) as T & {
-    message?: string | string[];
-    statusCode?: number;
-  };
-  if (!res.ok) {
-    const message = Array.isArray(data.message)
-      ? data.message.join(", ")
-      : data.message || "Request failed";
-    throw new Error(message);
+/** Map API upload errors to profile.errors translation keys. */
+export function resolveMediaUploadErrorKey(message: string): string | null {
+  const normalized = message.toLowerCase();
+  if (
+    normalized.includes("photo must be 2 mb") ||
+    normalized.includes("photo file is required")
+  ) {
+    return "photoTooLarge";
   }
-  return data;
+  if (
+    normalized.includes("nid file must be 5 mb") ||
+    normalized.includes("nid file is required")
+  ) {
+    return "nidTooLarge";
+  }
+  if (normalized.includes("photo must be jpeg")) {
+    return "invalidPhotoType";
+  }
+  if (normalized.includes("nid must be jpeg")) {
+    return "invalidNidType";
+  }
+  if (normalized.includes("file must be 5 mb")) {
+    return "nidTooLarge";
+  }
+  return null;
+}
+
+async function parseResponse<T>(res: Response): Promise<T> {
+  return readJsonResponse<T>(res);
 }
 
 function authOnlyHeaders(token: string) {

@@ -23,8 +23,11 @@ import {
   uploadNidDocument,
   submitForVerification,
   uploadProfilePhoto,
+  resolveMediaUploadErrorKey,
   validateNidFile,
   validatePhotoFile,
+  MAX_NID_BYTES,
+  MAX_PHOTO_BYTES,
 } from "@/lib/media";
 import {
   GALLERY_PHOTO_ASPECT,
@@ -184,6 +187,7 @@ export function ProfileMediaTab({
   const [uploading, setUploading] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [dismissingAlerts, setDismissingAlerts] = useState(false);
+  const [uploadNotice, setUploadNotice] = useState<string | null>(null);
   const [submittedAck, setSubmittedAck] = useState(false);
   const [cropRequest, setCropRequest] = useState<{
     file: File;
@@ -245,6 +249,25 @@ export function ProfileMediaTab({
     }
   }, [media]);
 
+  function reportUploadError(err: unknown) {
+    const raw = err instanceof Error ? err.message : "";
+    const key = raw ? resolveMediaUploadErrorKey(raw) : null;
+    const display = key ? te(key) : raw || t("uploadFailed");
+    setUploadNotice(display);
+    onError(display);
+  }
+
+  function reportValidationError(validationKey: string) {
+    const display = te(validationKey);
+    setUploadNotice(display);
+    onError(display);
+  }
+
+  function clearUploadNotice() {
+    setUploadNotice(null);
+    onError(null);
+  }
+
   async function handlePhotoUpload(
     type: "primary" | "gallery",
     file: File,
@@ -255,18 +278,18 @@ export function ProfileMediaTab({
 
     const validationKey = validatePhotoFile(file);
     if (validationKey) {
-      onError(te(validationKey));
+      reportValidationError(validationKey);
       return;
     }
 
     setUploading(type === "gallery" ? `gallery-${gallerySlot ?? "other"}` : type);
-    onError(null);
+    clearUploadNotice();
     try {
       await uploadProfilePhoto(token, file, type, gallerySlot);
       await loadMedia();
       onMessage(t("photoUploaded"));
     } catch (err) {
-      onError(err instanceof Error ? err.message : "Upload failed");
+      reportUploadError(err);
     } finally {
       setUploading(null);
     }
@@ -279,10 +302,10 @@ export function ProfileMediaTab({
   ) {
     const validationKey = validatePhotoFile(file);
     if (validationKey) {
-      onError(te(validationKey));
+      reportValidationError(validationKey);
       return;
     }
-    onError(null);
+    clearUploadNotice();
     setCropRequest({ file, type, gallerySlot });
   }
 
@@ -304,20 +327,20 @@ export function ProfileMediaTab({
 
     const validationKey = validateNidFile(file);
     if (validationKey) {
-      onError(te(validationKey));
+      reportValidationError(validationKey);
       return;
     }
 
     const uploadKey = `${subject}-${side}`;
     setUploading(uploadKey);
-    onError(null);
+    clearUploadNotice();
     try {
       clearSubmitted();
       await uploadNidDocument(token, file, side, subject);
       await loadMedia();
       onMessage(t("nidUploaded"));
     } catch (err) {
-      onError(err instanceof Error ? err.message : "Upload failed");
+      reportUploadError(err);
     } finally {
       setUploading(null);
     }
@@ -639,9 +662,20 @@ export function ProfileMediaTab({
 
   return (
     <div className="space-y-8">
+      {uploadNotice ? (
+        <p
+          className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800"
+          role="alert"
+        >
+          {uploadNotice}
+        </p>
+      ) : null}
+
       {cropRequest ? (
         <PhotoCropModal
           file={cropRequest.file}
+          maxBytes={MAX_PHOTO_BYTES}
+          tooLargeMessage={te("photoTooLarge")}
           aspect={
             cropRequest.type === "primary"
               ? PRIMARY_PHOTO_ASPECT

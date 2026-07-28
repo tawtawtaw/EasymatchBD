@@ -12,6 +12,7 @@ import { ExpressAdapter } from '@nestjs/platform-express';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { AppModule } from './app.module';
 import { assertProductionEnv, logBootstrapEnv } from './bootstrap-env';
+import { MulterExceptionFilter } from './common/multer-exception.filter';
 import { freeDevPort } from './dev-port.util';
 
 function devRequestLogger() {
@@ -128,6 +129,7 @@ async function bootstrap() {
 
   app.enableShutdownHooks();
   app.setGlobalPrefix('api/v1');
+  app.useGlobalFilters(new MulterExceptionFilter());
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

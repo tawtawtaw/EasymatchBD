@@ -29,6 +29,8 @@ type PhotoCropModalProps = {
   aspect: number;
   title: string;
   hint: string;
+  maxBytes?: number;
+  tooLargeMessage?: string;
   onCancel: () => void;
   onConfirm: (file: File) => void;
 };
@@ -38,6 +40,8 @@ export function PhotoCropModal({
   aspect,
   title,
   hint,
+  maxBytes,
+  tooLargeMessage,
   onCancel,
   onConfirm,
 }: PhotoCropModalProps) {
@@ -80,6 +84,10 @@ export function PhotoCropModal({
     setProcessing(true);
     setError(null);
     try {
+      if (maxBytes != null && file.size > maxBytes) {
+        setError(tooLargeMessage ?? t("exportError"));
+        return;
+      }
       onConfirm(file);
     } finally {
       setProcessing(false);
@@ -92,6 +100,10 @@ export function PhotoCropModal({
     setError(null);
     try {
       const cropped = await getCroppedPhotoFile(imageSrc, croppedAreaPixels, file.name);
+      if (maxBytes != null && cropped.size > maxBytes) {
+        setError(tooLargeMessage ?? t("exportError"));
+        return;
+      }
       onConfirm(cropped);
     } catch {
       setError(t("exportError"));

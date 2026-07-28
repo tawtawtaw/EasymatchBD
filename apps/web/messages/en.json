@@ -809,6 +809,7 @@
       "setPrimary": "Set as main",
       "photoUploaded": "Photo uploaded successfully.",
       "photoRemoved": "Photo removed.",
+      "uploadFailed": "Upload failed. Check the file type and size, then try again.",
       "primarySet": "Main photo updated.",
       "crop": {
         "primaryTitle": "Adjust main photo (optional)",
