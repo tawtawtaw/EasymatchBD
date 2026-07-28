@@ -27,6 +27,7 @@ const nextConfig: NextConfig = {
     : {}),
   experimental: {
     preloadEntriesOnStart: false,
+    proxyClientMaxBodySize: "10mb",
   },
   typescript: {
     // Pre-existing strict TS issues; dev uses `next dev` without blocking on these.

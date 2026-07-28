@@ -1149,14 +1149,11 @@ export default function ProfilePage() {
       <div className="min-h-screen bg-gradient-to-b from-rose-50 to-white px-4 py-10">
         <ProfileCreationIntent
           token={authToken}
-          onComplete={async () => {
-            setLoading(true);
-            try {
-              await loadProfile(authToken, locale);
-            } catch (err) {
-              setError(err instanceof Error ? err.message : "Failed to load");
-            } finally {
-              setLoading(false);
+          onComplete={(updated) => {
+            if (dropdowns) {
+              applyLoadedProfile(dropdowns, updated, verificationFeedback);
+            } else {
+              setProfile(updated);
             }
           }}
         />

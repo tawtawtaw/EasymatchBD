@@ -90,19 +90,55 @@ export const MAX_NID_BYTES = 5 * 1024 * 1024;
 
 const PHOTO_ACCEPT = "image/jpeg,image/png,image/webp";
 const NID_ACCEPT = "image/jpeg,image/png,image/webp,application/pdf";
+const PHOTO_EXTENSIONS = ["jpg", "jpeg", "png", "webp"] as const;
+const NID_EXTENSIONS = [...PHOTO_EXTENSIONS, "pdf"] as const;
+
+const EXTENSION_TO_MIME: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  pdf: "application/pdf",
+};
+
+function fileExtension(name: string): string {
+  const dot = name.lastIndexOf(".");
+  return dot >= 0 ? name.slice(dot + 1).toLowerCase() : "";
+}
+
+function resolveFileMimeType(file: File): string {
+  const trimmed = file.type.trim();
+  if (trimmed) return trimmed;
+  return EXTENSION_TO_MIME[fileExtension(file.name)] ?? "";
+}
+
+function isAllowedFileType(
+  file: File,
+  allowedMimes: readonly string[],
+  allowedExtensions: readonly string[],
+): boolean {
+  const mime = resolveFileMimeType(file);
+  if (mime && allowedMimes.includes(mime)) return true;
+  return allowedExtensions.includes(
+    fileExtension(file.name) as (typeof allowedExtensions)[number],
+  );
+}
 
 /** Map API upload errors to profile.errors translation keys. */
 export function resolveMediaUploadErrorKey(message: string): string | null {
   const normalized = message.toLowerCase();
   if (
     normalized.includes("photo must be 2 mb") ||
-    normalized.includes("photo file is required")
+    normalized.includes("photo file is required") ||
+    normalized.includes("file too large") ||
+    normalized.includes("limit_file_size")
   ) {
     return "photoTooLarge";
   }
   if (
     normalized.includes("nid file must be 5 mb") ||
-    normalized.includes("nid file is required")
+    normalized.includes("nid file is required") ||
+    normalized.includes("file must be 5 mb")
   ) {
     return "nidTooLarge";
   }
@@ -111,9 +147,6 @@ export function resolveMediaUploadErrorKey(message: string): string | null {
   }
   if (normalized.includes("nid must be jpeg")) {
     return "invalidNidType";
-  }
-  if (normalized.includes("file must be 5 mb")) {
-    return "nidTooLarge";
   }
   return null;
 }
@@ -288,21 +321,21 @@ export function nidFileUrl(
 }
 
 export function validatePhotoFile(file: File): string | null {
-  if (!PHOTO_ACCEPT.split(",").includes(file.type)) {
-    return "invalidPhotoType";
-  }
   if (file.size > MAX_PHOTO_BYTES) {
     return "photoTooLarge";
+  }
+  if (!isAllowedFileType(file, PHOTO_ACCEPT.split(","), PHOTO_EXTENSIONS)) {
+    return "invalidPhotoType";
   }
   return null;
 }
 
 export function validateNidFile(file: File): string | null {
-  if (!NID_ACCEPT.split(",").includes(file.type)) {
-    return "invalidNidType";
-  }
   if (file.size > MAX_NID_BYTES) {
     return "nidTooLarge";
+  }
+  if (!isAllowedFileType(file, NID_ACCEPT.split(","), NID_EXTENSIONS)) {
+    return "invalidNidType";
   }
   return null;
 }

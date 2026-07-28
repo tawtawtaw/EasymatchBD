@@ -810,6 +810,7 @@
       "photoUploaded": "Photo uploaded successfully.",
       "photoRemoved": "Photo removed.",
       "uploadFailed": "Upload failed. Check the file type and size, then try again.",
+      "fileLoadFailed": "Could not open this file. It may have been removed — please upload it again.",
       "primarySet": "Main photo updated.",
       "crop": {
         "primaryTitle": "Adjust main photo (optional)",

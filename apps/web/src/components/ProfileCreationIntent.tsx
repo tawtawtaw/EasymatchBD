@@ -8,11 +8,11 @@ import {
   type OnBehalfRelation,
   type ProfileCreationMode,
 } from "@easymatch/shared";
-import { setCreationIntent } from "@/lib/api";
+import { setCreationIntent, type Profile } from "@/lib/api";
 
 type ProfileCreationIntentProps = {
   token: string;
-  onComplete: () => void;
+  onComplete: (profile: Profile) => void;
 };
 
 export function ProfileCreationIntent({
@@ -35,12 +35,12 @@ export function ProfileCreationIntent({
     setLoading(true);
     setError(null);
     try {
-      await setCreationIntent(token, {
+      const updated = await setCreationIntent(token, {
         creationMode: mode,
         onBehalfRelation:
           mode === "on_behalf" ? (relation as OnBehalfRelation) : undefined,
       });
-      onComplete();
+      onComplete(updated);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("saveFailed"));
     } finally {

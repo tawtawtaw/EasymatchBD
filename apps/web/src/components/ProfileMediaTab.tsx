@@ -73,13 +73,17 @@ function AuthenticatedImage({
   path,
   alt,
   className,
+  onLoadFailed,
 }: {
   token: string;
   path: string;
   alt: string;
   className?: string;
+  onLoadFailed?: () => void;
 }) {
   const [src, setSrc] = useState<string | null>(null);
+  const onLoadFailedRef = useRef(onLoadFailed);
+  onLoadFailedRef.current = onLoadFailed;
 
   useEffect(() => {
     let objectUrl: string | null = null;
@@ -92,7 +96,10 @@ function AuthenticatedImage({
         setSrc(objectUrl);
       })
       .catch(() => {
-        if (!cancelled) setSrc(null);
+        if (!cancelled) {
+          setSrc(null);
+          onLoadFailedRef.current?.();
+        }
       });
 
     return () => {
@@ -119,6 +126,8 @@ function UploadCard({
   disabled,
   uploading,
   onSelect,
+  onFileRejected,
+  getFileError,
   children,
   required,
 }: {
@@ -128,14 +137,34 @@ function UploadCard({
   disabled?: boolean;
   uploading?: boolean;
   onSelect: (file: File) => void;
+  onFileRejected?: (message: string) => void;
+  getFileError?: (file: File) => string | null;
   children?: ReactNode;
   required?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const tc = useTranslations("common");
+  const [inlineError, setInlineError] = useState<string | null>(null);
+
+  function handleFileSelected(file: File) {
+    const validationMessage = getFileError?.(file) ?? null;
+    if (validationMessage) {
+      setInlineError(validationMessage);
+      onFileRejected?.(validationMessage);
+      return;
+    }
+    setInlineError(null);
+    onSelect(file);
+  }
 
   return (
-    <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-4">
+    <div
+      className={`rounded-xl border border-dashed p-4 ${
+        inlineError
+          ? "border-red-300 bg-red-50"
+          : "border-zinc-300 bg-zinc-50"
+      }`}
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="font-semibold text-zinc-900">
@@ -165,10 +194,15 @@ function UploadCard({
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
-          if (file) onSelect(file);
           e.target.value = "";
+          if (file) handleFileSelected(file);
         }}
       />
+      {inlineError ? (
+        <p className="mt-3 text-sm font-medium text-red-700" role="alert">
+          {inlineError}
+        </p>
+      ) : null}
       {children && <div className="mt-4">{children}</div>}
     </div>
   );
@@ -188,6 +222,7 @@ export function ProfileMediaTab({
   const [submitting, setSubmitting] = useState(false);
   const [dismissingAlerts, setDismissingAlerts] = useState(false);
   const [uploadNotice, setUploadNotice] = useState<string | null>(null);
+  const uploadAlertRef = useRef<HTMLParagraphElement>(null);
   const [submittedAck, setSubmittedAck] = useState(false);
   const [cropRequest, setCropRequest] = useState<{
     file: File;
@@ -249,18 +284,38 @@ export function ProfileMediaTab({
     }
   }, [media]);
 
+  function mediaErrorMessage(key: string): string {
+    return te(key as "photoTooLarge" | "nidTooLarge" | "invalidPhotoType" | "invalidNidType");
+  }
+
+  function getPhotoFileError(file: File): string | null {
+    const validationKey = validatePhotoFile(file);
+    return validationKey ? mediaErrorMessage(validationKey) : null;
+  }
+
+  function getNidFileError(file: File): string | null {
+    const validationKey = validateNidFile(file);
+    return validationKey ? mediaErrorMessage(validationKey) : null;
+  }
+
+  function showUploadError(display: string) {
+    setUploadNotice(display);
+    onError(display);
+    onMessage(null);
+    requestAnimationFrame(() => {
+      uploadAlertRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+  }
+
   function reportUploadError(err: unknown) {
     const raw = err instanceof Error ? err.message : "";
     const key = raw ? resolveMediaUploadErrorKey(raw) : null;
-    const display = key ? te(key) : raw || t("uploadFailed");
-    setUploadNotice(display);
-    onError(display);
+    const display = key ? mediaErrorMessage(key) : raw || t("uploadFailed");
+    showUploadError(display);
   }
 
   function reportValidationError(validationKey: string) {
-    const display = te(validationKey);
-    setUploadNotice(display);
-    onError(display);
+    showUploadError(mediaErrorMessage(validationKey));
   }
 
   function clearUploadNotice() {
@@ -274,7 +329,10 @@ export function ProfileMediaTab({
     gallerySlot?: "other" | "family",
   ) {
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
-    if (!token) return;
+    if (!token) {
+      showUploadError(t("uploadFailed"));
+      return;
+    }
 
     const validationKey = validatePhotoFile(file);
     if (validationKey) {
@@ -323,7 +381,10 @@ export function ProfileMediaTab({
     file: File,
   ) {
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
-    if (!token) return;
+    if (!token) {
+      showUploadError(t("uploadFailed"));
+      return;
+    }
 
     const validationKey = validateNidFile(file);
     if (validationKey) {
@@ -343,6 +404,29 @@ export function ProfileMediaTab({
       reportUploadError(err);
     } finally {
       setUploading(null);
+    }
+  }
+
+  function showFileLoadFailed() {
+    showUploadError(t("fileLoadFailed"));
+  }
+
+  async function handleViewNidPdf(
+    side: NidDocumentSide,
+    subject: NidDocumentSubject,
+  ) {
+    const token = authToken ?? localStorage.getItem(AUTH_TOKEN_KEY);
+    if (!token) {
+      showUploadError(t("uploadFailed"));
+      return;
+    }
+    try {
+      const blob = await fetchAuthenticatedBlob(token, nidFileUrl(side, subject));
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      showFileLoadFailed();
     }
   }
 
@@ -547,6 +631,8 @@ export function ProfileMediaTab({
                 accept={NID_ACCEPT}
                 disabled={nidLocked}
                 uploading={uploading === uploadKey}
+                getFileError={getNidFileError}
+                onFileRejected={showUploadError}
                 onSelect={(file) => handleNidUpload(side, subject, file)}
               >
                 {doc && mounted && authToken ? (
@@ -557,24 +643,16 @@ export function ProfileMediaTab({
                         path={nidFileUrl(side, subject)}
                         alt={side === "front" ? t("nidFront") : t("nidBack")}
                         className="h-32 w-full rounded-lg border border-zinc-200 bg-white object-contain"
+                        onLoadFailed={showFileLoadFailed}
                       />
                     ) : (
-                      <a
-                        href="#"
-                        onClick={async (e) => {
-                          e.preventDefault();
-                          const blob = await fetchAuthenticatedBlob(
-                            authToken,
-                            nidFileUrl(side, subject),
-                          );
-                          const url = URL.createObjectURL(blob);
-                          window.open(url, "_blank");
-                          setTimeout(() => URL.revokeObjectURL(url), 60_000);
-                        }}
+                      <button
+                        type="button"
+                        onClick={() => void handleViewNidPdf(side, subject)}
                         className="text-sm font-medium text-rose-700 hover:underline"
                       >
                         {t("viewPdf")}
-                      </a>
+                      </button>
                     )}
                     <div className="flex items-center gap-2">
                       <span
@@ -664,6 +742,7 @@ export function ProfileMediaTab({
     <div className="space-y-8">
       {uploadNotice ? (
         <p
+          ref={uploadAlertRef}
           className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800"
           role="alert"
         >
@@ -676,6 +755,7 @@ export function ProfileMediaTab({
           file={cropRequest.file}
           maxBytes={MAX_PHOTO_BYTES}
           tooLargeMessage={te("photoTooLarge")}
+          onSizeExceeded={() => reportValidationError("photoTooLarge")}
           aspect={
             cropRequest.type === "primary"
               ? PRIMARY_PHOTO_ASPECT
@@ -735,6 +815,8 @@ export function ProfileMediaTab({
           hint={t("passportPhotoHint")}
           accept={PHOTO_ACCEPT}
           uploading={uploading === "primary"}
+          getFileError={getPhotoFileError}
+          onFileRejected={showUploadError}
           onSelect={(file) => handlePhotoSelected("primary", file)}
         >
           {primaryPhoto && mounted && authToken && (
@@ -770,6 +852,8 @@ export function ProfileMediaTab({
           accept={PHOTO_ACCEPT}
           disabled={!canAddOther}
           uploading={uploading === "gallery-other"}
+          getFileError={getPhotoFileError}
+          onFileRejected={showUploadError}
           onSelect={(file) => handlePhotoSelected("gallery", file, "other")}
         >
           {otherPhoto && mounted && authToken ? (
@@ -810,6 +894,8 @@ export function ProfileMediaTab({
           accept={PHOTO_ACCEPT}
           disabled={!canAddFamily}
           uploading={uploading === "gallery-family"}
+          getFileError={getPhotoFileError}
+          onFileRejected={showUploadError}
           onSelect={(file) => handlePhotoSelected("gallery", file, "family")}
         >
           {familyPhotos.length > 0 && mounted && authToken ? (

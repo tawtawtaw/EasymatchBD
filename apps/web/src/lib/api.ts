@@ -578,13 +578,16 @@ export async function setCreationIntent(
     onBehalfRelation?: string;
   },
 ) {
-  return parseResponse<Profile>(
+  const updated = await parseResponse<Profile>(
     await apiFetch(`${clientApiUrl()}/profiles/me/creation-intent`, {
       method: "POST",
       headers: authHeaders(token),
       body: JSON.stringify(data),
     }),
   );
+  invalidateDedupeCache(`profiles:me:${token}`);
+  invalidateDedupeCache(`auth:editor-bootstrap:${token}`);
+  return updated;
 }
 
 export async function updatePersonal(

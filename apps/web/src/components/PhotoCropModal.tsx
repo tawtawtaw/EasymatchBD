@@ -31,6 +31,7 @@ type PhotoCropModalProps = {
   hint: string;
   maxBytes?: number;
   tooLargeMessage?: string;
+  onSizeExceeded?: () => void;
   onCancel: () => void;
   onConfirm: (file: File) => void;
 };
@@ -42,6 +43,7 @@ export function PhotoCropModal({
   hint,
   maxBytes,
   tooLargeMessage,
+  onSizeExceeded,
   onCancel,
   onConfirm,
 }: PhotoCropModalProps) {
@@ -85,7 +87,9 @@ export function PhotoCropModal({
     setError(null);
     try {
       if (maxBytes != null && file.size > maxBytes) {
-        setError(tooLargeMessage ?? t("exportError"));
+        const message = tooLargeMessage ?? t("exportError");
+        setError(message);
+        onSizeExceeded?.();
         return;
       }
       onConfirm(file);
@@ -101,7 +105,9 @@ export function PhotoCropModal({
     try {
       const cropped = await getCroppedPhotoFile(imageSrc, croppedAreaPixels, file.name);
       if (maxBytes != null && cropped.size > maxBytes) {
-        setError(tooLargeMessage ?? t("exportError"));
+        const message = tooLargeMessage ?? t("exportError");
+        setError(message);
+        onSizeExceeded?.();
         return;
       }
       onConfirm(cropped);
