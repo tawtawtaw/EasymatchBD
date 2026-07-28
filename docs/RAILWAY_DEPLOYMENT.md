@@ -49,10 +49,18 @@ Those files run monorepo-aware build scripts that:
 After the API has a public domain:
 
 ```env
+NEXT_PUBLIC_API_URL=https://api.easymatchbd.com/api/v1
+```
+
+Or Railway reference syntax:
+
+```env
 NEXT_PUBLIC_API_URL=https://${{api.RAILWAY_PUBLIC_DOMAIN}}/api/v1
 ```
 
 Replace `api` with your API service name if different. **Redeploy web** after changing any `NEXT_PUBLIC_*` variable.
+
+The web app also rewrites same-origin `/api/v1/*` to this URL (required for SSLCommerz callbacks on `easymatchbd.com/api/v1/...`). If `NEXT_PUBLIC_API_URL` is wrong or missing at build time, login shows **Invalid response from the API (404)** because the browser hits the Next.js app instead of the API.
 
 ## Web: WhatsApp support button
 

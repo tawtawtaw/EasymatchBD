@@ -35,9 +35,16 @@ const nextConfig: NextConfig = {
   // Lets Next dev accept requests via ngrok (e.g. easymatchbd.ngrok.dev).
   ...(ngrokDevOrigin ? { allowedDevOrigins: [ngrokDevOrigin] } : {}),
   async rewrites() {
-    // Production calls the API directly via NEXT_PUBLIC_API_URL (see api-base-url.ts).
-    if (process.env.NEXT_PUBLIC_API_URL?.trim()) {
-      return [];
+    const configured = process.env.NEXT_PUBLIC_API_URL?.trim();
+    if (configured) {
+      const apiBase = configured.replace(/\/$/, "");
+      // Proxy same-origin /api/v1 → API (OTP login, SSLCommerz callbacks, builds without baked-in URL).
+      return [
+        {
+          source: "/api/v1/:path*",
+          destination: `${apiBase}/:path*`,
+        },
+      ];
     }
     return [
       {
