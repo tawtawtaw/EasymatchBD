@@ -7,15 +7,23 @@ export type MembershipPurchaseEligibility = {
   isVerified: boolean;
 };
 
-export function membershipFromSession(session: {
+/** True when the user currently has active paid membership (not expired). */
+export function activePaidMembership(session: {
   isPaidMember?: boolean;
   subscription?: MembershipSnapshot | null;
 } | null | undefined) {
   if (!session) return false;
-  if (typeof session.isPaidMember === "boolean") {
-    return session.isPaidMember;
+  if (session.subscription) {
+    return isPaidMember(session.subscription);
   }
-  return isPaidMember(session.subscription);
+  return session.isPaidMember === true;
+}
+
+export function membershipFromSession(session: {
+  isPaidMember?: boolean;
+  subscription?: MembershipSnapshot | null;
+} | null | undefined) {
+  return activePaidMembership(session);
 }
 
 export function resolveMembershipPurchaseEligibility(input: {
@@ -44,7 +52,7 @@ export function canPurchaseMembership(
   eligibility: MembershipPurchaseEligibility | null | undefined,
 ) {
   if (!session || !eligibility) return false;
-  if (membershipFromSession(session)) return false;
+  if (activePaidMembership(session)) return false;
   if (!eligibility.hasProfile) return false;
   return eligibility.isVerified;
 }

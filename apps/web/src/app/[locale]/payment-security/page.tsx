@@ -2,24 +2,21 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { MarketingInfoPage } from "@/components/MarketingInfoPage";
 
 const SECTION_KEYS = [
-  "informationWeCollect",
-  "howWeUse",
-  "sharingDisclosure",
-  "paymentSecurity",
-  "overview",
-  "levels",
-  "photos",
-  "control",
+  "gateway",
+  "encryption",
+  "dataHandling",
+  "userResponsibilities",
+  "support",
 ] as const;
 
-export default async function PrivacyPage({
+export default async function PaymentSecurityPage({
   params,
 }: {
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const t = await getTranslations("privacyPage");
+  const t = await getTranslations("paymentSecurityPage");
 
   const sections = SECTION_KEYS.map((key) => {
     const title = t(`sections.${key}.title`);
@@ -40,10 +37,10 @@ export default async function PrivacyPage({
       backHomeLabel={t("backHome")}
       title={t("title")}
       intro={t("intro")}
-      effectiveDate={t("effectiveDate")}
+      effectiveDate={t.has("effectiveDate") ? t("effectiveDate") : undefined}
       sections={sections}
-      cta={{ label: t("fieldsCta"), href: "/privacy/fields" }}
-      secondaryCta={{ label: t("termsCta"), href: "/terms" }}
+      cta={{ label: t("membershipCta"), href: "/membership" }}
+      secondaryCta={{ label: t("contactCta"), href: "/contact" }}
     />
   );
 }

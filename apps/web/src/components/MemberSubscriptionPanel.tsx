@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import type { MembershipTariff } from "@easymatch/shared";
-import { formatTariffPriceBdt } from "@easymatch/shared";
+import { formatTariffPriceBdt, getMembershipServicePackage } from "@easymatch/shared";
 import {
   BiodataFieldRows,
   BiodataSectionShell,
@@ -264,7 +264,12 @@ export function MemberSubscriptionPanel({
       {account && account.payments.length > 0 ? (
         <BiodataSectionShell title={t("paymentsTitle")} theme="rose">
           <ul className="space-y-3">
-            {account.payments.map((payment) => (
+            {account.payments.map((payment) => {
+              const serviceCode =
+                payment.serviceCode ??
+                getMembershipServicePackage(payment.plan)?.code ??
+                null;
+              return (
               <li
                 key={payment.id}
                 className="overflow-hidden rounded-xl border border-rose-200 bg-white shadow-sm"
@@ -286,10 +291,18 @@ export function MemberSubscriptionPanel({
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-                  <p className="text-xs text-zinc-500">
-                    {t("transactionId")}:{" "}
-                    <span className="font-mono text-zinc-700">{payment.tranId}</span>
-                  </p>
+                  <div className="space-y-1">
+                    <p className="text-xs text-zinc-500">
+                      {t("transactionId")}:{" "}
+                      <span className="font-mono text-zinc-700">{payment.tranId}</span>
+                    </p>
+                    {serviceCode ? (
+                      <p className="text-xs text-zinc-500">
+                        {t("serviceCode")}:{" "}
+                        <span className="font-mono text-zinc-700">{serviceCode}</span>
+                      </p>
+                    ) : null}
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
@@ -314,7 +327,8 @@ export function MemberSubscriptionPanel({
                   </div>
                 </div>
               </li>
-            ))}
+            );
+            })}
           </ul>
         </BiodataSectionShell>
       ) : subscription && subscription.plan !== "free" ? (

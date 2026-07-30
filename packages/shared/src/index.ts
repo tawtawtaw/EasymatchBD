@@ -4,6 +4,7 @@ export * from './privacy-levels';
 export * from './profile-privacy-fields';
 export * from './subscriptions';
 export * from './membership-tariffs';
+export * from './membership-service-packages';
 export * from './consultant-tariffs';
 export * from './phone';
 export * from './email';

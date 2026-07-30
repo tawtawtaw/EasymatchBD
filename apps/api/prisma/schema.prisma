@@ -687,6 +687,7 @@ model MembershipPayment {
   userId       String
   user         User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
   plan         SubscriptionPlan
+  serviceCode  String?
   tranId       String                   @unique
   amountBdt    Decimal                  @db.Decimal(10, 2)
   currency     String                   @default("BDT")

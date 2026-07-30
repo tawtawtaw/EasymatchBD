@@ -6,6 +6,7 @@ import {
   isAnyReligionPreferenceText,
   isOpenToAllDistricts,
   isOpenToAnyReligion,
+  normalizeHijabPreference,
   PROFILE_PRIVACY_FIELDS,
 } from "@easymatch/shared";
 import type { DropdownMap } from "@/lib/api";
@@ -268,21 +269,26 @@ export function resolveStaticOptionLabel(
   value: string,
   translate?: (relativeKey: string) => string,
 ): string | undefined {
+  let resolvedValue = value;
+  if (fieldKey === "hijabPreference") {
+    resolvedValue = normalizeHijabPreference(value) ?? value;
+  }
+
   const group = STATIC_OPTION_GROUPS[fieldKey];
   if (!group) return undefined;
 
   if (translate) {
-    const label = translate(`${group}.${value}`);
+    const label = translate(`${group}.${resolvedValue}`);
     if (
       label &&
       !label.includes("MISSING_MESSAGE") &&
-      label !== `${group}.${value}`
+      label !== `${group}.${resolvedValue}`
     ) {
       return label;
     }
   }
 
-  return STATIC_OPTION_FALLBACKS[group]?.[value];
+  return STATIC_OPTION_FALLBACKS[group]?.[resolvedValue];
 }
 
 export function createFieldOptionResolver(
@@ -397,6 +403,10 @@ export function formatBiodataFieldValue(
   }
 
   const raw = String(value);
+  let optionLookup = raw;
+  if (key === "hijabPreference") {
+    optionLookup = normalizeHijabPreference(raw) ?? raw;
+  }
   if (
     key === "preferredReligion" &&
     isAnyReligionPreferenceText(raw)
@@ -441,8 +451,8 @@ export function formatBiodataFieldValue(
   }
 
   const fromStatic =
-    resolveStaticOption?.(key, raw) ??
-    resolveStaticOptionLabel(key, raw);
+    resolveStaticOption?.(key, optionLookup) ??
+    resolveStaticOptionLabel(key, optionLookup);
   if (fromStatic) return fromStatic;
 
   return raw;

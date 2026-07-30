@@ -6,6 +6,7 @@ import {
   getVerificationBiodataSnapshotValue,
   hasVerificationPathPrefix,
   isIslamReligion,
+  normalizeHijabPreference,
   requiresChildrenCountMaritalStatus,
   showHasBeardField,
   showDowryExpectationField,
@@ -136,7 +137,11 @@ function useBiodataChangeTracker(
         return previousLabel(formatHeightFromCm(raw as number) ?? "—");
       }
       if (options?.optionPrefix && typeof raw === "string") {
-        return previousLabel(tf(`${options.optionPrefix}.${raw}` as never));
+        let optionKey = raw;
+        if (options.optionPrefix === "hijabPreferenceOptions") {
+          optionKey = normalizeHijabPreference(raw) ?? raw;
+        }
+        return previousLabel(tf(`${options.optionPrefix}.${optionKey}` as never));
       }
       if (formatKey) {
         return previousLabel(
@@ -991,7 +996,11 @@ export function VerificationProfileDetails({
               <DetailItem
                 label={tf("hijabPreference")}
                 value={tf(
-                  `hijabPreferenceOptions.${submission.partnerPreference.hijabPreference}`,
+                  `hijabPreferenceOptions.${
+                    normalizeHijabPreference(
+                      submission.partnerPreference.hijabPreference,
+                    ) ?? submission.partnerPreference.hijabPreference
+                  }`,
                 )}
                 {...change.item("partnerPreference.hijabPreference", undefined, {
                   optionPrefix: "hijabPreferenceOptions",

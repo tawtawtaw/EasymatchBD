@@ -15,9 +15,10 @@ import { getMembershipTariffs, type MembershipTariff } from "@/lib/membership-ta
 import { startMembershipCheckout, confirmMembershipPayment } from "@/lib/membership-checkout";
 import { AUTH_TOKEN_KEY } from "@/lib/api";
 import { notifyAuthChanged } from "@/lib/auth-session";
-import { formatTariffPriceBdt } from "@easymatch/shared";
+import { formatTariffPriceBdt, getMembershipServicePackage } from "@easymatch/shared";
 import { PaidMembershipRequired } from "@/components/PaidMembershipRequired";
 import { MemberSubscriptionPanel } from "@/components/MemberSubscriptionPanel";
+import { MembershipCheckoutCompliance } from "@/components/MembershipCheckoutCompliance";
 import { markMobileCheckoutSession } from "@/lib/mobile-membership-checkout";
 
 export default function MembershipPage() {
@@ -25,8 +26,7 @@ export default function MembershipPage() {
   const locale = useLocale();
   const searchParams = useSearchParams();
   const fromMobile = searchParams.get("from") === "mobile";
-  const { user, ready, loggedIn } = useAuthSession();
-  const isPaid = membershipFromSession(user);
+  const { user, ready, loggedIn, refresh } = useAuthSession();
   const [eligibility, setEligibility] =
     useState<MembershipPurchaseEligibility | null>(null);
   const [eligibilityReady, setEligibilityReady] = useState(false);
@@ -34,9 +34,19 @@ export default function MembershipPage() {
   const [tariffsError, setTariffsError] = useState<string | null>(null);
   const [checkoutPlan, setCheckoutPlan] = useState<string | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [policiesAccepted, setPoliciesAccepted] = useState(false);
+
+  const isPaid = membershipFromSession(user);
+  const showCheckoutCompliance =
+    !isPaid && tariffs.length > 0 && !tariffsError;
 
   const canPay =
     loggedIn && canPurchaseMembership(user, eligibility);
+
+  useEffect(() => {
+    if (!ready || !loggedIn) return;
+    void refresh();
+  }, [loggedIn, ready, refresh]);
 
   useEffect(() => {
     if (fromMobile) {
@@ -100,6 +110,10 @@ export default function MembershipPage() {
 
   async function handleCheckout(plan: string) {
     setCheckoutError(null);
+    if (!policiesAccepted && showCheckoutCompliance) {
+      setCheckoutError(t("checkoutCompliance.checkboxRequired"));
+      return;
+    }
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
     if (!token) {
       setCheckoutError(t("signInRequired"));
@@ -211,6 +225,7 @@ export default function MembershipPage() {
 
       <section className="mt-8 space-y-4">
         <h2 className="text-lg font-semibold text-zinc-900">{t("freeTitle")}</h2>
+        <p className="text-sm font-medium text-zinc-700">{t("freeServiceCode")}</p>
         <ul className="list-inside list-disc space-y-1 text-sm text-zinc-700">
           <li>{t("free.browse")}</li>
           <li>{t("free.profile")}</li>
@@ -229,6 +244,13 @@ export default function MembershipPage() {
         <p className="text-sm text-zinc-600">{t("verifiedOnlyNote")}</p>
       </section>
 
+      {showCheckoutCompliance ? (
+        <MembershipCheckoutCompliance
+          accepted={policiesAccepted}
+          onAcceptedChange={setPoliciesAccepted}
+        />
+      ) : null}
+
       <section className="mt-8 space-y-4">
         <h2 className="text-lg font-semibold text-zinc-900">{t("plansTitle")}</h2>
         {tariffsError ? (
@@ -242,7 +264,12 @@ export default function MembershipPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             {tariffs.map((tariff) => {
               const paying = checkoutPlan === tariff.plan;
-              const payDisabled = !canPay || paying || !eligibilityReady;
+              const servicePackage = getMembershipServicePackage(tariff.plan);
+              const payDisabled =
+                !canPay ||
+                paying ||
+                !eligibilityReady ||
+                (showCheckoutCompliance && !policiesAccepted);
               return (
                 <article
                   key={tariff.id}
@@ -263,6 +290,11 @@ export default function MembershipPage() {
                   {tariffDescription(tariff) ? (
                     <p className="mt-3 text-sm text-zinc-700">
                       {tariffDescription(tariff)}
+                    </p>
+                  ) : null}
+                  {servicePackage ? (
+                    <p className="mt-2 font-mono text-xs text-zinc-500">
+                      {t("serviceCodeLabel", { code: servicePackage.code })}
                     </p>
                   ) : null}
                   <button

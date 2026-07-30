@@ -5,7 +5,7 @@ import {
 
 export const FACEBOOK_PAGE_URL = "https://www.facebook.com/EasyMatchBD";
 export const YOUTUBE_CHANNEL_URL =
-  "https://www.youtube.com/@easymatchbd-matrimoni";
+  "https://www.youtube.com/@EasyMatchBD-Matrimoni";
 
 export function getFacebookPageUrl(): string {
   const url = process.env.NEXT_PUBLIC_FACEBOOK_URL?.trim();

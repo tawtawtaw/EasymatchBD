@@ -2,7 +2,7 @@
 
 import { forwardRef, useImperativeHandle, useRef } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { formatTariffPriceBdt } from "@easymatch/shared";
+import { formatTariffPriceBdt, getMembershipServicePackage } from "@easymatch/shared";
 import type { MembershipPaymentReceipt } from "@/lib/membership-account";
 import { MEMBERSHIP_RECEIPT_CSS } from "@/lib/pdf-document-styles";
 
@@ -66,6 +66,8 @@ export const MembershipReceiptDocument = forwardRef<
 
   const isSubscriptionReceipt = receipt.receiptKind === "subscription";
   const memberName = receipt.member.fullName?.trim() || t("memberFallback");
+  const serviceCode =
+    receipt.serviceCode ?? getMembershipServicePackage(receipt.plan)?.code ?? null;
 
   const paymentRows = [
     {
@@ -73,6 +75,15 @@ export const MembershipReceiptDocument = forwardRef<
       label: t("plan"),
       value: planLabel,
     },
+    ...(serviceCode
+      ? [
+          {
+            key: "serviceCode",
+            label: t("serviceCode"),
+            value: serviceCode,
+          },
+        ]
+      : []),
     {
       key: "duration",
       label: t("duration"),

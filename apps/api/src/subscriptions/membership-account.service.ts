@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { isPaidMember } from '@easymatch/shared';
+import { isPaidMember, getMembershipServicePackage } from '@easymatch/shared';
 import { MembershipPaymentStatus, SubscriptionPlan } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MembershipService } from './membership.service';
@@ -83,6 +83,7 @@ export class MembershipAccountService {
           tranId: true,
           valId: true,
           plan: true,
+          serviceCode: true,
           amountBdt: true,
           currency: true,
           durationDays: true,
@@ -145,6 +146,7 @@ export class MembershipAccountService {
         tranId: payment.tranId,
         valId: payment.valId,
         plan: payment.plan,
+        serviceCode: payment.serviceCode,
         amountBdt: payment.amountBdt.toFixed(2),
         currency: payment.currency,
         durationDays: payment.durationDays,
@@ -168,6 +170,7 @@ export class MembershipAccountService {
           tranId: true,
           valId: true,
           plan: true,
+          serviceCode: true,
           amountBdt: true,
           currency: true,
           durationDays: true,
@@ -200,6 +203,7 @@ export class MembershipAccountService {
       tranId: payment.tranId,
       valId: payment.valId,
       plan: payment.plan,
+      serviceCode: payment.serviceCode,
       amountBdt: payment.amountBdt.toFixed(2),
       currency: payment.currency,
       durationDays: payment.durationDays,
@@ -273,6 +277,7 @@ export class MembershipAccountService {
       tranId: `EM-${reference}`,
       valId: null,
       plan: subscription.plan,
+      serviceCode: getMembershipServicePackage(subscription.plan)?.code ?? null,
       amountBdt: tariff.priceBdt,
       currency: tariff.currency,
       durationDays: tariff.durationDays,

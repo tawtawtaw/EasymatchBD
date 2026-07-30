@@ -10,6 +10,7 @@ import {
   getFacebookPageUrl,
   getYouTubeChannelUrl,
 } from "@/lib/site-social";
+import { SslCommerzFooterBanner } from "@/components/SslCommerzFooterBanner";
 
 export async function SiteFooter() {
   await connection();
@@ -80,11 +81,17 @@ export async function SiteFooter() {
             <div>
               <p className="text-sm font-semibold text-white">{t("company")}</p>
               <nav className="mt-4 flex flex-col gap-3">
+                <Link href="/cookies" className={linkClass}>
+                  {t("cookiesPolicy")}
+                </Link>
                 <Link href="/about" className={linkClass}>
                   {t("aboutUs")}
                 </Link>
                 <Link href="/privacy" className={linkClass}>
                   {t("privacyPolicy")}
+                </Link>
+                <Link href="/payment-security" className={linkClass}>
+                  {t("paymentSecurityPolicy")}
                 </Link>
                 <Link href="/privacy/fields" className={linkClass}>
                   {t("privacyFieldGuide")}
@@ -94,6 +101,9 @@ export async function SiteFooter() {
                 </Link>
                 <Link href="/refund" className={linkClass}>
                   {t("refundPolicy")}
+                </Link>
+                <Link href="/service-delivery" className={linkClass}>
+                  {t("serviceDeliveryPolicy")}
                 </Link>
               </nav>
             </div>
@@ -134,6 +144,11 @@ export async function SiteFooter() {
             </div>
           </div>
         </div>
+
+        <SslCommerzFooterBanner
+          ariaLabel={t("sslCommerzBannerAria")}
+          imageAlt={t("sslCommerzBannerAlt")}
+        />
 
         <div className="mt-12 flex flex-col gap-3 border-t border-white/10 pt-6 text-sm text-rose-100/60 sm:flex-row sm:items-center sm:justify-between">
           <p>{t("copyright", { year: new Date().getFullYear() })}</p>

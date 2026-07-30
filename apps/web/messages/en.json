@@ -66,7 +66,12 @@
     "privacyFieldGuide": "Data shared at each level",
     "howPrivacyWorks": "How privacy works",
     "terms": "Terms & Conditions",
-    "refundPolicy": "Refund Policy",
+    "refundPolicy": "Refund and Cancellation Policy",
+    "cookiesPolicy": "Cookies Policy",
+    "paymentSecurityPolicy": "Payment Security Policy",
+    "serviceDeliveryPolicy": "Service Delivery / Activation",
+    "sslCommerzBannerAria": "Visit SSLCommerz — authorized payment gateway partner",
+    "sslCommerzBannerAlt": "Payment methods accepted through SSLCommerz",
     "membershipPlans": "Membership Plans",
     "successStories": "Success Stories",
     "contact": "Contact",
@@ -81,9 +86,50 @@
   },
   "aboutPage": {
     "backHome": "← Back to home",
-    "title": "About EasymatchBD",
+    "title": "About Us",
     "intro": "EasymatchBD is a Bangladesh-focused matrimonial platform built for serious marriage search — with verification, progressive privacy, and family-friendly values.",
+    "introLicensed": "EasyMatch BD is a DNCC licensed Marriage Media / Matrimonial Service created to support safe, ethical, respectful, and family-focused matchmaking in Bangladesh. The platform aims to help brides, grooms, and families discover verified biodata, express interest, protect privacy, and connect step by step for serious marriage consideration.",
     "browseCta": "Browse verified biodata",
+    "company": {
+      "title": "Company Information",
+      "fields": {
+        "businessName": "Business Name",
+        "founder": "Founder / Proprietor",
+        "businessType": "Business Type",
+        "tradeLicenceNo": "Trade Licence No.",
+        "licensingAuthority": "Licensing Authority",
+        "tin": "TIN",
+        "dbid": "DBID",
+        "officeAddress": "Office Address",
+        "website": "Website",
+        "email": "Email",
+        "businessMobile": "Business Mobile",
+        "customerSupport": "Customer Support",
+        "facebook": "Facebook",
+        "youtube": "YouTube"
+      },
+      "values": {
+        "businessType": {
+          "marriageMedia": "Marriage Media / Matrimonial Service"
+        },
+        "licensingAuthority": {
+          "dncc": "Dhaka North City Corporation (DNCC)"
+        },
+        "tin": {
+          "pending": "[Insert TIN when available]"
+        },
+        "dbid": {
+          "pending": "[Insert DBID when available, if applicable]"
+        },
+        "address": {
+          "office": "Razia Tower, Flat E-1, 6/A/1 Navana Garden Road, South Kallyanpur, Mirpur, Dhaka-1207, Bangladesh"
+        }
+      },
+      "linkLabels": {
+        "facebook": "EasyMatch BD on Facebook",
+        "youtube": "EasyMatch BD on YouTube"
+      }
+    },
     "sections": {
       "mission": {
         "title": "Our mission",
@@ -102,10 +148,45 @@
   "privacyPage": {
     "backHome": "← Back to home",
     "title": "Privacy Policy",
-    "intro": "Your privacy is central to EasymatchBD. This summary explains how information is shared on the platform. For full legal terms, see our Terms & Conditions.",
+    "effectiveDate": "Effective Date: 30 July 2026",
+    "intro": "Your privacy is central to EasyMatch BD. This policy explains what information we collect, how we use it, how it is shared on the platform, and how payments are handled. For contractual terms, see our Terms & Conditions.",
     "termsCta": "Read Terms & Conditions",
     "fieldsCta": "See which fields unlock at each level",
     "sections": {
+      "informationWeCollect": {
+        "title": "Information We Collect",
+        "bullets": [
+          "Account information: name, mobile number, password/OTP verification status.",
+          "Biodata information: age, gender, marital status, height, education, occupation, family details, address/district, partner preferences, religious practice, and other matrimonial information provided by the user.",
+          "Verification information: NID, photos, family/guardian contact, and other documents where required.",
+          "Payment information: transaction ID, payment method, amount, membership package, date and status. Sensitive card or banking credentials are processed by the payment gateway and are not stored by EasyMatch BD unless legally required or provided by the gateway as masked data.",
+          "Technical information: IP address, browser/device information, cookies, page visits, referral source, and website usage information."
+        ]
+      },
+      "howWeUse": {
+        "title": "How We Use Information",
+        "bullets": [
+          "Create, verify, manage, and display matrimonial biodata according to privacy settings.",
+          "Provide search, interest, acceptance, messaging, video call, and family-connection services.",
+          "Process payments, issue receipts, manage membership, and handle refunds where applicable.",
+          "Prevent fraud, misuse, duplicate profiles, and security incidents.",
+          "Communicate service updates, verification requests, support messages, and account notices."
+        ]
+      },
+      "sharingDisclosure": {
+        "title": "Sharing and Disclosure",
+        "body": "We share information step by step according to privacy level, user consent, service rules, and mutual interest. We do not sell personal biodata to third parties. Information may be shared with payment gateway, hosting, SMS/OTP, verification, legal, regulatory, or technical service providers only as needed for service delivery and compliance."
+      },
+      "paymentSecurity": {
+        "title": "Payment Security",
+        "bullets": [
+          "Online payments should be processed through a secure and authorized payment gateway such as SSLCommerz or another approved provider.",
+          "Card, mobile wallet, and banking credentials should be entered only on secure payment pages using HTTPS/SSL encryption.",
+          "EasyMatch BD receives payment status, transaction reference, amount, and masked payment information only; full card credentials are not stored on our website.",
+          "Users should not share OTP, card PIN, mobile banking PIN, or sensitive credentials with EasyMatch BD staff or any third party.",
+          "Suspected unauthorized payment should be reported immediately to the issuing bank/payment provider and EasyMatch BD support."
+        ]
+      },
       "overview": {
         "title": "Progressive disclosure",
         "body": "We do not show photos or contact details in public browse. Members reveal more biodata step by step as both sides agree to move forward together."
@@ -126,7 +207,7 @@
   },
   "refundPage": {
     "backHome": "← Back to home",
-    "title": "Refund Policy",
+    "title": "Refund and Cancellation Policy",
     "intro": "This policy explains how EasymatchBD handles membership payments and refund requests. We want you to feel confident when upgrading your account. If you change your mind shortly after purchase, we intend to honor a full refund when you ask within two days.",
     "contactCta": "Contact support",
     "membershipCta": "View membership plans",
@@ -153,6 +234,138 @@
       }
     }
   },
+  "paymentSecurityPage": {
+    "backHome": "← Back to home",
+    "title": "Payment Security Policy",
+    "effectiveDate": "Effective Date: 30 July 2026",
+    "intro": "EasyMatch BD uses authorized online payment gateways for membership purchases. This policy explains how payments are secured, what information we receive, and how you can protect your credentials.",
+    "membershipCta": "View membership plans",
+    "contactCta": "Contact support",
+    "sections": {
+      "gateway": {
+        "title": "Authorized payment gateway",
+        "body": "Membership fees are collected through SSLCommerz or another approved Bangladesh payment gateway. You are redirected to the gateway’s secure checkout page to complete payment. EasyMatch BD does not collect or store full card numbers, CVV, or mobile banking PIN on our servers."
+      },
+      "encryption": {
+        "title": "Encryption and secure pages",
+        "bullets": [
+          "Checkout and callback pages use HTTPS (SSL/TLS) encryption.",
+          "Enter payment credentials only on the gateway’s official payment screen.",
+          "Verify the browser padlock and domain before submitting sensitive information."
+        ]
+      },
+      "dataHandling": {
+        "title": "What EasyMatch BD receives",
+        "bullets": [
+          "Transaction ID, validation reference, amount, currency, and payment status from the gateway.",
+          "Membership plan and service package code linked to your purchase.",
+          "Masked or non-sensitive payment metadata when provided by the gateway — not full card credentials."
+        ]
+      },
+      "userResponsibilities": {
+        "title": "Your responsibilities",
+        "bullets": [
+          "Do not share OTP, card PIN, mobile banking PIN, or passwords with EasyMatch BD staff or anyone claiming to represent us.",
+          "Report suspected unauthorized charges to your bank or wallet provider and contact our support promptly.",
+          "Keep your account login credentials private and use a strong password."
+        ]
+      },
+      "support": {
+        "title": "Payment support",
+        "body": "For billing questions, failed payments, or receipt requests, contact us via the Contact page or WhatsApp support listed on the website. Include your transaction ID when available."
+      }
+    }
+  },
+  "serviceDeliveryPage": {
+    "backHome": "← Back to home",
+    "title": "Service Delivery / Activation Timeline",
+    "intro": "EasyMatch BD provides digital and service-based matrimonial support. There is no physical product shipping unless specifically mentioned for a separate item.",
+    "membershipCta": "View membership plans",
+    "refundCta": "Refund and cancellation policy",
+    "timelineTable": {
+      "title": "Service Delivery / Activation Timeline",
+      "columns": {
+        "service": "Service",
+        "timeline": "Delivery / Activation Timeline",
+        "remarks": "Remarks"
+      },
+      "rows": {
+        "freeRegistration": {
+          "service": "Free Registration",
+          "timeline": "Immediate to 24 hours after OTP/mobile verification",
+          "remarks": "Subject to system availability"
+        },
+        "biodataReview": {
+          "service": "Biodata Submission Review",
+          "timeline": "1–3 working days",
+          "remarks": "May take longer if information is incomplete"
+        },
+        "paidMembership": {
+          "service": "Paid Membership Activation",
+          "timeline": "Instant to 24 hours after payment confirmation",
+          "remarks": "Depends on payment gateway status"
+        },
+        "profileVerification": {
+          "service": "Profile Verification Support",
+          "timeline": "3–7 working days",
+          "remarks": "Subject to document and family verification"
+        },
+        "interestProcessing": {
+          "service": "Interest Request Processing",
+          "timeline": "Immediate to 48 hours",
+          "remarks": "Depends on recipient response and privacy level"
+        },
+        "familyContact": {
+          "service": "Family Contact Exchange",
+          "timeline": "After mutual consent and higher privacy-level approval",
+          "remarks": "Serious marriage consideration only"
+        }
+      }
+    },
+    "sections": {
+      "digitalService": {
+        "title": "How services are delivered",
+        "body": "Registration, biodata, membership, verification, interest, messaging, and family contact features are delivered online through the EasymatchBD website and mobile app. Timelines above apply unless a separate written agreement states otherwise."
+      },
+      "support": {
+        "title": "Need help?",
+        "body": "If paid membership does not activate within 24 hours of payment confirmation, contact support with your transaction ID. For verification or biodata review delays, use WhatsApp support or the Contact page."
+      }
+    }
+  },
+  "cookiesPage": {
+    "backHome": "← Back to home",
+    "title": "Cookies Policy",
+    "intro": "This policy explains how EasymatchBD uses cookies and similar technologies when you visit our website or use your account. We keep this practical and transparent so you know what is stored on your device and why.",
+    "privacyCta": "Read Privacy Policy",
+    "contactCta": "Contact us",
+    "sections": {
+      "overview": {
+        "title": "What are cookies and similar storage?",
+        "body": "Cookies are small text files saved by your browser. We also use similar browser storage (such as local storage) for features that need to remember your sign-in or preferences. EasymatchBD is focused on matrimonial services — we do not use cookies for third-party advertising on this site."
+      },
+      "essential": {
+        "title": "Essential cookies and storage",
+        "body": "When you sign in, we store a secure access token in your browser so you stay logged in during your session. These are necessary to operate your account, protect access to your profile, and process actions you request (such as saving biodata or sending interest). Without them, the platform cannot work as intended."
+      },
+      "preferences": {
+        "title": "Preferences and language",
+        "body": "We may remember choices that improve your experience — for example, your selected language (English or Bangla) and certain on-screen settings. This storage is tied to your device and is used only to make the site easier to use on return visits."
+      },
+      "thirdParty": {
+        "title": "Payment and embedded content",
+        "body": "When you pay for membership or services, you may be redirected to our payment partner (for example SSLCommerz). That provider may set its own cookies or session data on their pages to complete the transaction securely. Embedded videos (such as YouTube) may use cookies according to the provider’s policy when you play them."
+      },
+      "control": {
+        "title": "Your choices",
+        "body": "You can clear cookies and site data through your browser settings at any time. Note that clearing essential storage will sign you out and reset some preferences. Most browsers also let you block cookies; blocking all cookies may prevent login and core features from working."
+      },
+      "updates": {
+        "title": "Updates and contact",
+        "body": "We may update this Cookies Policy when our technology or legal requirements change. The version on this page applies from the date it is published. For questions, contact us via the Contact page or WhatsApp support listed in the footer."
+      }
+    }
+  },
   "contactPage": {
     "backHome": "← Back to home",
     "title": "Contact us",
@@ -169,8 +382,11 @@
     "youtubeAction": "Visit our channel",
     "emailTitle": "Email",
     "emailBody": "Send us a message and we will respond as soon as possible.",
-    "supportTitle": "Support",
-    "supportBody": "Use the WhatsApp button on the site for the quickest response from our team.",
+    "supportTitle": "Official support channels",
+    "supportIntro": "For support, refund request, complaint, privacy request, or payment issue, contact EasyMatch BD through the official channels below:",
+    "supportEmailLabel": "Email",
+    "supportWhatsAppLabel": "WhatsApp / Business Mobile",
+    "supportCustomerLabel": "Customer Support",
     "hoursTitle": "Support hours",
     "hoursBody": "We aim to respond to WhatsApp messages within business hours (Sunday–Thursday, Bangladesh time). Messages outside hours are answered on the next working day."
   },
@@ -2224,6 +2440,18 @@
     "priceLabel": "৳{price}",
     "durationLabel": "{days} days",
     "payWithSslCommerz": "Pay with SSLCommerz",
+    "serviceCodeLabel": "Service code: {code}",
+    "freeServiceCode": "Service code: EMBD-FREE — Free Registration",
+    "checkoutCompliance": {
+      "title": "Before you pay",
+      "refundSummary": "Membership purchases may qualify for a full refund if you contact us within 2 calendar days (48 hours) of payment, subject to our Refund and Cancellation Policy.",
+      "deliveryIntro": "EasyMatch BD provides digital and service-based matrimonial support — no physical product shipping unless stated separately. Service delivery and activation timelines before you pay:",
+      "policyLinksIntro": "Full policies:",
+      "refundLink": "Refund and Cancellation Policy",
+      "deliveryLink": "Service Delivery / Activation Timeline",
+      "checkboxRequired": "You must accept the policies above before proceeding to payment.",
+      "agreement": "I have read and agree to the <terms>Terms and Conditions</terms>, <privacy>Privacy Policy</privacy>, <cookies>Cookies Policy</cookies>, <paymentSecurity>Payment Security Policy</paymentSecurity>, <refund>Refund and Cancellation Policy</refund>, and <serviceDelivery>Service Delivery / Activation Timeline</serviceDelivery> of EasyMatch BD."
+    },
     "homeUpsell": "Interest, messaging, video calls, and biodata PDF export require a paid membership.",
     "dev": {
       "title": "Development tools",
@@ -2280,6 +2508,7 @@
       "statusActive": "Active",
       "statusInactive": "Expired or inactive",
       "paymentsTitle": "Payment history",
+      "serviceCode": "Service code",
       "transactionId": "Transaction ID",
       "amountValue": "৳{amount} {currency}",
       "downloadReceipt": "Download receipt (PDF)",
@@ -2304,6 +2533,7 @@
       "profileCode": "Profile ID",
       "phone": "Mobile",
       "plan": "Membership plan",
+      "serviceCode": "Service code",
       "duration": "Duration",
       "durationValue": "{days} days",
       "paymentMethod": "Payment method",

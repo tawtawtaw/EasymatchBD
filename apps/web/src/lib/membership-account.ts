@@ -17,6 +17,7 @@ export type MemberPaymentRecord = {
   tranId: string;
   valId: string | null;
   plan: string;
+  serviceCode: string | null;
   amountBdt: string;
   currency: string;
   durationDays: number;

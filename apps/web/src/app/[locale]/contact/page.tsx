@@ -10,6 +10,8 @@ import {
   getFacebookPageUrl,
   getYouTubeChannelUrl,
 } from "@/lib/site-social";
+import { ABOUT_COMPANY, phoneTelHref } from "@/lib/about-company";
+import { buildWhatsAppChatUrl, normalizeWhatsAppPhoneDigits } from "@/lib/whatsapp-support";
 
 export default async function ContactPage({
   params,
@@ -21,7 +23,13 @@ export default async function ContactPage({
   await connection();
   const t = await getTranslations("contactPage");
   const whatsappHref = buildWhatsAppSupportHref(t("whatsappMessage"));
-  const contactEmail = getContactEmail();
+  const contactEmail = getContactEmail() ?? ABOUT_COMPANY.email;
+  const businessWhatsAppDigits = normalizeWhatsAppPhoneDigits(
+    ABOUT_COMPANY.businessMobile,
+  );
+  const businessWhatsAppHref = businessWhatsAppDigits
+    ? buildWhatsAppChatUrl(businessWhatsAppDigits, t("whatsappMessage"))
+    : null;
   const facebookHref = getFacebookPageUrl();
   const youtubeHref = getYouTubeChannelUrl();
 
@@ -88,25 +96,69 @@ export default async function ContactPage({
             </span>
           </a>
 
-          {contactEmail ? (
-            <a
-              href={`mailto:${contactEmail}`}
-              className="flex flex-col rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm transition hover:border-rose-200 hover:shadow-md"
-            >
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-rose-700 text-sm font-bold text-white">
-                @
-              </span>
-              <h2 className="mt-4 font-semibold text-zinc-900">{t("emailTitle")}</h2>
-              <p className="mt-2 text-sm text-zinc-600">{t("emailBody")}</p>
-              <span className="mt-4 text-sm font-semibold text-rose-800">{contactEmail}</span>
-            </a>
-          ) : (
-            <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-              <h2 className="font-semibold text-zinc-900">{t("supportTitle")}</h2>
-              <p className="mt-2 text-sm text-zinc-600">{t("supportBody")}</p>
-            </div>
-          )}
+          <a
+            href={`mailto:${contactEmail}`}
+            className="flex flex-col rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm transition hover:border-rose-200 hover:shadow-md"
+          >
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-rose-700 text-sm font-bold text-white">
+              @
+            </span>
+            <h2 className="mt-4 font-semibold text-zinc-900">{t("emailTitle")}</h2>
+            <p className="mt-2 text-sm text-zinc-600">{t("emailBody")}</p>
+            <span className="mt-4 text-sm font-semibold text-rose-800">{contactEmail}</span>
+          </a>
         </div>
+
+        <section className="rounded-2xl border border-rose-200 bg-rose-50 p-6 shadow-sm">
+          <h2 className="font-semibold text-zinc-900">{t("supportTitle")}</h2>
+          <p className="mt-2 text-sm leading-relaxed text-zinc-700">{t("supportIntro")}</p>
+          <dl className="mt-4 space-y-3 text-sm">
+            <div>
+              <dt className="font-medium text-zinc-900">{t("supportEmailLabel")}</dt>
+              <dd className="mt-0.5">
+                <a
+                  href={`mailto:${ABOUT_COMPANY.email}`}
+                  className="font-medium text-rose-800 hover:underline"
+                >
+                  {ABOUT_COMPANY.email}
+                </a>
+              </dd>
+            </div>
+            <div>
+              <dt className="font-medium text-zinc-900">{t("supportWhatsAppLabel")}</dt>
+              <dd className="mt-0.5">
+                {businessWhatsAppHref ? (
+                  <a
+                    href={businessWhatsAppHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-rose-800 hover:underline"
+                  >
+                    {ABOUT_COMPANY.businessMobile}
+                  </a>
+                ) : (
+                  <a
+                    href={phoneTelHref(ABOUT_COMPANY.businessMobile)}
+                    className="font-medium text-rose-800 hover:underline"
+                  >
+                    {ABOUT_COMPANY.businessMobile}
+                  </a>
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt className="font-medium text-zinc-900">{t("supportCustomerLabel")}</dt>
+              <dd className="mt-0.5">
+                <a
+                  href={phoneTelHref(ABOUT_COMPANY.customerSupport)}
+                  className="font-medium text-rose-800 hover:underline"
+                >
+                  {ABOUT_COMPANY.customerSupport}
+                </a>
+              </dd>
+            </div>
+          </dl>
+        </section>
 
         <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
           <h2 className="font-semibold text-zinc-900">{t("hoursTitle")}</h2>

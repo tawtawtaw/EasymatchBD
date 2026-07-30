@@ -182,12 +182,15 @@ export const TERMS_SECTIONS: TermsSection[] = [
     intro: 'Users agree that:',
     bullets: [
       'Subscription fees are payable in advance.',
+      'Services are digital and service-based unless a separate item is explicitly stated; there is no physical product shipping by default.',
+      'Paid membership activation is typically instant to 24 hours after payment confirmation, depending on payment gateway status (see Service Delivery / Activation Timeline on the website).',
       'Fees are generally non-refundable once services are activated.',
       'Promotional offers may be subject to separate conditions.',
       'Premium features may change from time to time.',
     ],
     paragraphs: [
-      'Refunds, if applicable, shall be governed by the Platform\'s Refund Policy.',
+      'Refunds, if applicable, shall be governed by the Platform\'s Refund and Cancellation Policy.',
+      'Delivery and activation timelines for registration, biodata review, verification, interest, and family contact are set out in the Service Delivery / Activation Timeline policy on the website.',
     ],
   },
   {

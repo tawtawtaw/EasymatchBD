@@ -10,6 +10,7 @@ import {
   isPaidMember,
   PROFILE_REQUIRED_FOR_SUBSCRIPTION_MESSAGE,
   VERIFIED_MEMBER_REQUIRED_FOR_SUBSCRIPTION_MESSAGE,
+  getMembershipServicePackage,
 } from '@easymatch/shared';
 import {
   MembershipPaymentStatus,
@@ -120,11 +121,13 @@ export class MembershipPaymentService {
     const amount = new Prisma.Decimal(tariff.priceBdt);
     const tranId = `EM-${randomBytes(6).toString('hex')}-${Date.now()}`;
     const callbackBase = this.callbackBaseUrl();
+    const servicePackage = getMembershipServicePackage(plan);
 
     await this.prisma.membershipPayment.create({
       data: {
         userId,
         plan: plan as SubscriptionPlan,
+        serviceCode: servicePackage?.code ?? null,
         tranId,
         amountBdt: amount,
         currency: tariff.currency,
@@ -153,7 +156,9 @@ export class MembershipPaymentService {
       cancel_url: `${callbackBase}/cancel`,
       ipn_url: `${callbackBase}/ipn`,
       shipping_method: 'NO',
-      product_name: tariff.labelEn,
+      product_name: servicePackage
+        ? `${servicePackage.code} — ${tariff.labelEn}`
+        : tariff.labelEn,
       product_category: 'Membership',
       product_profile: 'non-physical-goods',
       cus_name: customerName,
