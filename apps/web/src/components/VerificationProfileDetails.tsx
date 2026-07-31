@@ -202,14 +202,20 @@ function DetailItem({
     <div
       className={
         changed
-          ? `rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 ${className ?? ""}`
-          : className
+          ? `min-w-0 break-words rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 ${className ?? ""}`
+          : `min-w-0 break-words ${className ?? ""}`
       }
     >
       <dt className={changed ? "font-medium text-amber-900" : "text-zinc-500"}>
         {label}
       </dt>
-      <dd className={changed ? "font-semibold text-amber-950" : "font-medium text-zinc-900"}>
+      <dd
+        className={
+          changed
+            ? "break-words font-semibold text-amber-950"
+            : "break-words font-medium text-zinc-900"
+        }
+      >
         {value}
       </dd>
       {changed && previousValue != null && (
@@ -220,7 +226,11 @@ function DetailItem({
 }
 
 function DetailGrid({ children }: { children: ReactNode }) {
-  return <dl className="grid gap-3 text-sm sm:grid-cols-2">{children}</dl>;
+  return (
+    <dl className="grid min-w-0 grid-cols-1 gap-3 text-sm md:grid-cols-2 [&>*]:min-w-0">
+      {children}
+    </dl>
+  );
 }
 
 function Section({
@@ -231,11 +241,11 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-4">
+    <section className="min-w-0 overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50/80 p-4">
       <h3 className="text-sm font-bold uppercase tracking-wide text-zinc-600">
         {title}
       </h3>
-      <div className="mt-3">{children}</div>
+      <div className="mt-3 min-w-0">{children}</div>
     </section>
   );
 }
@@ -306,7 +316,7 @@ export function VerificationProfileDetails({
   const change = useBiodataChangeTracker(submissionWithChanges, fmt, tf, previousLabel);
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 max-w-full space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-zinc-900">{t("profileDetails")}</h2>
@@ -345,7 +355,7 @@ export function VerificationProfileDetails({
             <DetailItem
               label={tf("divorceDetails")}
               value={display(personal.divorceDetails)}
-              className="sm:col-span-2"
+              className="md:col-span-2"
               {...change.item("personal.divorceDetails", "divorceDetails")}
             />
           )}
@@ -452,7 +462,7 @@ export function VerificationProfileDetails({
             <p className="text-xs font-semibold uppercase text-zinc-500">
               {tf("currentAddress")}
             </p>
-            <p className="mt-1 text-sm text-zinc-900">
+            <p className="mt-1 break-words text-sm text-zinc-900">
               {formatAddressBlock(
                 {
                   country: personal.currentCountry,
@@ -476,7 +486,7 @@ export function VerificationProfileDetails({
             <p className="text-xs font-semibold uppercase text-zinc-500">
               {tf("permanentAddress")}
             </p>
-            <p className="mt-1 text-sm text-zinc-900">
+            <p className="mt-1 break-words text-sm text-zinc-900">
               {personal.permanentSameAsCurrent
                 ? t("sameAsCurrent")
                 : formatAddressBlock(
@@ -665,7 +675,7 @@ export function VerificationProfileDetails({
                 <DetailItem
                   label={tf("livingArrangementsOther")}
                   value={display(marital.livingArrangementsOther)}
-                  className="sm:col-span-2"
+                  className="md:col-span-2"
                   {...change.item(
                     "marital.livingArrangementsOther",
                     "livingArrangementsOther",

@@ -352,7 +352,7 @@ export function AdminProfilesPanel({
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-      <section className="rounded-2xl border border-zinc-300 bg-white p-4 shadow-md sm:p-6">
+      <section className="min-w-0 rounded-2xl border border-zinc-300 bg-white p-4 shadow-md sm:p-6">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 className="text-lg font-bold text-zinc-900">{t("title")}</h2>
@@ -518,7 +518,7 @@ export function AdminProfilesPanel({
         ) : null}
       </section>
 
-      <section className="rounded-2xl border border-zinc-300 bg-white p-4 shadow-md sm:p-6">
+      <section className="min-w-0 rounded-2xl border border-zinc-300 bg-white p-4 shadow-md sm:p-6">
         {!selected ? (
           <p className="text-sm text-zinc-600">{t("selectProfile")}</p>
         ) : detailLoading ? (
@@ -536,7 +536,7 @@ export function AdminProfilesPanel({
               </p>
             </div>
 
-            <dl className="grid gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm sm:grid-cols-2">
+            <dl className="grid min-w-0 grid-cols-1 gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm md:grid-cols-2 [&>*]:min-w-0">
               <div>
                 <dt className="text-zinc-500">{t("loginPhoneLabel")}</dt>
                 <dd className="font-semibold text-zinc-900">
@@ -699,7 +699,7 @@ export function AdminProfilesPanel({
               <p className="text-sm text-zinc-600">{t("noProfileYet")}</p>
             </div>
 
-            <dl className="grid gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm sm:grid-cols-2">
+            <dl className="grid min-w-0 grid-cols-1 gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm md:grid-cols-2 [&>*]:min-w-0">
               <div>
                 <dt className="text-zinc-500">{t("loginPhoneLabel")}</dt>
                 <dd className="font-semibold text-zinc-900">

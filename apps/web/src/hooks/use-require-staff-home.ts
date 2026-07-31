@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "@/i18n/routing";
 import { isStaffRole, isSuperAdminRole } from "@easymatch/shared";
 import { useAuthSession } from "@/hooks/use-auth-session";
+import { useAuthToken } from "@/hooks/use-auth-token";
 import { staffHomePath } from "@/lib/staff-routing";
 import { isOfficerRole } from "@/lib/verification";
 
@@ -12,11 +13,15 @@ export type StaffLandingKind = "admin" | "verification";
 export function useRequireStaffLanding(kind: StaffLandingKind) {
   const router = useRouter();
   const { user, ready, loggedIn } = useAuthSession();
+  const authToken = useAuthToken();
 
   useEffect(() => {
     if (!ready) return;
 
     if (!loggedIn) {
+      if (authToken) {
+        return;
+      }
       router.replace("/auth");
       return;
     }
@@ -34,7 +39,7 @@ export function useRequireStaffLanding(kind: StaffLandingKind) {
     if (!allowed) {
       router.replace(staffHomePath(user.role));
     }
-  }, [ready, loggedIn, user, router, kind]);
+  }, [ready, loggedIn, authToken, user, router, kind]);
 
   const authorized =
     ready &&
@@ -45,5 +50,7 @@ export function useRequireStaffLanding(kind: StaffLandingKind) {
       ? isSuperAdminRole(user.role)
       : isOfficerRole(user.role));
 
-  return { ready, authorized, user };
+  const sessionPending = ready && !loggedIn && Boolean(authToken);
+
+  return { ready: ready && !sessionPending, authorized, user, sessionPending };
 }

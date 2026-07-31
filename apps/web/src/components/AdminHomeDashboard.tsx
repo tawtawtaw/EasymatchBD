@@ -8,6 +8,10 @@ import { useAuthToken } from "@/hooks/use-auth-token";
 import { useMounted } from "@/hooks/use-mounted";
 import { useRequireStaffLanding } from "@/hooks/use-require-staff-home";
 import { resolveStaffDisplayName } from "@/lib/staff-display";
+import {
+  handleStaffDashboardLoadError,
+  shouldSignOutAfterStaffLoadError,
+} from "@/lib/staff-dashboard-load-error";
 import { AdminPaymentsRecentSection } from "@/components/AdminPaymentsRecentSection";
 
 export function AdminHomeDashboard() {
@@ -20,6 +24,7 @@ export function AdminHomeDashboard() {
   const [loading, setLoading] = useState(true);
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [completionPercent, setCompletionPercent] = useState(100);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!mounted || !authorized) return;
@@ -38,8 +43,14 @@ export function AdminHomeDashboard() {
         if (cancelled) return;
         setDisplayName(resolveStaffDisplayName(bootstrap.profile));
         setCompletionPercent(bootstrap.completionPercent ?? 100);
-      } catch {
-        if (!cancelled) router.replace("/auth");
+      } catch (err) {
+        if (cancelled) return;
+        handleStaffDashboardLoadError(err, () => router.replace("/auth"));
+        if (!shouldSignOutAfterStaffLoadError(err)) {
+          setLoadError(
+            err instanceof Error ? err.message : "Could not load dashboard.",
+          );
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -56,6 +67,21 @@ export function AdminHomeDashboard() {
     return (
       <main className="mx-auto max-w-5xl px-4 py-16 sm:px-6">
         <p className="text-zinc-600">{tc("loading")}</p>
+      </main>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <main className="mx-auto max-w-5xl px-4 py-16 sm:px-6">
+        <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800">{loadError}</p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="mt-4 text-sm font-semibold text-rose-800 hover:underline"
+        >
+          Try again
+        </button>
       </main>
     );
   }

@@ -7,6 +7,10 @@ import { AUTH_TOKEN_KEY, getProfileEditorBootstrap } from "@/lib/api";
 import { useAuthToken } from "@/hooks/use-auth-token";
 import { useMounted } from "@/hooks/use-mounted";
 import { useRequireStaffLanding } from "@/hooks/use-require-staff-home";
+import {
+  handleStaffDashboardLoadError,
+  shouldSignOutAfterStaffLoadError,
+} from "@/lib/staff-dashboard-load-error";
 import { resolveStaffDisplayName } from "@/lib/staff-display";
 import { getVerificationQueue } from "@/lib/verification";
 
@@ -21,6 +25,7 @@ export function VerificationHomeDashboard() {
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [completionPercent, setCompletionPercent] = useState(100);
   const [pendingCount, setPendingCount] = useState(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!mounted || !authorized) return;
@@ -43,8 +48,12 @@ export function VerificationHomeDashboard() {
         setDisplayName(resolveStaffDisplayName(bootstrap.profile));
         setCompletionPercent(bootstrap.completionPercent ?? 100);
         setPendingCount(queue.length);
-      } catch {
-        if (!cancelled) router.replace("/auth");
+      } catch (err) {
+        if (cancelled) return;
+        handleStaffDashboardLoadError(err, () => router.replace("/auth"));
+        if (!shouldSignOutAfterStaffLoadError(err)) {
+          setLoadError(err instanceof Error ? err.message : "Could not load dashboard.");
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -61,6 +70,25 @@ export function VerificationHomeDashboard() {
     return (
       <main className="mx-auto max-w-5xl px-4 py-16 sm:px-6">
         <p className="text-zinc-600">{tc("loading")}</p>
+      </main>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <main className="mx-auto max-w-5xl px-4 py-16 sm:px-6">
+        <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800">{loadError}</p>
+        <button
+          type="button"
+          onClick={() => {
+            setLoadError(null);
+            setLoading(true);
+            window.location.reload();
+          }}
+          className="mt-4 text-sm font-semibold text-rose-800 hover:underline"
+        >
+          Try again
+        </button>
       </main>
     );
   }

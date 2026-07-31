@@ -1,7 +1,7 @@
-import { EASYMATCH_API_URL, type VerificationBiodataChanges } from "@easymatch/shared";
+import { type VerificationBiodataChanges } from "@easymatch/shared";
 import type { BiodataExportPayload } from "@/lib/profile-biodata-export";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? EASYMATCH_API_URL;
+import { getApiBaseUrl } from "@/lib/api-base-url";
+import { apiFetch, readJsonResponse } from "@/lib/parse-response";
 
 export type MediaReviewStatus = "pending" | "approved" | "rejected";
 
@@ -200,17 +200,17 @@ function authHeaders(token: string) {
 }
 
 export async function getVerificationQueue(token: string) {
-  const res = await fetch(`${API_URL}/verification/queue`, {
+  const res = await apiFetch(`${getApiBaseUrl()}/verification/queue`, {
     headers: authHeaders(token),
   });
-  return parseResponse<VerificationQueueItem[]>(res);
+  return readJsonResponse<VerificationQueueItem[]>(res);
 }
 
 export async function getVerificationSubmission(token: string, profileId: string) {
-  const res = await fetch(`${API_URL}/verification/submissions/${profileId}`, {
+  const res = await apiFetch(`${getApiBaseUrl()}/verification/submissions/${profileId}`, {
     headers: authHeaders(token),
   });
-  return parseResponse<VerificationSubmission>(res);
+  return readJsonResponse<VerificationSubmission>(res);
 }
 
 export async function reviewPhoto(
@@ -219,7 +219,7 @@ export async function reviewPhoto(
   decision: "approved" | "rejected",
   officerMessage?: string,
 ) {
-  const res = await fetch(`${API_URL}/verification/photos/${photoId}/review`, {
+  const res = await fetch(`${getApiBaseUrl()}/verification/photos/${photoId}/review`, {
     method: "POST",
     headers: authHeaders(token),
     body: JSON.stringify({
@@ -237,7 +237,7 @@ export async function reviewProfileBiodata(
   officerMessage?: string,
 ) {
   const res = await fetch(
-    `${API_URL}/verification/profiles/${profileId}/biodata/review`,
+    `${getApiBaseUrl()}/verification/profiles/${profileId}/biodata/review`,
     {
       method: "POST",
       headers: authHeaders(token),
@@ -264,7 +264,7 @@ export async function reviewNid(
   officerMessage?: string,
 ) {
   const res = await fetch(
-    `${API_URL}/verification/profiles/${profileId}/nid/review?subject=${subject}`,
+    `${getApiBaseUrl()}/verification/profiles/${profileId}/nid/review?subject=${subject}`,
     {
     method: "POST",
     headers: authHeaders(token),
@@ -284,7 +284,7 @@ export async function fetchVerificationBlob(
   token: string,
   path: string,
 ): Promise<Blob> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetch(`${getApiBaseUrl()}${path}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
@@ -302,7 +302,7 @@ export async function fetchVerificationAuditBiodata(
   profileId: string,
 ): Promise<BiodataExportPayload> {
   const res = await fetch(
-    `${API_URL}/verification/profiles/${profileId}/biodata-export`,
+    `${getApiBaseUrl()}/verification/profiles/${profileId}/biodata-export`,
     {
       headers: { Authorization: `Bearer ${token}` },
     },

@@ -260,8 +260,8 @@ export default function VerificationPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-rose-50 to-white px-4 py-10">
-      <div className="mx-auto max-w-6xl space-y-6">
+    <div className="min-h-screen overflow-x-hidden bg-gradient-to-b from-rose-50 to-white px-4 py-10">
+      <div className="mx-auto min-w-0 max-w-6xl space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <Link href="/verification/home" className="text-sm font-medium text-rose-700 hover:underline">
@@ -282,8 +282,8 @@ export default function VerificationPage() {
           <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
         )}
 
-        <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
-          <aside className="rounded-2xl border border-zinc-300 bg-white p-4 shadow-md">
+        <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)]">
+          <aside className="min-w-0 rounded-2xl border border-zinc-300 bg-white p-4 shadow-md">
             <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-zinc-500">
               {t("pendingQueue")}
             </h2>
@@ -334,14 +334,14 @@ export default function VerificationPage() {
             )}
           </aside>
 
-          <main className="rounded-2xl border border-zinc-300 bg-white p-6 shadow-md">
+          <main className="min-w-0 overflow-x-hidden rounded-2xl border border-zinc-300 bg-white p-4 shadow-md sm:p-6">
             {!submission ? (
               <p className="text-sm text-zinc-600">{t("selectSubmission")}</p>
             ) : (
               <div className="space-y-8">
                 <section className="rounded-xl border border-zinc-200 bg-white p-4">
                   <h2 className="text-lg font-bold text-zinc-900">{t("applicant")}</h2>
-                  <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+                  <dl className="mt-3 grid min-w-0 grid-cols-1 gap-2 text-sm md:grid-cols-2 [&>*]:min-w-0">
                     <div>
                       <dt className="text-zinc-500">{t("fullName")}</dt>
                       <dd className="font-semibold text-zinc-900">
@@ -371,9 +371,9 @@ export default function VerificationPage() {
                       </dd>
                     </div>
                     {submission.creationMode === "on_behalf" ? (
-                      <div className="sm:col-span-2">
+                      <div className="md:col-span-2">
                         <dt className="text-zinc-500">{t("creationMode")}</dt>
-                        <dd className="font-semibold text-zinc-900">
+                        <dd className="break-words font-semibold text-zinc-900">
                           {t("onBehalfProfile", {
                             relation: submission.onBehalfRelation
                               ? t(`onBehalfRelations.${submission.onBehalfRelation}`)
