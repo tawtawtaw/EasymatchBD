@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
+import { useSearchParams } from "next/navigation";
 import { Link, useRouter } from "@/i18n/routing";
 import { AUTH_TOKEN_KEY, getSession } from "@/lib/api";
 import { useAuthToken } from "@/hooks/use-auth-token";
@@ -26,6 +27,7 @@ function connectionProfileRef(member: ConnectionItem["member"]) {
 
 export default function ConnectionsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { isMember } = useRequireMember();
   const t = useTranslations("connections");
   const tp = useTranslations("privacy");
@@ -72,6 +74,14 @@ export default function ConnectionsPage() {
     if (!mounted) return;
     void load();
   }, [mounted, load]);
+
+  useEffect(() => {
+    if (!mounted || loading || connections.length === 0) return;
+    const highlightId = searchParams.get("connectionId")?.trim();
+    if (!highlightId) return;
+    const el = document.getElementById(`connection-${highlightId}`);
+    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [mounted, loading, connections, searchParams]);
 
   useEffect(() => {
     if (!mounted) return;
@@ -212,6 +222,7 @@ export default function ConnectionsPage() {
             return (
               <li
                 key={connection.connectionId}
+                id={`connection-${connection.connectionId}`}
                 className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm"
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
