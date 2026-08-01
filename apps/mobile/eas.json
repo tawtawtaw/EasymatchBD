@@ -24,6 +24,18 @@
       },
       "prebuildCommand": "node scripts/verify-google-services.mjs && npx expo prebuild --platform android --no-install"
     },
+    "preview-live": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.easymatchbd.com/api/v1",
+        "EXPO_PUBLIC_WEB_URL": "https://easymatchbd.com",
+        "EXPO_PUBLIC_VIDEO_CALL_WEB_URL": "https://easymatchbd.com"
+      },
+      "android": {
+        "buildType": "apk"
+      },
+      "prebuildCommand": "node scripts/verify-google-services.mjs && npx expo prebuild --platform android --no-install"
+    },
     "production": {
       "android": {
         "buildType": "app-bundle"
