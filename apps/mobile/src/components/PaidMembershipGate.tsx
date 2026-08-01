@@ -62,7 +62,7 @@ export function PaidMembershipGate({
         )
       ) : (
         <>
-          <Text style={styles.note}>{copy.requiredNote}</Text>
+          <Text style={styles.note}>{copy.checkoutSubtitle}</Text>
           <Pressable style={styles.button} onPress={handleUpgrade}>
             <Text style={styles.buttonText}>{copy.viewPlans}</Text>
           </Pressable>
