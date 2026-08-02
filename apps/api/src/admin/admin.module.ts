@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AuthModule } from '../auth/auth.module';
 import { ConsultantModule } from '../consultant/consultant.module';
 import { DropdownsModule } from '../dropdowns/dropdowns.module';
 import { LegalModule } from '../legal/legal.module';
@@ -18,7 +19,7 @@ import { AdminInterestsController } from './admin-interests.controller';
 import { AdminInterestsService } from './admin-interests.service';
 
 @Module({
-  imports: [ConsultantModule, DropdownsModule, PrivacyModule, LegalModule, VerificationModule, StorageModule],
+  imports: [AuthModule, ConsultantModule, DropdownsModule, PrivacyModule, LegalModule, VerificationModule, StorageModule],
   controllers: [
     AdminConsultantCasesController,
     AdminDropdownsController,

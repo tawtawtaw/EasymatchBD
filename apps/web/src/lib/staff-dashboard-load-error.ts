@@ -8,7 +8,8 @@ export function shouldSignOutAfterStaffLoadError(error: unknown): boolean {
   return (
     message.includes("(401)") ||
     message.includes("unauthorized") ||
-    message.includes("invalid or expired")
+    message.includes("invalid or expired") ||
+    message.includes("inactive or not found")
   );
 }
 

@@ -68,3 +68,15 @@ export function signOut(): void {
   }
   clearAuthSession();
 }
+
+const SESSION_NOTICE_KEY = "easymatch_session_notice";
+
+export function rememberSessionNotice(message: string) {
+  sessionStorage.setItem(SESSION_NOTICE_KEY, message);
+}
+
+export function consumeSessionNotice(): string | null {
+  const value = sessionStorage.getItem(SESSION_NOTICE_KEY);
+  if (value) sessionStorage.removeItem(SESSION_NOTICE_KEY);
+  return value;
+}

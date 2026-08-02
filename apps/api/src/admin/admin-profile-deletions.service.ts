@@ -15,6 +15,7 @@ import { isStaffRole } from '@easymatch/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { StaffNotificationService } from '../staff/staff-notification.service';
+import { AuthUserCacheService } from '../auth/auth-user-cache.service';
 
 @Injectable()
 export class AdminProfileDeletionsService {
@@ -22,6 +23,7 @@ export class AdminProfileDeletionsService {
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
     private readonly staffNotifications: StaffNotificationService,
+    private readonly authUserCache: AuthUserCacheService,
   ) {}
 
   async createRequest(
@@ -44,6 +46,12 @@ export class AdminProfileDeletionsService {
 
     if (!target.isActive) {
       throw new BadRequestException('This account is already inactive');
+    }
+
+    if (isStaffRole(target.role)) {
+      throw new BadRequestException(
+        'Staff accounts cannot be scheduled for deletion',
+      );
     }
 
     const existingPending = await this.prisma.profileDeletionRequest.findFirst({
@@ -201,6 +209,10 @@ export class AdminProfileDeletionsService {
       throw new NotFoundException('Profile not found');
     }
 
+    if (isStaffRole(user.role)) {
+      throw new BadRequestException('Staff accounts cannot be deactivated');
+    }
+
     for (const photo of user.profile?.photos ?? []) {
       await this.storage.delete(photo.storageKey);
     }
@@ -224,6 +236,8 @@ export class AdminProfileDeletionsService {
       where: { id: targetUserId },
       data: { isActive: false },
     });
+
+    this.authUserCache.invalidate(targetUserId);
   }
 
   private async cancelStalePendingDeletionRequests() {

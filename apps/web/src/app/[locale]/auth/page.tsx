@@ -14,6 +14,7 @@ import {
 import {
   clearAuthSession,
   clearAuthToken,
+  consumeSessionNotice,
   getDeviceSession,
   setAuthToken,
   setDeviceSession,
@@ -94,6 +95,9 @@ export default function AuthPage() {
   }
 
   useEffect(() => {
+    const notice = consumeSessionNotice();
+    if (notice) setError(notice);
+
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
     if (token) {
       loadSignedInUser(token, true).catch(() => clearAuthToken());

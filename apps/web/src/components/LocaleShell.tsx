@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { usePathname } from "@/i18n/routing";
+import { AuthSessionNoticeBanner } from "@/components/AuthSessionNoticeBanner";
 
 function isMobileEmbedPath(pathname: string): boolean {
   return /\/mobile\/video-call(?:\/|$)/.test(pathname);
@@ -29,6 +30,7 @@ export function LocaleShell({ children, header, footer, widgets }: Props) {
     <>
       <div className="flex min-h-screen flex-col">
         {header}
+        <AuthSessionNoticeBanner />
         <main className="flex-1">{children}</main>
         {footer}
       </div>

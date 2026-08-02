@@ -14,6 +14,7 @@ import {
   AUTH_CHANGED_EVENT,
   getDeviceSession,
   notifyAuthChanged,
+  rememberSessionNotice,
   setAuthToken,
   setDeviceSession,
   signOut,
@@ -21,6 +22,8 @@ import {
 import { useMounted } from "@/hooks/use-mounted";
 import { membershipFromSession } from "@/lib/membership";
 import { confirmMembershipPayment } from "@/lib/membership-checkout";
+import { isStaffRole } from "@easymatch/shared";
+import { isInactiveAccountAuthError } from "@/lib/auth-errors";
 
 const SESSION_CLIENT_CACHE_MS = 30_000;
 const MEMBERSHIP_HEAL_KEY = "easymatch_membership_heal_at";
@@ -39,6 +42,7 @@ async function healMembershipIfNeeded(
   token: string,
   session: AuthSession,
 ): Promise<void> {
+  if (isStaffRole(session.role)) return;
   if (membershipFromSession(session)) return;
 
   const lastHealAt = Number(localStorage.getItem(MEMBERSHIP_HEAL_KEY) ?? "0");
@@ -115,6 +119,8 @@ type AuthSessionContextValue = {
   ready: boolean;
   refresh: () => Promise<void>;
   pollDeferMs: number;
+  sessionNotice: string | null;
+  clearSessionNotice: () => void;
 };
 
 const AuthSessionContext = createContext<AuthSessionContextValue | null>(null);
@@ -124,6 +130,11 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   const [loggedIn, setLoggedIn] = useState(false);
   const [user, setUser] = useState<AuthSession | null>(null);
   const [ready, setReady] = useState(false);
+  const [sessionNotice, setSessionNotice] = useState<string | null>(null);
+
+  const clearSessionNotice = useCallback(() => {
+    setSessionNotice(null);
+  }, []);
 
   const refresh = useCallback(async () => {
     let token = localStorage.getItem(AUTH_TOKEN_KEY) ?? (await tryRestoreFromDevice());
@@ -140,9 +151,24 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       const session = await loadSession(token);
       setLoggedIn(true);
       setUser(session);
+      setSessionNotice(null);
       void healMembershipIfNeeded(token, session);
-    } catch {
+    } catch (firstError) {
       sessionClientCache = null;
+      if (isInactiveAccountAuthError(firstError)) {
+        rememberSessionNotice(
+          "Your session ended. Sign in again — use the Staff tab for admin accounts.",
+        );
+        signOut();
+        setLoggedIn(false);
+        setUser(null);
+        setSessionNotice(
+          "Your session ended. Sign in again — use the Staff tab for admin accounts.",
+        );
+        setReady(true);
+        return;
+      }
+
       token = (await tryRestoreFromDevice()) ?? null;
       if (!token) {
         setLoggedIn(false);
@@ -155,11 +181,22 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
         const session = await loadSession(token);
         setLoggedIn(true);
         setUser(session);
+        setSessionNotice(null);
         void healMembershipIfNeeded(token, session);
-      } catch {
+      } catch (secondError) {
+        if (isInactiveAccountAuthError(secondError)) {
+          rememberSessionNotice(
+            "Your session ended. Sign in again — use the Staff tab for admin accounts.",
+          );
+        }
         signOut();
         setLoggedIn(false);
         setUser(null);
+        if (isInactiveAccountAuthError(secondError)) {
+          setSessionNotice(
+            "Your session ended. Sign in again — use the Staff tab for admin accounts.",
+          );
+        }
       }
     } finally {
       setReady(true);
@@ -214,8 +251,10 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       ready,
       refresh,
       pollDeferMs: POLL_DEFER_MS,
+      sessionNotice,
+      clearSessionNotice,
     }),
-    [loggedIn, ready, refresh, user],
+    [clearSessionNotice, loggedIn, ready, refresh, sessionNotice, user],
   );
 
   return (

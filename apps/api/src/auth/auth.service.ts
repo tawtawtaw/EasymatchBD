@@ -271,6 +271,10 @@ export class AuthService {
       include: verifyOtpUserInclude,
     });
 
+    if (!user.isActive) {
+      throw new UnauthorizedException('Account is inactive or not found');
+    }
+
     const [response, redirectPath] = await Promise.all([
       this.buildAuthResponse(user, isNewUser, rememberDevice),
       isStaffRole(user.role)

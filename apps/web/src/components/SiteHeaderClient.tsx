@@ -20,7 +20,6 @@ import { StaffNotificationBell } from "@/components/StaffNotificationBell";
 import { useAuthSession } from "@/hooks/use-auth-session";
 import { useMounted } from "@/hooks/use-mounted";
 import { isStaffRole } from "@easymatch/shared";
-import { staffHomePath } from "@/lib/staff-routing";
 import type { SiteNavLayout } from "@/lib/site-nav-styles";
 
 type SiteHeaderClientProps = {
@@ -66,12 +65,7 @@ export function SiteHeaderClient({ brand }: SiteHeaderClientProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuTop, setMenuTop] = useState(56);
   const { loggedIn, user, ready } = useAuthSession();
-  const homeHref =
-    ready && loggedIn && user
-      ? isStaffRole(user.role)
-        ? staffHomePath(user.role)
-        : "/home"
-      : "/";
+  const homeHref = "/";
 
   useEffect(() => {
     const header = document.getElementById("site-header");
