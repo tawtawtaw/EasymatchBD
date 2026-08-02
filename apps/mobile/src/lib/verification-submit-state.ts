@@ -17,6 +17,40 @@ export function biodataSubmittedFromSummary(
   return biodata?.status === "pending" || biodata?.status === "approved";
 }
 
+/** Drop completion gaps already satisfied on the media payload (stale bootstrap after upload). */
+export function applyMediaCompletionOverrides(
+  media: ProfileMedia,
+  completionMissing: string[],
+): string[] {
+  const onBehalf = isOnBehalfProfile(media);
+  return completionMissing.filter((key) => {
+    if (key === "primaryPhoto") {
+      return !media.photos.some((photo) => photo.type === "primary");
+    }
+    if (onBehalf && key === "creatorNidFront") {
+      return !media.nidDocuments.some(
+        (doc) => doc.subject === "creator" && doc.side === "front",
+      );
+    }
+    if (onBehalf && key === "creatorNidBack") {
+      return !media.nidDocuments.some(
+        (doc) => doc.subject === "creator" && doc.side === "back",
+      );
+    }
+    if (!onBehalf && key === "nidFront") {
+      return !media.nidDocuments.some(
+        (doc) => doc.subject === "member" && doc.side === "front",
+      );
+    }
+    if (!onBehalf && key === "nidBack") {
+      return !media.nidDocuments.some(
+        (doc) => doc.subject === "member" && doc.side === "back",
+      );
+    }
+    return true;
+  });
+}
+
 export function isVerificationPackageComplete(media: ProfileMedia) {
   const hasPrimary = media.photos.some((photo) => photo.type === "primary");
   const onBehalf = isOnBehalfProfile(media);

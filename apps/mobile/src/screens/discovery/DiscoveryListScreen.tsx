@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import {
   ActivityIndicator,
   FlatList,
@@ -27,15 +28,14 @@ import {
 import { shouldShowVerificationFeedback } from "../../lib/verification-feedback";
 import type { DiscoveryListScreenProps } from "../../navigation/types";
 import { listDiscoveryProfiles } from "../../services/discovery";
-import { getVerificationFeedback } from "../../services/media";
 import { getDropdowns } from "../../services/dropdowns";
 import { getMyProfile } from "../../services/profile";
+import { useMemberVerificationStore } from "../../store/memberVerificationStore";
 import { useAuthStore } from "../../store/authStore";
 import { useLocaleStore } from "../../store/localeStore";
 import type { DiscoveryFilters } from "../../types/discovery-filters";
 import type { DiscoveryListItem } from "../../types/discovery";
 import type { DropdownMap } from "../../types/dropdowns";
-import type { VerificationFeedback } from "../../types/media";
 import { colors } from "../../theme/colors";
 
 const PAGE_SIZE = 20;
@@ -56,18 +56,23 @@ export default function DiscoveryListScreen({ navigation }: DiscoveryListScreenP
   const [draftFilters, setDraftFilters] = useState<DiscoveryFilters>(EMPTY_DISCOVERY_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState<DiscoveryFilters>(EMPTY_DISCOVERY_FILTERS);
   const [filtersVisible, setFiltersVisible] = useState(false);
-  const [verificationFeedback, setVerificationFeedback] =
-    useState<VerificationFeedback | null>(null);
+  const verificationFeedback = useMemberVerificationStore(
+    (s) => s.verificationFeedback,
+  );
+  const syncVerification = useMemberVerificationStore((s) => s.sync);
 
   const activeFilterCount = countActiveFilters(appliedFilters);
   const filterLabels = discoveryFilterLabels(copy);
   const isProfilePaused = Boolean(session?.isPaused);
 
+  useFocusEffect(
+    useCallback(() => {
+      void syncVerification(true);
+    }, [syncVerification]),
+  );
+
   useEffect(() => {
     void getDropdowns(locale).then(setDropdowns);
-    void getVerificationFeedback()
-      .then(setVerificationFeedback)
-      .catch(() => setVerificationFeedback(null));
   }, [locale]);
 
   const loadPage = useCallback(
@@ -230,7 +235,10 @@ export default function DiscoveryListScreen({ navigation }: DiscoveryListScreenP
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => void loadPage(1, "refresh", appliedFilters)}
+            onRefresh={() => {
+              void syncVerification(true);
+              void loadPage(1, "refresh", appliedFilters);
+            }}
           />
         }
         onEndReached={() => {

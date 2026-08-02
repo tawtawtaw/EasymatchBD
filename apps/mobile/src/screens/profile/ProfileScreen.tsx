@@ -31,6 +31,8 @@ import { getMembershipTariffs } from "../../services/membership";
 import type { MembershipTariff } from "@easymatch/shared";
 import { useAuthStore } from "../../store/authStore";
 import { useLocaleStore } from "../../store/localeStore";
+import { useOnboardingStore } from "../../store/onboardingStore";
+import { useMemberVerificationStore } from "../../store/memberVerificationStore";
 import type { VerificationFeedback } from "../../types/media";
 import { shouldShowVerificationFeedback } from "../../lib/verification-feedback";
 import { colors } from "../../theme/colors";
@@ -39,11 +41,16 @@ export default function ProfileScreen({ navigation }: ProfileHomeScreenProps) {
   const user = useAuthStore((s) => s.user);
   const session = useAuthStore((s) => s.session);
   const locale = useLocaleStore((s) => s.locale);
+  const onboardingBootstrap = useOnboardingStore((s) => s.bootstrap);
   const copy = tProfileHome(locale);
   const membershipCopy = tMembership(locale);
   const mediaCopy = tProfileMedia(locale);
   const isPaid = useIsPaidMember();
   const { needsVerificationAction } = useMemberVerificationState();
+  const storeVerificationFeedback = useMemberVerificationStore(
+    (s) => s.verificationFeedback,
+  );
+  const syncVerification = useMemberVerificationStore((s) => s.sync);
   const [completionPercent, setCompletionPercent] = useState(user?.completionPercent ?? 0);
   const [missing, setMissing] = useState<string[]>(user?.completionMissing ?? []);
   const [memberProfile, setMemberProfile] = useState<MemberProfileSummary | null>(null);
@@ -61,8 +68,10 @@ export default function ProfileScreen({ navigation }: ProfileHomeScreenProps) {
     setError(null);
     try {
       const [data, feedback, tariffData] = await Promise.all([
-        getProfileEditorBootstrap(locale),
-        getVerificationFeedback().catch(() => null),
+        getProfileEditorBootstrap(locale, {
+          forceFresh: options?.refresh === true || options?.silent === true,
+        }),
+        getVerificationFeedback({ forceFresh: true }).catch(() => null),
         getMembershipTariffs().catch(() => []),
       ]);
       setMemberProfile(memberProfileSummaryFromEditorBootstrap(data));
@@ -79,15 +88,37 @@ export default function ProfileScreen({ navigation }: ProfileHomeScreenProps) {
   }, [copy.loadError, locale]);
 
   useEffect(() => {
+    if (user?.completionPercent != null) {
+      setCompletionPercent(user.completionPercent);
+    }
+    if (Array.isArray(user?.completionMissing)) {
+      setMissing(user.completionMissing);
+    }
+  }, [user?.completionMissing, user?.completionPercent]);
+
+  useEffect(() => {
+    if (!onboardingBootstrap) return;
+    setCompletionPercent(onboardingBootstrap.completionPercent ?? 0);
+    setMissing(onboardingBootstrap.completionMissing ?? []);
+  }, [
+    onboardingBootstrap?.completionMissing,
+    onboardingBootstrap?.completionPercent,
+  ]);
+
+  useEffect(() => {
     void load();
   }, [load]);
 
   useFocusEffect(
     useCallback(() => {
-      void load({ silent: hasLoadedRef.current });
+      void syncVerification(true);
+      void load({ refresh: true, silent: hasLoadedRef.current });
       hasLoadedRef.current = true;
-    }, [load]),
+    }, [load, syncVerification]),
   );
+
+  const displayVerificationFeedback =
+    storeVerificationFeedback ?? verificationFeedback;
 
   const verified = session?.isVerified ?? user?.profile?.isVerified ?? false;
   const planCode = session?.subscription?.plan ?? user?.subscription?.plan ?? "free";
@@ -118,11 +149,12 @@ export default function ProfileScreen({ navigation }: ProfileHomeScreenProps) {
         </View>
       ) : null}
 
-      {verificationFeedback && shouldShowVerificationFeedback(verificationFeedback) ? (
+      {displayVerificationFeedback &&
+      shouldShowVerificationFeedback(displayVerificationFeedback) ? (
         <View style={styles.feedbackWrap}>
           <VerificationFeedbackPanel
             copy={mediaCopy}
-            feedback={verificationFeedback}
+            feedback={displayVerificationFeedback}
             compact
             hideAlertHistory
           />

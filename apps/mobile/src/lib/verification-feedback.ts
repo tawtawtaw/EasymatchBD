@@ -2,6 +2,7 @@ import type {
   VerificationAlertType,
   VerificationFeedback,
   VerificationSummaryItem,
+  ProfileMedia,
 } from "../types/media";
 
 export function isActionableVerificationAlert(
@@ -35,6 +36,33 @@ export function rejectionMessageForSummaryItem(
   });
 
   return match?.officerMessage?.trim() ?? null;
+}
+
+/** Align checklist biodata row with profile review status (stale media summary cache). */
+export function reconcileVerificationFeedbackWithMedia(
+  media: Pick<ProfileMedia, "profileBiodataReviewStatus" | "verificationFeedback">,
+): VerificationFeedback | null {
+  const feedback = media.verificationFeedback;
+  if (!feedback) return null;
+
+  const status = media.profileBiodataReviewStatus;
+  if (status !== "pending" && status !== "approved") {
+    return feedback;
+  }
+
+  const summaryStatus = status === "approved" ? "approved" : "pending";
+  return {
+    ...feedback,
+    summary: feedback.summary.map((item) =>
+      item.category === "biodata"
+        ? {
+            ...item,
+            status: summaryStatus,
+            needsAction: false,
+          }
+        : item,
+    ),
+  };
 }
 
 export function shouldShowVerificationFeedback(

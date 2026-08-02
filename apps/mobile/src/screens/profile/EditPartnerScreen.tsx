@@ -139,7 +139,6 @@ export default function EditPartnerScreen({ navigation }: EditPartnerScreenProps
         }),
       );
       setMessage(copy.saved);
-      await refreshSession();
       await advanceAfterBiodataSave({
         navigation,
         currentScreen: "EditPartner",

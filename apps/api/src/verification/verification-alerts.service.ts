@@ -182,9 +182,14 @@ export class VerificationAlertsService {
       photoType: 'primary',
     });
 
+    const seenGalleryPhotoIds = new Set<string>();
     for (const photo of profile.photos.filter(
       (entry) => entry.type === ProfilePhotoType.gallery,
     )) {
+      if (photo.id === primary?.id || seenGalleryPhotoIds.has(photo.id)) {
+        continue;
+      }
+      seenGalleryPhotoIds.add(photo.id);
       items.push({
         category: 'photo',
         labelKey: 'photoGallery',

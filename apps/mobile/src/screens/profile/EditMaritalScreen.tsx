@@ -98,7 +98,6 @@ export default function EditMaritalScreen({ navigation }: EditMaritalScreenProps
       }
       await updateMarital(buildUpdateMaritalPayload(form, gender));
       setMessage(copy.saved);
-      await refreshSession();
       await advanceAfterBiodataSave({
         navigation,
         currentScreen: "EditMarital",

@@ -44,14 +44,14 @@ function SummaryList({
 }) {
   return (
     <View style={styles.list}>
-      {items.map((item) => {
+      {items.map((item, index) => {
         const rejectionMessage = rejectionMessageForSummaryItem(
           feedback.alerts,
           item,
         );
         return (
           <View
-            key={`${item.category}-${item.photoId ?? item.labelKey}`}
+            key={`${item.category}-${item.labelKey}-${item.photoType ?? "na"}-${item.photoId ?? index}`}
             style={styles.listItem}
           >
             <Text style={styles.listItemText}>

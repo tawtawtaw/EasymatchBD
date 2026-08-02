@@ -131,7 +131,6 @@ export default function EditPersonalScreen({ navigation }: EditPersonalScreenPro
       setProfile(updated);
       setForm(profileToPersonalForm(updated));
       setMessage(copy.saved);
-      await refreshSession();
       await advanceAfterBiodataSave({
         navigation,
         currentScreen: "EditPersonal",

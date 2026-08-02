@@ -1,9 +1,10 @@
 import { create } from "zustand";
 import { isVerificationAwaitingOfficer } from "../lib/verification-submit-state";
+import { reconcileVerificationFeedbackWithMedia } from "../lib/verification-feedback";
 import { invalidateDedupeCache } from "../services/api/dedupe";
-import { getProfileMedia } from "../services/media";
+import { getProfileMedia, invalidateProfileMediaCaches } from "../services/media";
 import { useAuthStore } from "./authStore";
-import type { ProfileMedia } from "../types/media";
+import type { ProfileMedia, VerificationFeedback } from "../types/media";
 
 let cachedMedia: ProfileMedia | null = null;
 let cachedUserId: string | null = null;
@@ -34,27 +35,37 @@ async function loadVerificationMedia(userId: string, force = false) {
   if (force) {
     cachedMedia = null;
     cachedUserId = null;
+    inflight = null;
+    invalidateProfileMediaCaches();
   }
 
   if (!force && cachedUserId === userId && cachedMedia) {
     return cachedMedia;
   }
 
-  if (inflight) {
+  if (inflight && !force) {
     return inflight;
   }
 
-  inflight = getProfileMedia().then((media) => {
-    cachedMedia = media;
-    cachedUserId = userId;
-    inflight = null;
-    return media;
-  });
+  const fetchPromise = getProfileMedia({ forceFresh: force || !cachedMedia }).then(
+    (media) => {
+      if (inflight === fetchPromise) {
+        cachedMedia = media;
+        cachedUserId = userId;
+        inflight = null;
+      }
+      return media;
+    },
+  );
+
+  inflight = fetchPromise;
 
   try {
-    return await inflight;
+    return await fetchPromise;
   } catch (error) {
-    inflight = null;
+    if (inflight === fetchPromise) {
+      inflight = null;
+    }
     throw error;
   }
 }
@@ -62,20 +73,26 @@ async function loadVerificationMedia(userId: string, force = false) {
 type MemberVerificationState = {
   mediaVerified: boolean;
   awaitingOfficer: boolean;
+  verificationFeedback: VerificationFeedback | null;
   loading: boolean;
   sync: (forceFresh?: boolean) => Promise<void>;
 };
 
-export const useMemberVerificationStore = create<MemberVerificationState>(
-  (set, get) => ({
+export const useMemberVerificationStore = create<MemberVerificationState>((set) => ({
     mediaVerified: false,
     awaitingOfficer: false,
+    verificationFeedback: null,
     loading: false,
 
     sync: async (forceFresh = false) => {
       const userId = useAuthStore.getState().user?.id ?? null;
       if (!userId) {
-        set({ mediaVerified: false, awaitingOfficer: false, loading: false });
+        set({
+          mediaVerified: false,
+          awaitingOfficer: false,
+          verificationFeedback: null,
+          loading: false,
+        });
         return;
       }
 
@@ -94,7 +111,12 @@ export const useMemberVerificationStore = create<MemberVerificationState>(
         }
 
         if (readAuthVerified()) {
-          set({ mediaVerified: true, awaitingOfficer: false, loading: false });
+          set({
+            mediaVerified: true,
+            awaitingOfficer: false,
+            verificationFeedback: null,
+            loading: false,
+          });
           return;
         }
 
@@ -111,13 +133,19 @@ export const useMemberVerificationStore = create<MemberVerificationState>(
             awaitingOfficer: fromMedia
               ? false
               : isVerificationAwaitingOfficer(media),
+            verificationFeedback: reconcileVerificationFeedbackWithMedia(media),
             loading: false,
           });
           if (fromMedia && !readAuthVerified()) {
             void useAuthStore.getState().refreshSession();
           }
         } catch {
-          set({ mediaVerified: false, awaitingOfficer: false, loading: false });
+          set({
+            mediaVerified: false,
+            awaitingOfficer: false,
+            verificationFeedback: null,
+            loading: false,
+          });
         }
       })();
 
@@ -127,5 +155,4 @@ export const useMemberVerificationStore = create<MemberVerificationState>(
 
       return syncInFlight;
     },
-  }),
-);
+  }));

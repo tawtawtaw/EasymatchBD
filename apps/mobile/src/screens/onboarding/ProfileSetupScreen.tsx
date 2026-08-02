@@ -37,8 +37,8 @@ export default function ProfileSetupScreen({ navigation }: ProfileSetupScreenPro
 
   useFocusEffect(
     useCallback(() => {
-      void refresh(locale);
-      void getVerificationFeedback()
+      void refresh(locale, { force: true });
+      void getVerificationFeedback({ forceFresh: true })
         .then(setVerificationFeedback)
         .catch(() => setVerificationFeedback(null));
     }, [locale, refresh]),
@@ -123,7 +123,7 @@ export default function ProfileSetupScreen({ navigation }: ProfileSetupScreenPro
         ) : (
           <Pressable
             style={styles.primaryButton}
-            onPress={() => void refresh(locale)}
+            onPress={() => void refresh(locale, { force: true })}
           >
             <Text style={styles.primaryButtonText}>{copy.continueToApp}</Text>
           </Pressable>

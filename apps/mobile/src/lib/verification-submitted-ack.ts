@@ -1,15 +1,28 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export const VERIFICATION_SUBMITTED_KEY = "easymatch_verification_submitted";
+export const VERIFICATION_SUBMITTED_KEY_PREFIX = "easymatch_verification_submitted:";
 
-export async function readVerificationSubmittedAck(): Promise<boolean> {
-  return (await AsyncStorage.getItem(VERIFICATION_SUBMITTED_KEY)) === "1";
+function storageKey(profileId: string) {
+  return `${VERIFICATION_SUBMITTED_KEY_PREFIX}${profileId}`;
 }
 
-export async function markVerificationSubmittedAck(): Promise<void> {
-  await AsyncStorage.setItem(VERIFICATION_SUBMITTED_KEY, "1");
+export async function readVerificationSubmittedAck(
+  profileId: string | null | undefined,
+): Promise<boolean> {
+  if (!profileId) return false;
+  return (await AsyncStorage.getItem(storageKey(profileId))) === "1";
 }
 
-export async function clearVerificationSubmittedAck(): Promise<void> {
-  await AsyncStorage.removeItem(VERIFICATION_SUBMITTED_KEY);
+export async function markVerificationSubmittedAck(
+  profileId: string | null | undefined,
+): Promise<void> {
+  if (!profileId) return;
+  await AsyncStorage.setItem(storageKey(profileId), "1");
+}
+
+export async function clearVerificationSubmittedAck(
+  profileId: string | null | undefined,
+): Promise<void> {
+  if (!profileId) return;
+  await AsyncStorage.removeItem(storageKey(profileId));
 }

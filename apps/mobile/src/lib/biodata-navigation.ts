@@ -1,5 +1,6 @@
 import type { NavigationProp, ParamListBase } from "@react-navigation/native";
 import type { AppLocale } from "./locale";
+import { syncMemberProfileStateAfterMutation } from "./member-status-refresh";
 
 export type BiodataFlowScreen =
   | "EditPersonal"
@@ -29,9 +30,9 @@ export async function advanceAfterBiodataSave(options: {
   isOnboardingSetup: boolean;
   refreshOnboarding: (locale?: AppLocale) => Promise<void>;
 }) {
-  if (!options.isOnboardingSetup) return;
+  await syncMemberProfileStateAfterMutation(options.locale);
 
-  await options.refreshOnboarding(options.locale);
+  if (!options.isOnboardingSetup) return;
 
   const next = getNextBiodataScreen(options.currentScreen);
   if (next) {

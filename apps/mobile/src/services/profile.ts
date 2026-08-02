@@ -11,7 +11,13 @@ export function invalidateProfileEditorBootstrapCache() {
   invalidateDedupeCache("profile:editor-bootstrap");
 }
 
-export async function getProfileEditorBootstrap(locale = "en") {
+export async function getProfileEditorBootstrap(
+  locale = "en",
+  options?: { forceFresh?: boolean },
+) {
+  if (options?.forceFresh) {
+    invalidateProfileEditorBootstrapCache();
+  }
   return dedupeRequest(
     `profile:editor-bootstrap:${locale}`,
     () =>
@@ -20,7 +26,7 @@ export async function getProfileEditorBootstrap(locale = "en") {
           dropdowns: DropdownMap | null;
         }
       >(`/auth/me/editor-bootstrap?locale=${encodeURIComponent(locale)}`),
-    5_000,
+    2_000,
   );
 }
 

@@ -67,7 +67,6 @@ export default function EditFamilyScreen({ navigation }: EditFamilyScreenProps) 
     try {
       await updateFamily(buildUpdateFamilyPayload(form));
       setMessage(copy.saved);
-      await refreshSession();
       await advanceAfterBiodataSave({
         navigation,
         currentScreen: "EditFamily",

@@ -20,13 +20,15 @@ export function getOnboardingMediaStep(media: ProfileMedia): OnboardingMediaStep
   const primary = photos.find((photo) => photo.type === "primary");
   const nidFront = requiredDocs.find((doc) => doc.side === "front");
   const nidBack = requiredDocs.find((doc) => doc.side === "back");
-  const requiredStatus = isOnBehalfProfile(media)
-    ? (media.creatorNidStatus ?? "not_submitted")
-    : media.nidStatus;
 
   if (!primary) return "primary";
   if (!nidFront) return "nidFront";
   if (!nidBack) return "nidBack";
-  if (requiredStatus === "not_submitted") return "submit";
-  return "complete";
+  if (
+    media.profileBiodataReviewStatus === "pending" ||
+    media.profileBiodataReviewStatus === "approved"
+  ) {
+    return "complete";
+  }
+  return "submit";
 }

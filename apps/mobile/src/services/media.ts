@@ -12,19 +12,33 @@ import type {
 
 type UploadFile = { uri: string; name: string; type: string };
 
-export async function getProfileMedia() {
+const PROFILE_MEDIA_DEDUPE_MS = 4_000;
+const VERIFICATION_FEEDBACK_DEDUPE_MS = 4_000;
+
+export function invalidateProfileMediaCaches() {
+  invalidateDedupeCache("profile:media");
+  invalidateDedupeCache("profile:verification-feedback");
+}
+
+export async function getProfileMedia(options?: { forceFresh?: boolean }) {
+  if (options?.forceFresh) {
+    invalidateDedupeCache("profile:media");
+  }
   return dedupeRequest(
     "profile:media",
     () => apiRequest<ProfileMedia>("/profiles/me/media"),
-    30_000,
+    PROFILE_MEDIA_DEDUPE_MS,
   );
 }
 
-export async function getVerificationFeedback() {
+export async function getVerificationFeedback(options?: { forceFresh?: boolean }) {
+  if (options?.forceFresh) {
+    invalidateDedupeCache("profile:verification-feedback");
+  }
   return dedupeRequest(
     "profile:verification-feedback",
     () => apiRequest<VerificationFeedback>("/profiles/me/verification/feedback"),
-    60_000,
+    VERIFICATION_FEEDBACK_DEDUPE_MS,
   );
 }
 
@@ -53,20 +67,30 @@ export async function uploadProfilePhoto(
   if (gallerySlot) {
     params.set("slot", gallerySlot);
   }
-  return apiUpload<ProfilePhoto>(`/profiles/me/photos?${params.toString()}`, formData);
+  const photo = await apiUpload<ProfilePhoto>(
+    `/profiles/me/photos?${params.toString()}`,
+    formData,
+  );
+  invalidateProfileMediaCaches();
+  return photo;
 }
 
 export async function deleteProfilePhoto(photoId: string) {
-  return apiRequest<{ deleted: boolean }>(`/profiles/me/photos/${encodeURIComponent(photoId)}`, {
-    method: "DELETE",
-  });
+  const result = await apiRequest<{ deleted: boolean }>(
+    `/profiles/me/photos/${encodeURIComponent(photoId)}`,
+    { method: "DELETE" },
+  );
+  invalidateProfileMediaCaches();
+  return result;
 }
 
 export async function setPrimaryPhoto(photoId: string) {
-  return apiRequest<ProfilePhoto>(
+  const photo = await apiRequest<ProfilePhoto>(
     `/profiles/me/photos/${encodeURIComponent(photoId)}/primary`,
     { method: "PUT" },
   );
+  invalidateProfileMediaCaches();
+  return photo;
 }
 
 export async function uploadNidDocument(
@@ -80,20 +104,24 @@ export async function uploadNidDocument(
     name: file.name,
     type: file.type,
   } as unknown as Blob);
-  return apiUpload<NidDocument>(
+  const doc = await apiUpload<NidDocument>(
     `/profiles/me/nid?side=${side}&subject=${subject}`,
     formData,
   );
+  invalidateProfileMediaCaches();
+  return doc;
 }
 
 export async function deleteNidDocument(
   side: NidDocumentSide,
   subject: NidDocumentSubject = "member",
 ) {
-  return apiRequest<{ deleted: boolean }>(
+  const result = await apiRequest<{ deleted: boolean }>(
     `/profiles/me/nid/${side}?subject=${subject}`,
     { method: "DELETE" },
   );
+  invalidateProfileMediaCaches();
+  return result;
 }
 
 export async function submitForVerification() {
@@ -102,7 +130,7 @@ export async function submitForVerification() {
     message?: string;
     profileBiodataReviewStatus?: ProfileMedia["profileBiodataReviewStatus"];
   }>("/profiles/me/verification/submit", { method: "POST" });
-  invalidateDedupeCache("profile:media");
+  invalidateProfileMediaCaches();
   return result;
 }
 

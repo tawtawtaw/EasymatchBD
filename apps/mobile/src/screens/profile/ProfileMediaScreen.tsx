@@ -32,7 +32,7 @@ import {
   getRequiredNidSubject,
   type OnboardingMediaStep,
 } from "../../lib/onboarding-media-steps";
-import { computeVerificationSubmitState, isVerificationAwaitingOfficer, requiredNidStatus } from "../../lib/verification-submit-state";
+import { computeVerificationSubmitState, applyMediaCompletionOverrides, isVerificationAwaitingOfficer, requiredNidStatus } from "../../lib/verification-submit-state";
 import { isProfileBiodataComplete } from "../../lib/member-onboarding";
 import { formatCompletionMissingMessage } from "../../lib/completion-missing-labels";
 import {
@@ -40,9 +40,8 @@ import {
   markVerificationSubmittedAck,
   readVerificationSubmittedAck,
 } from "../../lib/verification-submitted-ack";
+import { syncMemberProfileStateAfterMutation } from "../../lib/member-status-refresh";
 import { clearMemberVerificationMediaCache } from "../../hooks/use-member-verification-state";
-import { invalidateDedupeCache } from "../../services/api/dedupe";
-import { useMemberVerificationStore } from "../../store/memberVerificationStore";
 import { shouldShowVerificationFeedback } from "../../lib/verification-feedback";
 import type { ProfileMediaScreenProps } from "../../navigation/types";
 import {
@@ -68,13 +67,39 @@ import {
 } from "../../types/media";
 import { colors } from "../../theme/colors";
 
+function patchMediaAfterVerificationSubmit(
+  media: ProfileMedia,
+  profileBiodataReviewStatus: ProfileMedia["profileBiodataReviewStatus"],
+): ProfileMedia {
+  if (!profileBiodataReviewStatus) return media;
+
+  const next: ProfileMedia = {
+    ...media,
+    profileBiodataReviewStatus,
+  };
+
+  if (!next.verificationFeedback || profileBiodataReviewStatus !== "pending") {
+    return next;
+  }
+
+  return {
+    ...next,
+    verificationFeedback: {
+      ...next.verificationFeedback,
+      summary: next.verificationFeedback.summary.map((item) =>
+        item.category === "biodata"
+          ? { ...item, status: "pending", needsAction: false }
+          : item,
+      ),
+    },
+  };
+}
+
 export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenProps) {
   const locale = useLocaleStore((s) => s.locale);
-  const refreshSession = useAuthStore((s) => s.refreshSession);
   const user = useAuthStore((s) => s.user);
   const onboardingPhase = useOnboardingStore((s) => s.phase);
   const onboardingBootstrap = useOnboardingStore((s) => s.bootstrap);
-  const refreshOnboarding = useOnboardingStore((s) => s.refresh);
   const isOnboardingSetup = onboardingPhase === "profile_setup";
   const copy = tProfileMedia(locale);
   const [media, setMedia] = useState<ProfileMedia | null>(null);
@@ -85,32 +110,48 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
   const [message, setMessage] = useState<string | null>(null);
   const [submittedAck, setSubmittedAck] = useState(false);
 
+  const profileId = user?.profile?.id ?? null;
+
   const completionMissing =
     onboardingBootstrap?.completionMissing ?? user?.completionMissing ?? [];
 
   const biodataComplete = isProfileBiodataComplete({
-    completionMissing,
+    completionMissing: media
+      ? applyMediaCompletionOverrides(media, completionMissing)
+      : completionMissing,
     completionPercent:
       onboardingBootstrap?.completionPercent ?? user?.completionPercent,
   });
 
   const biodataIncompleteDetail = formatCompletionMissingMessage(
     locale,
-    completionMissing,
+    media ? applyMediaCompletionOverrides(media, completionMissing) : completionMissing,
     copy.biodataIncompleteIntro,
   );
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (options?: { forceFresh?: boolean }) => {
+    if (options?.forceFresh !== false) {
+      setLoading(true);
+    }
     setError(null);
     try {
-      setMedia(await getProfileMedia());
+      setMedia(await getProfileMedia({ forceFresh: true }));
     } catch (err) {
       setError(getApiErrorMessage(err, copy.loadError));
     } finally {
       setLoading(false);
     }
   }, [copy.loadError]);
+
+  const reloadAfterMutation = useCallback(async () => {
+    clearMemberVerificationMediaCache();
+    try {
+      setMedia(await getProfileMedia({ forceFresh: true }));
+    } catch (err) {
+      setError(getApiErrorMessage(err, copy.loadError));
+    }
+    void syncMemberProfileStateAfterMutation(locale);
+  }, [copy.loadError, locale]);
 
   const handleDismissAlerts = useCallback(async () => {
     setDismissingAlerts(true);
@@ -128,15 +169,10 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
 
   useFocusEffect(
     useCallback(() => {
-      invalidateDedupeCache("auth:");
-      invalidateDedupeCache("profile:media");
-      clearMemberVerificationMediaCache();
-      void useMemberVerificationStore.getState().sync(true);
-      void refreshOnboarding(locale);
-      void refreshSession();
-      void readVerificationSubmittedAck().then(setSubmittedAck);
+      void readVerificationSubmittedAck(profileId).then(setSubmittedAck);
       void load();
-    }, [load, locale, refreshOnboarding, refreshSession]),
+      void syncMemberProfileStateAfterMutation(locale);
+    }, [load, locale, profileId]),
   );
 
   useEffect(() => {
@@ -150,21 +186,25 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
       media.profileBiodataReviewStatus === "rejected"
     ) {
       setSubmittedAck(false);
-      void clearVerificationSubmittedAck();
+      void clearVerificationSubmittedAck(profileId);
       return;
     }
 
     if (canResubmit) {
       setSubmittedAck(false);
-      void clearVerificationSubmittedAck();
+      void clearVerificationSubmittedAck(profileId);
       return;
     }
 
-    if (media.isVerified || media.profileBiodataReviewStatus === "pending") {
-      setSubmittedAck(true);
-      void markVerificationSubmittedAck();
-    }
-  }, [media]);
+    void readVerificationSubmittedAck(profileId).then((stored) => {
+      if (media.isVerified || media.profileBiodataReviewStatus === "pending") {
+        setSubmittedAck(true);
+        void markVerificationSubmittedAck(profileId);
+      } else if (!stored) {
+        setSubmittedAck(false);
+      }
+    });
+  }, [media, profileId]);
 
   async function uploadPhotoFile(
     file: PickedMediaFile,
@@ -188,8 +228,7 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
         gallerySlot,
       );
       setMessage(copy.uploaded);
-      await load();
-      await refreshSession();
+      await reloadAfterMutation();
     } catch (err) {
       setError(getApiErrorMessage(err, copy.uploadError));
     } finally {
@@ -285,8 +324,7 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
         subject,
       );
       setMessage(copy.uploaded);
-      await load();
-      await refreshSession();
+      await reloadAfterMutation();
     } catch (err) {
       setError(getApiErrorMessage(err, copy.uploadError));
     } finally {
@@ -335,7 +373,7 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
     setBusy(true);
     try {
       await setPrimaryPhoto(photo.id);
-      await load();
+      await reloadAfterMutation();
     } catch (err) {
       setError(getApiErrorMessage(err, copy.actionError));
     } finally {
@@ -347,8 +385,7 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
     setBusy(true);
     try {
       await deleteProfilePhoto(photoId);
-      await load();
-      await refreshSession();
+      await reloadAfterMutation();
     } catch (err) {
       setError(getApiErrorMessage(err, copy.actionError));
     } finally {
@@ -386,32 +423,28 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
       const result = await submitForVerification();
       if (result.submitted) {
         setSubmittedAck(true);
-        await markVerificationSubmittedAck();
+        await markVerificationSubmittedAck(profileId);
         setMessage(result.message ?? copy.submitted);
         if (result.profileBiodataReviewStatus) {
           setMedia((current) =>
             current
-              ? {
-                  ...current,
-                  profileBiodataReviewStatus: result.profileBiodataReviewStatus!,
-                }
+              ? patchMediaAfterVerificationSubmit(
+                  current,
+                  result.profileBiodataReviewStatus!,
+                )
               : current,
           );
         }
       } else {
         setSubmittedAck(false);
-        await clearVerificationSubmittedAck();
+        await clearVerificationSubmittedAck(profileId);
         setError(result.message ?? copy.submitNotQueued);
         setMessage(null);
       }
-      clearMemberVerificationMediaCache();
-      invalidateDedupeCache("profile:media");
-      await load();
-      await refreshSession();
-      await refreshOnboarding(locale);
+      await reloadAfterMutation();
     } catch (err) {
       setSubmittedAck(false);
-      await clearVerificationSubmittedAck();
+      await clearVerificationSubmittedAck(profileId);
       setError(getApiErrorMessage(err, copy.submitError));
     } finally {
       setBusy(false);
@@ -419,7 +452,7 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
   }
 
   async function handleContinueSetup() {
-    await refreshOnboarding(locale);
+    await syncMemberProfileStateAfterMutation(locale);
     navigation.replace("ProfileSetup");
   }
 
@@ -455,7 +488,10 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
   const requiredNidBack = nidDocuments.find(
     (d) => d.side === "back" && d.subject === requiredSubject,
   );
-  const { otherPhoto, familyPhotos } = splitGalleryPhotos(gallery);
+  const { otherPhoto, familyPhotos: familyPhotosRaw } = splitGalleryPhotos(gallery);
+  const familyPhotos = familyPhotosRaw.filter(
+    (photo, index, list) => list.findIndex((entry) => entry.id === photo.id) === index,
+  );
   const canAddOther = canAddOtherGalleryPhoto(gallery.length, otherPhoto);
   const canAddFamily = canAddFamilyGalleryPhoto(gallery.length, familyPhotos);
   const onboardingStep = isOnboardingSetup ? getOnboardingMediaStep(media) : null;
