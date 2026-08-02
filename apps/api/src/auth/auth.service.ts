@@ -267,6 +267,7 @@ export class AuthService {
         phoneVerifiedAt: now,
         lastLoginAt: now,
         ...(assignedRole ? { role: assignedRole } : {}),
+        ...(purpose === 'staff' && staffAllowlisted ? { isActive: true } : {}),
       },
       include: verifyOtpUserInclude,
     });
@@ -325,9 +326,21 @@ export class AuthService {
       include: subscriptionInclude,
     });
 
-    if (!user?.isActive || user.phone !== phone) {
+    if (!user || user.phone !== phone) {
       await this.revokeTrustedDevice(deviceToken);
       throw new UnauthorizedException('Invalid or expired device session');
+    }
+
+    if (!user.isActive) {
+      if (purpose === 'staff' && staffAllowlisted) {
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: { isActive: true },
+        });
+      } else {
+        await this.revokeTrustedDevice(deviceToken);
+        throw new UnauthorizedException('Invalid or expired device session');
+      }
     }
 
     const now = new Date();
