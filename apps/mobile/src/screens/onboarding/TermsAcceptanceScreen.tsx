@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -33,12 +33,13 @@ export default function TermsAcceptanceScreen({ navigation }: TermsAcceptanceScr
   const [terms, setTerms] = useState<Awaited<ReturnType<typeof getPublishedTerms>> | null>(
     null,
   );
+  const termsLoadedRef = useRef(false);
 
   const loadTerms = useCallback(async () => {
-    setLoading(true);
     setError(null);
     try {
       setTerms(await getPublishedTerms(locale));
+      termsLoadedRef.current = true;
     } catch (err) {
       setError(getApiErrorMessage(err, copy.loadError));
     } finally {
@@ -47,6 +48,9 @@ export default function TermsAcceptanceScreen({ navigation }: TermsAcceptanceScr
   }, [copy.loadError, locale]);
 
   useEffect(() => {
+    if (!termsLoadedRef.current) {
+      setLoading(true);
+    }
     void loadTerms();
   }, [loadTerms]);
 
@@ -75,9 +79,9 @@ export default function TermsAcceptanceScreen({ navigation }: TermsAcceptanceScr
         });
       }
 
+      await refresh(locale, { force: true });
       await useAuthStore.getState().refreshSession();
       await enablePushNotificationsOnLogin();
-      await refresh(locale, { force: true });
     } catch (err) {
       setError(getApiErrorMessage(err, copy.acceptError));
     } finally {
@@ -108,7 +112,10 @@ export default function TermsAcceptanceScreen({ navigation }: TermsAcceptanceScr
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
         <Text style={styles.title}>{copy.pageTitle}</Text>
         {terms?.effectiveDate ? (
           <Text style={styles.effectiveDate}>
@@ -133,7 +140,11 @@ export default function TermsAcceptanceScreen({ navigation }: TermsAcceptanceScr
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        <Pressable style={styles.checkboxRow} onPress={() => setReadConfirmed((v) => !v)}>
+        <Pressable
+          style={styles.checkboxRow}
+          onPress={() => setReadConfirmed((v) => !v)}
+          hitSlop={8}
+        >
           <View style={[styles.checkbox, readConfirmed && styles.checkboxChecked]}>
             {readConfirmed ? <Text style={styles.checkmark}>✓</Text> : null}
           </View>

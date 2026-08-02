@@ -1,10 +1,14 @@
 import { apiRequest } from "./api/client";
-import { dedupeRequest } from "./api/dedupe";
+import { dedupeRequest, invalidateDedupeCache } from "./api/dedupe";
 import type { DropdownMap } from "../types/dropdowns";
 import type { MemberProfile, ProfileEditorBootstrap } from "../types/profile";
 
 export async function getMyProfile() {
   return dedupeRequest("profile:me", () => apiRequest<MemberProfile>("/profiles/me"), 15_000);
+}
+
+export function invalidateProfileEditorBootstrapCache() {
+  invalidateDedupeCache("profile:editor-bootstrap");
 }
 
 export async function getProfileEditorBootstrap(locale = "en") {
@@ -16,7 +20,7 @@ export async function getProfileEditorBootstrap(locale = "en") {
           dropdowns: DropdownMap | null;
         }
       >(`/auth/me/editor-bootstrap?locale=${encodeURIComponent(locale)}`),
-    60_000,
+    5_000,
   );
 }
 

@@ -1,10 +1,14 @@
 import { create } from "zustand";
 import {
   computeOnboardingPhase,
+  mergeOnboardingBootstrap,
   type OnboardingBootstrap,
   type OnboardingPhase,
 } from "../lib/member-onboarding";
-import { getProfileEditorBootstrap } from "../services/profile";
+import {
+  getProfileEditorBootstrap,
+  invalidateProfileEditorBootstrapCache,
+} from "../services/profile";
 import type { AppLocale } from "../lib/locale";
 
 type OnboardingState = {
@@ -29,22 +33,30 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
     const generation = ++refreshGeneration;
 
     refreshInFlight = (async () => {
-      const isInitialLoad = get().bootstrap === null;
+      const previous = get().bootstrap;
+      const isInitialLoad = previous === null;
       if (isInitialLoad) {
         set({ phase: "loading" });
       }
 
       try {
-        const bootstrap = await getProfileEditorBootstrap(locale);
+        invalidateProfileEditorBootstrapCache();
+        const fetched = await getProfileEditorBootstrap(locale);
         if (generation !== refreshGeneration) {
           return;
         }
+        const bootstrap = mergeOnboardingBootstrap(previous, fetched);
         set({
           bootstrap,
           phase: computeOnboardingPhase(bootstrap),
         });
       } catch {
         if (generation !== refreshGeneration) {
+          return;
+        }
+        const previous = get().bootstrap;
+        if (previous) {
+          set({ phase: computeOnboardingPhase(previous) });
           return;
         }
         set({ bootstrap: null, phase: "terms" });

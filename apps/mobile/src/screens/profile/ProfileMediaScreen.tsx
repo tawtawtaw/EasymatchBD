@@ -1,5 +1,5 @@
 import { useFocusEffect } from "@react-navigation/native";
-import { useCallback, useLayoutEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -33,6 +33,13 @@ import {
   type OnboardingMediaStep,
 } from "../../lib/onboarding-media-steps";
 import { computeVerificationSubmitState, isVerificationAwaitingOfficer, requiredNidStatus } from "../../lib/verification-submit-state";
+import { isProfileBiodataComplete } from "../../lib/member-onboarding";
+import { formatCompletionMissingMessage } from "../../lib/completion-missing-labels";
+import {
+  clearVerificationSubmittedAck,
+  markVerificationSubmittedAck,
+  readVerificationSubmittedAck,
+} from "../../lib/verification-submitted-ack";
 import { clearMemberVerificationMediaCache } from "../../hooks/use-member-verification-state";
 import { invalidateDedupeCache } from "../../services/api/dedupe";
 import { useMemberVerificationStore } from "../../store/memberVerificationStore";
@@ -64,7 +71,9 @@ import { colors } from "../../theme/colors";
 export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenProps) {
   const locale = useLocaleStore((s) => s.locale);
   const refreshSession = useAuthStore((s) => s.refreshSession);
+  const user = useAuthStore((s) => s.user);
   const onboardingPhase = useOnboardingStore((s) => s.phase);
+  const onboardingBootstrap = useOnboardingStore((s) => s.bootstrap);
   const refreshOnboarding = useOnboardingStore((s) => s.refresh);
   const isOnboardingSetup = onboardingPhase === "profile_setup";
   const copy = tProfileMedia(locale);
@@ -74,6 +83,22 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
   const [dismissingAlerts, setDismissingAlerts] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [submittedAck, setSubmittedAck] = useState(false);
+
+  const completionMissing =
+    onboardingBootstrap?.completionMissing ?? user?.completionMissing ?? [];
+
+  const biodataComplete = isProfileBiodataComplete({
+    completionMissing,
+    completionPercent:
+      onboardingBootstrap?.completionPercent ?? user?.completionPercent,
+  });
+
+  const biodataIncompleteDetail = formatCompletionMissingMessage(
+    locale,
+    completionMissing,
+    copy.biodataIncompleteIntro,
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -104,11 +129,42 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
   useFocusEffect(
     useCallback(() => {
       invalidateDedupeCache("auth:");
+      invalidateDedupeCache("profile:media");
       clearMemberVerificationMediaCache();
       void useMemberVerificationStore.getState().sync(true);
+      void refreshOnboarding(locale);
+      void refreshSession();
+      void readVerificationSubmittedAck().then(setSubmittedAck);
       void load();
-    }, [load]),
+    }, [load, locale, refreshOnboarding, refreshSession]),
   );
+
+  useEffect(() => {
+    if (!media) return;
+
+    const { canResubmit } = computeVerificationSubmitState(media);
+
+    if (
+      media.nidStatus === "rejected" ||
+      media.creatorNidStatus === "rejected" ||
+      media.profileBiodataReviewStatus === "rejected"
+    ) {
+      setSubmittedAck(false);
+      void clearVerificationSubmittedAck();
+      return;
+    }
+
+    if (canResubmit) {
+      setSubmittedAck(false);
+      void clearVerificationSubmittedAck();
+      return;
+    }
+
+    if (media.isVerified || media.profileBiodataReviewStatus === "pending") {
+      setSubmittedAck(true);
+      void markVerificationSubmittedAck();
+    }
+  }, [media]);
 
   async function uploadPhotoFile(
     file: PickedMediaFile,
@@ -302,9 +358,25 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
 
   async function handleSubmitVerification() {
     if (!media) return;
+    if (!biodataComplete) {
+      setError(biodataIncompleteDetail);
+      setMessage(null);
+      return;
+    }
     if (computeVerificationSubmitState(media).nidRejected) {
       setError(copy.submitRejectedNid);
       setMessage(null);
+      return;
+    }
+
+    const submitStateNow = computeVerificationSubmitState(media);
+    const awaitingReviewNow =
+      submitStateNow.isPendingReview ||
+      (submittedAck && !submitStateNow.canResubmit);
+
+    if (awaitingReviewNow) {
+      setMessage(copy.submitted);
+      setError(null);
       return;
     }
 
@@ -313,14 +385,33 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
     try {
       const result = await submitForVerification();
       if (result.submitted) {
+        setSubmittedAck(true);
+        await markVerificationSubmittedAck();
         setMessage(result.message ?? copy.submitted);
+        if (result.profileBiodataReviewStatus) {
+          setMedia((current) =>
+            current
+              ? {
+                  ...current,
+                  profileBiodataReviewStatus: result.profileBiodataReviewStatus!,
+                }
+              : current,
+          );
+        }
       } else {
+        setSubmittedAck(false);
+        await clearVerificationSubmittedAck();
         setError(result.message ?? copy.submitNotQueued);
         setMessage(null);
       }
       clearMemberVerificationMediaCache();
+      invalidateDedupeCache("profile:media");
       await load();
+      await refreshSession();
+      await refreshOnboarding(locale);
     } catch (err) {
+      setSubmittedAck(false);
+      await clearVerificationSubmittedAck();
       setError(getApiErrorMessage(err, copy.submitError));
     } finally {
       setBusy(false);
@@ -370,11 +461,17 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
   const onboardingStep = isOnboardingSetup ? getOnboardingMediaStep(media) : null;
   const submitState = computeVerificationSubmitState(media);
   const awaitingOfficer = isVerificationAwaitingOfficer(media);
+  const awaitingReview =
+    awaitingOfficer ||
+    submitState.isPendingReview ||
+    (submittedAck && !submitState.canResubmit);
   const canSubmitNow =
-    !awaitingOfficer && (submitState.readyToSubmit || submitState.canResubmit);
+    !awaitingOfficer &&
+    biodataComplete &&
+    (submitState.readyToSubmit ||
+      (submitState.canResubmit && !submittedAck));
   const submitDisabled =
     busy || media.isVerified || !submitState.packageComplete || !canSubmitNow;
-  const awaitingReview = awaitingOfficer || (submitState.isPendingReview && !submitState.canResubmit);
 
   let submitLabel: string = copy.submitForReview;
   if (busy) submitLabel = copy.submitVerification;
@@ -620,6 +717,9 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
         ) : null}
         {!submitState.packageComplete && !awaitingOfficer ? (
           <Text style={styles.hint}>{copy.packageIncompleteHint}</Text>
+        ) : null}
+        {submitState.packageComplete && !biodataComplete && !awaitingOfficer ? (
+          <Text style={styles.hint}>{biodataIncompleteDetail}</Text>
         ) : null}
         <Pressable
           style={[

@@ -17,19 +17,28 @@ npm install
 npm run build -w @easymatch/shared
 ```
 
-Copy environment file:
+Copy environment file (optional — see presets below):
 
 ```powershell
 Copy-Item apps/mobile/.env.example apps/mobile/.env
 ```
 
-Edit `apps/mobile/.env`:
+Or test against **Railway production** without maintaining `.env`:
+
+```bash
+npm run dev:mobile:live
+```
+
+That sets `EXPO_PUBLIC_API_URL` / `EXPO_PUBLIC_WEB_URL` to `api.easymatchbd.com` and `easymatchbd.com` for Expo Go.
+
+Edit `apps/mobile/.env` when you need a custom target:
 
 | Environment | `EXPO_PUBLIC_API_URL` |
 |-------------|------------------------|
-| Android emulator | `http://10.0.2.2:4101/api/v1` |
-| Physical device (same Wi‑Fi) | `http://YOUR_PC_LAN_IP:4101/api/v1` |
-| ngrok / remote | `https://your-host.ngrok.dev/api/v1` |
+| Android emulator (local API) | `http://10.0.2.2:4101/api/v1` — or `npm run dev:mobile` |
+| Physical device (same Wi‑Fi) | `http://YOUR_PC_LAN_IP:4101/api/v1` in `.env` |
+| Railway live (Expo Go) | `npm run dev:mobile:live` or copy `.env.live.example` → `.env` |
+| ngrok | `npm run dev:mobile:ngrok` (requires `npm run tunnel` + dev servers) |
 
 ## Run (same workflow as BCS mobile)
 

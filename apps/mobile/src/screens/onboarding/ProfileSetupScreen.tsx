@@ -12,6 +12,7 @@ import { LoadingState } from "../../components/ScreenState";
 import { VerificationFeedbackPanel } from "../../components/VerificationFeedbackPanel";
 import { tOnboardingProfileSetup } from "../../i18n/onboarding";
 import { tProfileMedia } from "../../i18n/messages";
+import { getCompletionMissingLabel } from "../../lib/completion-missing-labels";
 import type { ProfileSetupScreenProps } from "../../navigation/types";
 import { getVerificationFeedback } from "../../services/media";
 import { shouldShowVerificationFeedback } from "../../lib/verification-feedback";
@@ -69,7 +70,7 @@ export default function ProfileSetupScreen({ navigation }: ProfileSetupScreenPro
             <Text style={styles.missingTitle}>{copy.stillNeeded}</Text>
             {missing.slice(0, 10).map((item) => (
               <Text key={item} style={styles.missingItem}>
-                • {item.replace(/_/g, " ")}
+                • {getCompletionMissingLabel(locale, item)}
               </Text>
             ))}
           </View>

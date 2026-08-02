@@ -23,6 +23,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { generateUniqueProfileCode } from './profile-code.util';
 import { VerificationAlertsService } from '../verification/verification-alerts.service';
 import { StaffNotificationService } from '../staff/staff-notification.service';
+import { ProfilesService } from './profiles.service';
 
 type UploadedFile = {
   buffer: Buffer;
@@ -94,6 +95,7 @@ export class MediaService {
     private readonly storage: StorageService,
     private readonly verificationAlerts: VerificationAlertsService,
     private readonly staffNotifications: StaffNotificationService,
+    private readonly profilesService: ProfilesService,
   ) {}
 
   async getMediaSummary(userId: string): Promise<MediaSummaryResponse> {
@@ -242,6 +244,17 @@ export class MediaService {
         submitted: true,
         profileBiodataReviewStatus: profile.profileBiodataReviewStatus,
       };
+    }
+
+    const completion =
+      await this.profilesService.getCompletionSummary(userId);
+    if (
+      completion.completionMissing.length > 0 &&
+      completion.completionPercent < 100
+    ) {
+      throw new BadRequestException(
+        'Complete all required biodata sections before submitting for verification',
+      );
     }
 
     const updated = await this.prisma.profile.update({

@@ -20,7 +20,10 @@ function defaultApiUrl(): string {
   if (__DEV__ && Platform.OS === "android") {
     return "http://10.0.2.2:4101/api/v1";
   }
-  return "http://192.168.0.43:4101/api/v1";
+  if (__DEV__ && Platform.OS === "ios") {
+    return "http://127.0.0.1:4101/api/v1";
+  }
+  return "";
 }
 
 function getWebBaseUrlFromBuild(): string | null {

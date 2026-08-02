@@ -1,5 +1,4 @@
-import { useFocusEffect } from "@react-navigation/native";
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -23,19 +22,35 @@ import { useLocaleStore } from "../../store/localeStore";
 import { useOnboardingStore } from "../../store/onboardingStore";
 import { colors } from "../../theme/colors";
 
+function initialCreationMode(
+  bootstrap: ReturnType<typeof useOnboardingStore.getState>["bootstrap"],
+): ProfileCreationMode | null {
+  const mode = bootstrap?.profile?.creationMode ?? bootstrap?.creationMode ?? null;
+  return mode === "self" || mode === "on_behalf" ? mode : null;
+}
+
+function initialRelation(
+  bootstrap: ReturnType<typeof useOnboardingStore.getState>["bootstrap"],
+): OnBehalfRelation | "" {
+  const relation = bootstrap?.onBehalfRelation ?? bootstrap?.profile?.onBehalfRelation;
+  if (relation && ON_BEHALF_RELATIONS.includes(relation as OnBehalfRelation)) {
+    return relation as OnBehalfRelation;
+  }
+  return "";
+}
+
 export default function ProfileCreationIntentScreen() {
   const locale = useLocaleStore((s) => s.locale);
   const copy = tOnboardingCreationIntent(locale);
+  const bootstrap = useOnboardingStore((s) => s.bootstrap);
   const refresh = useOnboardingStore((s) => s.refresh);
 
-  useFocusEffect(
-    useCallback(() => {
-      void refresh(locale);
-    }, [locale, refresh]),
+  const [mode, setMode] = useState<ProfileCreationMode | null>(() =>
+    initialCreationMode(bootstrap),
   );
-
-  const [mode, setMode] = useState<ProfileCreationMode | null>(null);
-  const [relation, setRelation] = useState<OnBehalfRelation | "">("");
+  const [relation, setRelation] = useState<OnBehalfRelation | "">(() =>
+    initialRelation(bootstrap),
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -87,7 +102,10 @@ export default function ProfileCreationIntentScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
         <Text style={styles.title}>{copy.title}</Text>
         <Text style={styles.subtitle}>{copy.subtitle}</Text>
 

@@ -14,6 +14,7 @@ import { PaidMembershipGate } from "../../components/PaidMembershipGate";
 import { VerificationFeedbackPanel } from "../../components/VerificationFeedbackPanel";
 import { ProfilePausedBanner } from "../../components/ProfilePausedBanner";
 import { tProfileHome, tMembership, tProfileMedia } from "../../i18n/messages";
+import { getCompletionMissingLabel } from "../../lib/completion-missing-labels";
 import { useMemberVerificationState } from "../../hooks/use-member-verification-state";
 import { useIsPaidMember } from "../../hooks/use-is-paid-member";
 import { membershipPlanLabel } from "../../lib/membership-labels";
@@ -191,7 +192,7 @@ export default function ProfileScreen({ navigation }: ProfileHomeScreenProps) {
             <Text style={styles.missingTitle}>{copy.stillNeeded}:</Text>
             {missing.slice(0, 8).map((item) => (
               <Text key={item} style={styles.missingItem}>
-                • {item.replace(/_/g, " ")}
+                • {getCompletionMissingLabel(locale, item)}
               </Text>
             ))}
             {missing.length > 8 ? (

@@ -991,6 +991,9 @@ const profileMedia = {
     verifiedButton: "Profile verified",
     submitForReview: "Submit for verification",
     packageIncompleteHint: "Upload a passport photo and both sides of the required NID before submitting.",
+    biodataIncompleteSubmit:
+      "Complete personal, family, marital, and partner preference sections before submitting for verification.",
+    biodataIncompleteIntro: "Complete these required items before submitting for verification:",
     verificationChecklistTitle: "Verification status",
     verificationChecklistHint: "Each item must be approved before your profile is fully verified.",
     verificationActionBanner: "Verification needs your attention",
@@ -1112,6 +1115,9 @@ const profileMedia = {
     verifiedButton: "প্রোফাইল যাচাইকৃত",
     submitForReview: "যাচাইয়ের জন্য জমা দিন",
     packageIncompleteHint: "জমা দেওয়ার আগে পাসপোর্ট ছবি ও প্রয়োজনীয় এনআইডির উভয় পাশ আপলোড করুন।",
+    biodataIncompleteSubmit:
+      "যাচাইয়ের জন্য জমা দেওয়ার আগে ব্যক্তিগত, পারিবারিক, বৈবাহিক ও পছন্দের সব তথ্য পূরণ করুন।",
+    biodataIncompleteIntro: "যাচাইয়ের জন্য জমা দেওয়ার আগে এই প্রয়োজনীয় তথ্যগুলো পূরণ করুন:",
     verificationChecklistTitle: "যাচাইকরণ অবস্থা",
     verificationChecklistHint: "প্রোফাইল সম্পূর্ণ যাচাইকৃত হতে প্রতিটি আইটেম অনুমোদিত হতে হবে।",
     verificationActionBanner: "যাচাইকরণে আপনার পদক্ষেপ প্রয়োজন",

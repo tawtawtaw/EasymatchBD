@@ -1,5 +1,5 @@
 import { apiRequest, apiUpload } from "./api/client";
-import { dedupeRequest } from "./api/dedupe";
+import { dedupeRequest, invalidateDedupeCache } from "./api/dedupe";
 import type {
   NidDocument,
   NidDocumentSide,
@@ -97,10 +97,13 @@ export async function deleteNidDocument(
 }
 
 export async function submitForVerification() {
-  return apiRequest<{ submitted: boolean; message?: string }>(
-    "/profiles/me/verification/submit",
-    { method: "POST" },
-  );
+  const result = await apiRequest<{
+    submitted: boolean;
+    message?: string;
+    profileBiodataReviewStatus?: ProfileMedia["profileBiodataReviewStatus"];
+  }>("/profiles/me/verification/submit", { method: "POST" });
+  invalidateDedupeCache("profile:media");
+  return result;
 }
 
 export function profilePhotoUrl(photoId: string) {
