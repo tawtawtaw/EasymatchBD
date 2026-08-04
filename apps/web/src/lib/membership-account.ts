@@ -1,4 +1,4 @@
-import { dedupeRequest } from "@/lib/api";
+import { dedupeRequest, invalidateDedupeCache } from "@/lib/api";
 import { getApiBaseUrl } from "@/lib/api-base-url";
 import { apiFetch, readJsonResponse } from "@/lib/parse-response";
 
@@ -44,9 +44,17 @@ export type MembershipPaymentReceipt = MemberPaymentRecord & {
   subscriptionEndsAt?: string | null;
 };
 
+export function invalidateMembershipAccountCache() {
+  invalidateDedupeCache("membership-account");
+}
+
 export async function getMembershipAccount(
   token: string,
+  options?: { forceFresh?: boolean },
 ): Promise<MembershipAccountSummary> {
+  if (options?.forceFresh) {
+    invalidateMembershipAccountCache();
+  }
   return dedupeRequest(
     `membership-account:${token.slice(-12)}`,
     async () => {

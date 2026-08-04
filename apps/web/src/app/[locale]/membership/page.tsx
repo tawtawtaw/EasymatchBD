@@ -55,19 +55,25 @@ export default function MembershipPage() {
   }, [fromMobile]);
 
   useEffect(() => {
-    if (!ready || !loggedIn || isPaid) return;
+    if (!ready || !loggedIn) return;
 
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
     if (!token) return;
 
-    confirmMembershipPayment(token)
+    const tranId = searchParams.get("tran_id") ?? undefined;
+    const valId = searchParams.get("val_id") ?? undefined;
+    const hasPaymentParams = Boolean(tranId || valId);
+
+    if (isPaid && !hasPaymentParams) return;
+
+    confirmMembershipPayment(token, hasPaymentParams ? { tranId, valId } : undefined)
       .then((result) => {
         if (result.isPaidMember) {
           notifyAuthChanged();
         }
       })
       .catch(() => {});
-  }, [loggedIn, ready, isPaid]);
+  }, [loggedIn, ready, isPaid, searchParams]);
 
   useEffect(() => {
     getMembershipTariffs()
@@ -187,7 +193,10 @@ export default function MembershipPage() {
       ) : null}
 
       {ready && loggedIn ? (
-        <MemberSubscriptionPanel tariffs={tariffs} />
+        <MemberSubscriptionPanel
+          key={isPaid ? "paid" : "free"}
+          tariffs={tariffs}
+        />
       ) : null}
 
       {checkoutError ? (

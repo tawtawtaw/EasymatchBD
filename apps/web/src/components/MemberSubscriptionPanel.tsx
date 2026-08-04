@@ -9,8 +9,11 @@ import {
   BiodataSectionShell,
 } from "@/components/BiodataFieldRows";
 import { MembershipReceiptDocument } from "@/components/MembershipReceiptDocument";
+import { useAuthSession } from "@/hooks/use-auth-session";
 import { AUTH_TOKEN_KEY } from "@/lib/api";
+import { AUTH_CHANGED_EVENT } from "@/lib/auth-session";
 import { downloadBiodataPdf, printBiodataPdf } from "@/lib/download-biodata-pdf";
+import { membershipFromSession } from "@/lib/membership";
 import {
   getMembershipAccount,
   getMembershipPaymentReceipt,
@@ -52,6 +55,8 @@ export function MemberSubscriptionPanel({
 }: MemberSubscriptionPanelProps) {
   const locale = useLocale();
   const t = useTranslations("membership.subscription");
+  const { user } = useAuthSession();
+  const sessionIsPaid = membershipFromSession(user);
   const [account, setAccount] = useState<MembershipAccountSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -121,12 +126,49 @@ export function MemberSubscriptionPanel({
       return;
     }
 
-    getMembershipAccount(token)
-      .then(setAccount)
-      .catch((err) => {
-        setError(err instanceof Error ? err.message : t("loadError"));
+    let cancelled = false;
+
+    getMembershipAccount(token, { forceFresh: sessionIsPaid })
+      .then((data) => {
+        if (!cancelled) {
+          setAccount(data);
+        }
       })
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : t("loadError"));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionIsPaid, t]);
+
+  useEffect(() => {
+    function onAuthChanged() {
+      const token = localStorage.getItem(AUTH_TOKEN_KEY);
+      if (!token) {
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+      getMembershipAccount(token, { forceFresh: true })
+        .then(setAccount)
+        .catch((err) => {
+          setError(err instanceof Error ? err.message : t("loadError"));
+        })
+        .finally(() => setLoading(false));
+    }
+
+    window.addEventListener(AUTH_CHANGED_EVENT, onAuthChanged);
+    return () => window.removeEventListener(AUTH_CHANGED_EVENT, onAuthChanged);
   }, [t]);
 
   const subscription = account?.subscription;

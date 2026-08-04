@@ -1,5 +1,6 @@
 import { getApiBaseUrl } from "@/lib/api-base-url";
 import { apiFetch, readJsonResponse } from "@/lib/parse-response";
+import { invalidateMembershipAccountCache } from "@/lib/membership-account";
 
 export type MembershipCheckoutResult = {
   gatewayUrl: string;
@@ -47,5 +48,9 @@ export async function confirmMembershipPayment(
       valId: options?.valId,
     }),
   });
-  return readJsonResponse<MembershipConfirmResult>(res);
+  const result = await readJsonResponse<MembershipConfirmResult>(res);
+  if (result.isPaidMember || result.synced) {
+    invalidateMembershipAccountCache();
+  }
+  return result;
 }
