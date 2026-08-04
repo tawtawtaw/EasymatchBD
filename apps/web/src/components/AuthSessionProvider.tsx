@@ -98,11 +98,14 @@ async function loadSession(token: string): Promise<AuthSession> {
   if (!sessionInflight) {
     sessionInflight = getSession(token)
       .then((value) => {
-        sessionClientCache = {
-          token,
-          expiresAt: Date.now() + SESSION_CLIENT_CACHE_MS,
-          value,
-        };
+        const stillCurrent = localStorage.getItem(AUTH_TOKEN_KEY) === token;
+        if (stillCurrent) {
+          sessionClientCache = {
+            token,
+            expiresAt: Date.now() + SESSION_CLIENT_CACHE_MS,
+            value,
+          };
+        }
         return value;
       })
       .finally(() => {
@@ -232,7 +235,10 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
 
     function onAuthChanged() {
       sessionClientCache = null;
-      setReady(false);
+      sessionInflight = null;
+      setLoggedIn(false);
+      setUser(null);
+      setReady(true);
       void refresh();
     }
 

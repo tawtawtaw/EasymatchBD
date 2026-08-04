@@ -67,6 +67,7 @@ export function signOut(): void {
     void revokeDeviceSession(device.deviceToken).catch(() => undefined);
   }
   clearAuthSession();
+  invalidateDedupeCache();
 }
 
 const SESSION_NOTICE_KEY = "easymatch_session_notice";

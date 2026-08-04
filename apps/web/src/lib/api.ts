@@ -35,11 +35,15 @@ export async function dedupeRequest<T>(
 
   const request = loader()
     .then((value) => {
-      recentResponses.set(key, { expiresAt: Date.now() + ttlMs, value });
+      if (inflightRequests.get(key) === request) {
+        recentResponses.set(key, { expiresAt: Date.now() + ttlMs, value });
+      }
       return value;
     })
     .finally(() => {
-      inflightRequests.delete(key);
+      if (inflightRequests.get(key) === request) {
+        inflightRequests.delete(key);
+      }
     });
 
   inflightRequests.set(key, request as Promise<unknown>);
@@ -50,11 +54,17 @@ export async function dedupeRequest<T>(
 export function invalidateDedupeCache(keyPrefix?: string) {
   if (!keyPrefix) {
     recentResponses.clear();
+    inflightRequests.clear();
     return;
   }
   for (const key of recentResponses.keys()) {
     if (key.startsWith(keyPrefix)) {
       recentResponses.delete(key);
+    }
+  }
+  for (const key of inflightRequests.keys()) {
+    if (key.startsWith(keyPrefix)) {
+      inflightRequests.delete(key);
     }
   }
 }

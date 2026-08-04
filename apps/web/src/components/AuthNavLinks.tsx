@@ -30,7 +30,7 @@ export function AuthNavLinks({ layout = "inline", onNavigate }: AuthNavLinksProp
   function handleSignOut() {
     signOut();
     onNavigate?.();
-    router.push("/");
+    router.replace("/auth");
     router.refresh();
   }
 

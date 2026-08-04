@@ -131,7 +131,7 @@ export function FeatureCommandPaletteProvider({
       close();
       if (feature.action === "signOut") {
         signOut();
-        router.push("/");
+        router.replace("/auth");
         router.refresh();
         return;
       }
