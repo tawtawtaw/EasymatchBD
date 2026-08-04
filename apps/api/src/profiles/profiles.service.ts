@@ -799,38 +799,19 @@ export class ProfilesService {
     });
   }
 
-  private biodataResetData(profile: {
+  private biodataResetData(_profile: {
     profileBiodataReviewStatus: MediaReviewStatus | null;
   }): Prisma.ProfileUpdateInput {
-    // Only verified (approved) biodata re-enters review automatically when edited.
-    // After rejection, members must explicitly submit from Photos & Verification.
-    if (profile.profileBiodataReviewStatus === MediaReviewStatus.approved) {
-      return {
-        profileBiodataReviewStatus: MediaReviewStatus.pending,
-        profileBiodataReviewedAt: null,
-        isVerified: false,
-      };
-    }
+    // Biodata edits do not re-enter review until the member submits from Photos & Verification.
     return {};
   }
 
-  private async markBiodataPendingAfterProfileEdit(profile: {
+  private async markBiodataPendingAfterProfileEdit(_profile: {
     id: string;
     profileCode: string;
     profileBiodataReviewStatus: MediaReviewStatus | null;
   }) {
-    const reset = this.biodataResetData(profile);
-    if (Object.keys(reset).length > 0) {
-      await this.prisma.profile.update({
-        where: { id: profile.id },
-        data: reset,
-      });
-      void this.staffNotifications.notifyVerificationSubmission({
-        profileId: profile.id,
-        profileCode: profile.profileCode,
-        detail: 'biodata (profile edit)',
-      });
-    }
+    // Saved biodata edits do not enter review until the member submits from Photos & Verification.
   }
 
   private resolveHeightCm(

@@ -234,6 +234,43 @@ export class MediaService {
     }
 
     if (profile.profileBiodataReviewStatus === MediaReviewStatus.approved) {
+      if (profile.isVerified) {
+        const completion =
+          await this.profilesService.getCompletionSummary(userId);
+        if (
+          completion.completionMissing.length > 0 &&
+          completion.completionPercent < 100
+        ) {
+          throw new BadRequestException(
+            'Complete all required biodata sections before submitting for verification',
+          );
+        }
+
+        const updated = await this.prisma.profile.update({
+          where: { id: profile.id },
+          data: {
+            profileBiodataReviewStatus: MediaReviewStatus.pending,
+            profileBiodataReviewedAt: null,
+            isVerified: false,
+            verifiedOnBehalf: false,
+          },
+          select: {
+            profileBiodataReviewStatus: true,
+          },
+        });
+
+        this.invalidateMediaSummaryCache(userId);
+        void this.staffNotifications.notifyVerificationSubmission({
+          profileId: profile.id,
+          profileCode: profile.profileCode,
+          detail: 'profile amendment',
+        });
+        return {
+          submitted: true,
+          profileBiodataReviewStatus: updated.profileBiodataReviewStatus,
+        };
+      }
+
       throw new BadRequestException(
         'Re-upload any rejected documents before resubmitting for verification',
       );
@@ -334,11 +371,6 @@ export class MediaService {
       });
 
       this.invalidateMediaSummaryCache(userId);
-      void this.staffNotifications.notifyVerificationSubmission({
-        profileId: profile.id,
-        profileCode: profile.profileCode,
-        detail: `photo (${type})`,
-      });
       return this.toPhotoDto(photo);
     }
 
@@ -356,11 +388,6 @@ export class MediaService {
     });
 
     this.invalidateMediaSummaryCache(userId);
-    void this.staffNotifications.notifyVerificationSubmission({
-      profileId: profile.id,
-      profileCode: profile.profileCode,
-      detail: `photo (${type})`,
-    });
     return this.toPhotoDto(photo);
   }
 

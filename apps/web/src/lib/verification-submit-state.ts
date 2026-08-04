@@ -47,7 +47,13 @@ export function nidNeedsResubmit(media: ProfileMedia) {
   );
 }
 
-export function computeVerificationSubmitState(media: ProfileMedia) {
+export function computeVerificationSubmitState(
+  media: ProfileMedia,
+  options?: {
+    amendmentDirty?: boolean;
+    biodataComplete?: boolean;
+  },
+) {
   const packageComplete = isVerificationPackageComplete(media);
   const biodataRejected = media.profileBiodataReviewStatus === "rejected";
   const biodataPending = media.profileBiodataReviewStatus === "pending";
@@ -56,7 +62,15 @@ export function computeVerificationSubmitState(media: ProfileMedia) {
     packageComplete &&
     !nidRejected &&
     (biodataRejected || nidNeedsResubmit(media));
-  const isPendingReview = biodataPending && !canResubmit;
+  const canSubmitVerifiedAmendment =
+    Boolean(options?.biodataComplete) &&
+    packageComplete &&
+    media.isVerified &&
+    Boolean(options?.amendmentDirty) &&
+    !biodataPending &&
+    !nidRejected;
+  const isPendingReview =
+    biodataPending && !canResubmit && !canSubmitVerifiedAmendment;
 
   return {
     packageComplete,
@@ -64,6 +78,7 @@ export function computeVerificationSubmitState(media: ProfileMedia) {
     biodataPending,
     nidRejected,
     canResubmit,
+    canSubmitVerifiedAmendment,
     isPendingReview,
     readyToSubmit:
       packageComplete &&

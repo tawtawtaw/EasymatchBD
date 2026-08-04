@@ -28,6 +28,7 @@ import {
   validatePhotoFile,
   MAX_NID_BYTES,
   MAX_PHOTO_BYTES,
+  invalidateAuthenticatedBlobCache,
 } from "@/lib/media";
 import {
   GALLERY_PHOTO_ASPECT,
@@ -39,6 +40,11 @@ import {
   computeVerificationSubmitState,
   isVerificationPackageComplete,
 } from "@/lib/verification-submit-state";
+import {
+  clearProfileAmendmentDirty,
+  isProfileAmendmentDirty,
+  markProfileAmendmentDirty,
+} from "@/lib/profile-amendment";
 import { useAuthToken } from "@/hooks/use-auth-token";
 import { useMounted } from "@/hooks/use-mounted";
 
@@ -52,6 +58,7 @@ type ProfileMediaTabProps = {
   onError: (message: string | null) => void;
   onMessage: (message: string | null) => void;
   onProfileRefresh?: () => Promise<void>;
+  biodataComplete?: boolean;
 };
 
 function statusBadgeClass(status: string) {
@@ -212,6 +219,7 @@ export function ProfileMediaTab({
   onError,
   onMessage,
   onProfileRefresh,
+  biodataComplete = true,
 }: ProfileMediaTabProps) {
   const t = useTranslations("profile.media");
   const te = useTranslations("profile.errors");
@@ -224,6 +232,7 @@ export function ProfileMediaTab({
   const [uploadNotice, setUploadNotice] = useState<string | null>(null);
   const uploadAlertRef = useRef<HTMLParagraphElement>(null);
   const [submittedAck, setSubmittedAck] = useState(false);
+  const [amendmentDirty, setAmendmentDirty] = useState(false);
   const [cropRequest, setCropRequest] = useState<{
     file: File;
     type: "primary" | "gallery";
@@ -242,15 +251,25 @@ export function ProfileMediaTab({
     sessionStorage.removeItem(VERIFICATION_SUBMITTED_KEY);
   }
 
-  const loadMedia = useCallback(async () => {
+  function markAmendmentPending() {
+    markProfileAmendmentDirty();
+    setAmendmentDirty(true);
+    clearSubmitted();
+  }
+
+  const loadMedia = useCallback(async (forceFresh = false) => {
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
     if (!token) return;
-    const data = await getProfileMedia(token);
+    const data = await getProfileMedia(token, { forceFresh });
     setMedia(data);
   }, []);
 
   useEffect(() => {
-    loadMedia()
+    setAmendmentDirty(isProfileAmendmentDirty());
+  }, []);
+
+  useEffect(() => {
+    loadMedia(true)
       .catch((err) =>
         onError(err instanceof Error ? err.message : "Failed to load media"),
       )
@@ -260,7 +279,16 @@ export function ProfileMediaTab({
   useEffect(() => {
     if (!media) return;
 
-    const { canResubmit } = computeVerificationSubmitState(media);
+    const submitOptions = {
+      amendmentDirty,
+      biodataComplete,
+    };
+    const { canResubmit, canSubmitVerifiedAmendment } =
+      computeVerificationSubmitState(media, submitOptions);
+
+    if (canSubmitVerifiedAmendment) {
+      return;
+    }
 
     if (
       media.nidStatus === "rejected" ||
@@ -277,12 +305,21 @@ export function ProfileMediaTab({
     }
 
     const stored = sessionStorage.getItem(VERIFICATION_SUBMITTED_KEY) === "1";
-    if (media.isVerified || media.profileBiodataReviewStatus === "pending") {
+    if (media.isVerified) {
+      if (stored) {
+        setSubmittedAck(true);
+      } else {
+        setSubmittedAck(false);
+      }
+      return;
+    }
+
+    if (media.profileBiodataReviewStatus === "pending") {
       setSubmittedAck(true);
     } else if (!stored) {
       setSubmittedAck(false);
     }
-  }, [media]);
+  }, [media, amendmentDirty, biodataComplete]);
 
   function mediaErrorMessage(key: string): string {
     return te(key as "photoTooLarge" | "nidTooLarge" | "invalidPhotoType" | "invalidNidType");
@@ -343,8 +380,33 @@ export function ProfileMediaTab({
     setUploading(type === "gallery" ? `gallery-${gallerySlot ?? "other"}` : type);
     clearUploadNotice();
     try {
-      await uploadProfilePhoto(token, file, type, gallerySlot);
-      await loadMedia();
+      const previousPrimaryId = media?.photos.find((p) => p.type === "primary")?.id;
+      const uploaded = await uploadProfilePhoto(token, file, type, gallerySlot);
+      if (previousPrimaryId && type === "primary") {
+        invalidateAuthenticatedBlobCache(previousPrimaryId);
+      }
+      setMedia((current) => {
+        if (!current) return current;
+        let photos = current.photos.filter(
+          (photo) =>
+            !(
+              type === "primary" &&
+              photo.type === "primary" &&
+              photo.id !== uploaded.id
+            ),
+        );
+        if (type === "gallery" && gallerySlot === "other") {
+          photos = photos.filter(
+            (photo) => !(photo.type === "gallery" && photo.sortOrder === 0),
+          );
+        }
+        const withoutDuplicate = photos.filter((photo) => photo.id !== uploaded.id);
+        return { ...current, photos: [...withoutDuplicate, uploaded] };
+      });
+      if (media?.isVerified) {
+        markAmendmentPending();
+      }
+      await loadMedia(true);
       onMessage(t("photoUploaded"));
     } catch (err) {
       reportUploadError(err);
@@ -436,7 +498,10 @@ export function ProfileMediaTab({
     setUploading(photo.id);
     try {
       await deleteProfilePhoto(token, photo.id);
-      await loadMedia();
+      if (media?.isVerified) {
+        markAmendmentPending();
+      }
+      await loadMedia(true);
       onMessage(t("photoRemoved"));
     } catch (err) {
       onError(err instanceof Error ? err.message : "Delete failed");
@@ -492,6 +557,9 @@ export function ProfileMediaTab({
     if (!media.photos.some((p) => p.type === "primary")) {
       missing.push(t("passportPhoto"));
     }
+    if (!biodataComplete) {
+      missing.push(t("biodataIncomplete"));
+    }
     if (!requiredDocs.some((d) => d.side === "front")) {
       missing.push(
         onBehalf ? t("creatorNidFront") : t("nidFront"),
@@ -507,7 +575,9 @@ export function ProfileMediaTab({
       return;
     }
 
-    const { canResubmit, nidRejected } = computeVerificationSubmitState(media);
+    const submitOptions = { amendmentDirty, biodataComplete };
+    const { canResubmit, nidRejected, canSubmitVerifiedAmendment } =
+      computeVerificationSubmitState(media, submitOptions);
     const awaitingReview =
       media.profileBiodataReviewStatus === "pending" &&
       (submittedAck || !canResubmit);
@@ -518,13 +588,12 @@ export function ProfileMediaTab({
       return;
     }
 
-    if (awaitingReview) {
+    if (awaitingReview && !canSubmitVerifiedAmendment) {
       onMessage(t("submittedForReview"));
       return;
     }
 
-    if (media.isVerified) {
-      onMessage(t("submittedForReview"));
+    if (media.isVerified && !canSubmitVerifiedAmendment) {
       return;
     }
 
@@ -535,7 +604,9 @@ export function ProfileMediaTab({
     onError(null);
     try {
       const result = await submitForVerification(token);
-      await loadMedia();
+      clearProfileAmendmentDirty();
+      setAmendmentDirty(false);
+      await loadMedia(true);
       await onProfileRefresh?.();
       if (result.submitted) {
         markSubmitted();
@@ -689,13 +760,16 @@ export function ProfileMediaTab({
     return t(`reviewStatus.${status}`);
   }
 
+  const submitOptions = { amendmentDirty, biodataComplete };
   const submitState = media
-    ? computeVerificationSubmitState(media)
+    ? computeVerificationSubmitState(media, submitOptions)
     : {
         packageComplete: false,
         canResubmit: false,
+        canSubmitVerifiedAmendment: false,
         isPendingReview: false,
         readyToSubmit: false,
+        nidRejected: false,
       };
   const {
     packageComplete,
@@ -703,22 +777,29 @@ export function ProfileMediaTab({
     isPendingReview,
     readyToSubmit,
     nidRejected,
+    canSubmitVerifiedAmendment,
   } = submitState;
   const isVerified = Boolean(media?.isVerified);
-  const awaitingReview = isPendingReview || (submittedAck && !canResubmit);
+  const awaitingReview =
+    (isPendingReview || (submittedAck && !canResubmit)) &&
+    !canSubmitVerifiedAmendment;
   const canSubmitNow =
-    readyToSubmit || (canResubmit && !submittedAck);
+    readyToSubmit ||
+    (canResubmit && !submittedAck) ||
+    canSubmitVerifiedAmendment;
   const submitDisabled =
     submitting ||
     Boolean(uploading) ||
-    isVerified ||
+    !biodataComplete ||
     !packageComplete ||
-    !canSubmitNow;
+    !canSubmitNow ||
+    awaitingReview;
 
   let submitLabel = t("submitForReview");
   if (submitting) submitLabel = tc("saving");
-  else if (isVerified) submitLabel = t("verifiedButton");
+  else if (isVerified && !canSubmitVerifiedAmendment) submitLabel = t("verifiedButton");
   else if (awaitingReview) submitLabel = t("pendingReviewButton");
+  else if (canSubmitVerifiedAmendment) submitLabel = t("resubmitForReview");
   else if (canResubmit) submitLabel = t("resubmitForReview");
 
   const submitButton = (
@@ -786,7 +867,7 @@ export function ProfileMediaTab({
         />
       )}
 
-      {readyToSubmit && (
+      {(readyToSubmit || canSubmitVerifiedAmendment) && (
         <section className="rounded-xl border-2 border-rose-300 bg-rose-50 p-4 sm:p-5">
           <h2 className="text-base font-bold text-rose-950">{t("readyToSubmitTitle")}</h2>
           <p className="mt-1 text-sm text-rose-900">{t("readyToSubmitHint")}</p>
@@ -822,10 +903,12 @@ export function ProfileMediaTab({
           {primaryPhoto && mounted && authToken && (
             <div className="flex flex-wrap items-end gap-4">
               <AuthenticatedImage
+                key={primaryPhoto.id}
                 token={authToken}
                 path={photoFileUrl(primaryPhoto.id)}
                 alt={t("passportPhoto")}
                 className="h-40 w-32 rounded-lg border border-zinc-200 object-cover"
+                onLoadFailed={() => void loadMedia(true)}
               />
               <div className="space-y-2 text-sm">
                 <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${statusBadgeClass(primaryPhoto.status)}`}>

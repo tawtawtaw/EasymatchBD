@@ -1,4 +1,4 @@
-import { dedupeRequest } from "@/lib/api";
+import { dedupeRequest, invalidateDedupeCache } from "@/lib/api";
 import { getApiBaseUrl } from "@/lib/api-base-url";
 import { readJsonResponse } from "@/lib/parse-response";
 
@@ -192,23 +192,36 @@ export async function submitForVerification(token: string) {
     method: "POST",
     headers: authOnlyHeaders(token),
   });
-  return parseResponse<{
+  const result = await parseResponse<{
     submitted: boolean;
     profileBiodataReviewStatus: MediaReviewStatus | null;
     message?: string;
   }>(res);
+  invalidateProfileMediaCaches();
+  return result;
 }
 
-export async function getProfileMedia(token: string) {
+export function invalidateProfileMediaCaches() {
+  invalidateDedupeCache("profile-media:");
+  invalidateDedupeCache("verification-feedback:");
+}
+
+export async function getProfileMedia(
+  token: string,
+  options?: { forceFresh?: boolean },
+) {
+  if (options?.forceFresh) {
+    invalidateProfileMediaCaches();
+  }
   return dedupeRequest(
-    `profile-media:${token}`,
+    `profile-media:${token.slice(-12)}`,
     async () => {
       const res = await fetch(`${apiUrl()}/profiles/me/media`, {
         headers: authOnlyHeaders(token),
       });
       return parseResponse<ProfileMedia>(res);
     },
-    30_000,
+    4_000,
   );
 }
 
@@ -229,7 +242,10 @@ export async function uploadProfilePhoto(
     headers: authOnlyHeaders(token),
     body: form,
   });
-  return parseResponse<ProfilePhoto>(res);
+  const photo = await parseResponse<ProfilePhoto>(res);
+  invalidateProfileMediaCaches();
+  invalidateAuthenticatedBlobCache("/profiles/me/photos/");
+  return photo;
 }
 
 export async function deleteProfilePhoto(token: string, photoId: string) {
@@ -237,7 +253,10 @@ export async function deleteProfilePhoto(token: string, photoId: string) {
     method: "DELETE",
     headers: authOnlyHeaders(token),
   });
-  return parseResponse<{ deleted: boolean }>(res);
+  const result = await parseResponse<{ deleted: boolean }>(res);
+  invalidateProfileMediaCaches();
+  invalidateAuthenticatedBlobCache(photoId);
+  return result;
 }
 
 export async function setPrimaryPhoto(token: string, photoId: string) {
@@ -281,6 +300,18 @@ export async function deleteNidDocument(
 }
 
 const blobCache = new Map<string, Promise<Blob>>();
+
+export function invalidateAuthenticatedBlobCache(path?: string) {
+  if (!path) {
+    blobCache.clear();
+    return;
+  }
+  for (const key of blobCache.keys()) {
+    if (key.includes(path)) {
+      blobCache.delete(key);
+    }
+  }
+}
 
 export async function fetchAuthenticatedBlob(
   token: string,

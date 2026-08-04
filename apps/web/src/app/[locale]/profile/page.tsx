@@ -84,6 +84,7 @@ import {
   getVerificationFeedback,
   type VerificationFeedback,
 } from "@/lib/media";
+import { markProfileAmendmentDirty } from "@/lib/profile-amendment";
 
 type Tab = "personal" | "family" | "marital" | "partner" | "photos";
 
@@ -973,6 +974,9 @@ export default function ProfilePage() {
       }
 
       setProfile(updated);
+      if (profile?.isVerified) {
+        markProfileAmendmentDirty();
+      }
       setMessage(t("saved"));
 
       const tabIndex = PROFILE_TABS.indexOf(tab);
@@ -1292,6 +1296,10 @@ export default function ProfilePage() {
               onError={setError}
               onMessage={setMessage}
               onProfileRefresh={refreshProfile}
+              biodataComplete={
+                (profile?.completionPercent ?? 0) >= 100 &&
+                (profile?.completionMissing?.length ?? 0) === 0
+              }
             />
           </div>
         ) : (

@@ -1079,6 +1079,7 @@
       "verifiedButton": "Verified",
       "submittedForReview": "Submitted for verification. An officer will review your documents.",
       "submitMissing": "Please upload before submitting: {items}",
+      "biodataIncomplete": "required biodata sections",
       "submitRejectedNid": "Your NID was rejected. Re-upload front and back NID images before resubmitting.",
       "submitNotQueued": "Your submission was not queued. Re-upload any rejected documents and try again.",
       "biodataReviewLabel": "Profile biodata review",
