@@ -5,6 +5,37 @@
   max-height: 360px;
 }
 
+.easymatch-video-call-room--web .easymatch-video-call-stage--adaptive {
+  height: min(520px, 58vh);
+  min-height: 300px;
+  max-height: 520px;
+}
+
+.easymatch-speaker-layout {
+  height: 100%;
+}
+
+.easymatch-speaker-main .easymatch-video-tile {
+  height: 100%;
+}
+
+.easymatch-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.5rem;
+  align-content: center;
+  align-items: stretch;
+}
+
+.easymatch-gallery-grid--compact {
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
+.easymatch-video-tile .lk-participant-tile {
+  height: 100%;
+  width: 100%;
+}
+
 /* Mobile app WebView: shorter video so guest invite fits below */
 .easymatch-video-call-room--embedded .easymatch-video-call-stage--embedded {
   height: min(280px, 38vh);

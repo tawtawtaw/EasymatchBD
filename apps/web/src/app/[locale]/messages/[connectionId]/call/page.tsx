@@ -30,6 +30,9 @@ export default function VideoCallPage({
   const [loading, setLoading] = useState(true);
 
   const callId = searchParams.get("callId");
+  const autoJoin =
+    searchParams.get("autoJoin") === "1" ||
+    searchParams.get("autoJoin") === "true";
 
   useEffect(() => {
     void params.then((value) => setConnectionId(value.connectionId));
@@ -55,15 +58,19 @@ export default function VideoCallPage({
           }),
         );
       } catch {
-        const connections = await listMyConnections(token);
-        const match = connections.find((c) => c.connectionId === connectionId);
-        if (match) {
-          setMemberName(
-            resolveMemberDisplayName(match.member, {
-              profileRef: (code) => t("profileRef", { code }),
-              anonymous: t("unknownMember"),
-            }),
-          );
+        try {
+          const connections = await listMyConnections(token);
+          const match = connections.find((c) => c.connectionId === connectionId);
+          if (match) {
+            setMemberName(
+              resolveMemberDisplayName(match.member, {
+                profileRef: (code) => t("profileRef", { code }),
+                anonymous: t("unknownMember"),
+              }),
+            );
+          }
+        } catch {
+          /* API unreachable — VideoCallRoom can still load the call by callId */
         }
       } finally {
         setLoading(false);
@@ -109,6 +116,7 @@ export default function VideoCallPage({
         connectionId={connectionId}
         callId={callId}
         memberName={memberName}
+        autoJoin={autoJoin}
       />
     </main>
   );

@@ -10,18 +10,32 @@ function getAudioContextClass(): AudioContextConstructor | null {
   return window.AudioContext ?? extended.webkitAudioContext ?? null;
 }
 
+/** WhatsApp-style incoming call melody (approximation), louder than the old beeps. */
+const INCOMING_MELODY: Array<{ freq: number; startMs: number; durationMs: number }> =
+  [
+    { freq: 659, startMs: 0, durationMs: 120 },
+    { freq: 784, startMs: 140, durationMs: 120 },
+    { freq: 988, startMs: 280, durationMs: 180 },
+    { freq: 784, startMs: 500, durationMs: 120 },
+    { freq: 659, startMs: 640, durationMs: 160 },
+  ];
+
 class VideoCallRingtonePlayer {
   private ctx: AudioContext | null = null;
   private loopTimer: number | null = null;
   private running = false;
   private kind: VideoCallRingtoneKind | null = null;
   private activeNodes: OscillatorNode[] = [];
+  private masterGain: GainNode | null = null;
 
   private ensureContext(): AudioContext | null {
     if (this.ctx) return this.ctx;
     const Ctx = getAudioContextClass();
     if (!Ctx) return null;
     this.ctx = new Ctx();
+    this.masterGain = this.ctx.createGain();
+    this.masterGain.gain.value = 0.92;
+    this.masterGain.connect(this.ctx.destination);
     return this.ctx;
   }
 
@@ -29,7 +43,11 @@ class VideoCallRingtonePlayer {
     const ctx = this.ensureContext();
     if (!ctx) return;
     if (ctx.state === "suspended") {
-      await ctx.resume();
+      try {
+        await ctx.resume();
+      } catch {
+        /* gesture may be required */
+      }
     }
   }
 
@@ -38,7 +56,14 @@ class VideoCallRingtonePlayer {
     this.stop();
     this.running = true;
     this.kind = kind;
-    void this.unlock().then(() => this.schedulePulse(kind));
+    void this.unlock().then(() => {
+      if (this.ctx?.state === "suspended") {
+        this.running = false;
+        this.kind = null;
+        return;
+      }
+      this.schedulePulse(kind);
+    });
   }
 
   stop() {
@@ -63,46 +88,55 @@ class VideoCallRingtonePlayer {
     if (!this.running || this.kind !== kind) return;
 
     const ctx = this.ensureContext();
-    if (!ctx) return;
+    if (!ctx || !this.masterGain) return;
 
     if (kind === "incoming") {
-      this.playDualTone(ctx, 0.13);
+      this.playMelody(ctx, this.masterGain);
       this.loopTimer = window.setTimeout(() => {
-        if (!this.running || this.kind !== kind) return;
-        this.playDualTone(ctx, 0.13);
-        this.loopTimer = window.setTimeout(() => {
-          this.schedulePulse(kind);
-        }, 2600);
-      }, 450);
+        this.schedulePulse(kind);
+      }, 2400);
       return;
     }
 
-    this.playSingleTone(ctx, 425, 0.09, 0.55);
+    this.playSingleTone(ctx, this.masterGain, 425, 0.75, 0.12);
     this.loopTimer = window.setTimeout(() => {
       this.schedulePulse(kind);
-    }, 3000);
+    }, 2800);
   }
 
-  private playDualTone(ctx: AudioContext, volume: number) {
-    this.playSingleTone(ctx, 440, volume, 0.85);
-    this.playSingleTone(ctx, 480, volume, 0.85);
+  private playMelody(ctx: AudioContext, destination: AudioNode) {
+    const start = ctx.currentTime;
+    for (const note of INCOMING_MELODY) {
+      this.playSingleTone(
+        ctx,
+        destination,
+        note.freq,
+        0.85,
+        note.durationMs / 1000,
+        start + note.startMs / 1000,
+      );
+    }
   }
 
   private playSingleTone(
     ctx: AudioContext,
+    destination: AudioNode,
     frequency: number,
     volume: number,
     durationSec: number,
+    when = ctx.currentTime,
   ) {
     const oscillator = ctx.createOscillator();
     const gain = ctx.createGain();
-    oscillator.type = "sine";
+    oscillator.type = "triangle";
     oscillator.frequency.value = frequency;
-    gain.gain.value = volume;
+    gain.gain.setValueAtTime(0.0001, when);
+    gain.gain.exponentialRampToValueAtTime(volume, when + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, when + durationSec);
     oscillator.connect(gain);
-    gain.connect(ctx.destination);
-    oscillator.start(ctx.currentTime);
-    oscillator.stop(ctx.currentTime + durationSec);
+    gain.connect(destination);
+    oscillator.start(when);
+    oscillator.stop(when + durationSec + 0.05);
     this.activeNodes.push(oscillator);
     oscillator.onended = () => {
       this.activeNodes = this.activeNodes.filter((node) => node !== oscillator);

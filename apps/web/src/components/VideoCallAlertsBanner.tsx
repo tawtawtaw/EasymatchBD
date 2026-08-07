@@ -5,7 +5,6 @@ import { useLocale, useTranslations } from "next-intl";
 import { Link, usePathname, useRouter } from "@/i18n/routing";
 import { AUTH_TOKEN_KEY } from "@/lib/api";
 import { useMemberAlerts } from "@/components/MemberAlertsProvider";
-import { useVideoCallRingtone } from "@/hooks/use-video-call-ringtone";
 import { unlockVideoCallRingtone } from "@/lib/video-call-ringtone";
 import {
   formatVideoCallWhen,
@@ -47,15 +46,18 @@ export function VideoCallAlertsBanner({
   const visibleAlerts = useMemo(() => {
     void dismissedVersion;
     if (pathname.includes("/video-calls")) return [];
-    return (summary.callAlerts ?? []).filter((alert) => !isDismissed(alert));
+
+    return (summary.callAlerts ?? []).filter((alert) => {
+      if (isDismissed(alert)) return false;
+      if (alert.kind === "incoming") return false;
+      return true;
+    });
   }, [dismissedVersion, pathname, summary.callAlerts]);
 
   const hasIncomingAlert = visibleAlerts.some(
     (alert) => alert.kind === "incoming",
   );
-  const onCallPage = pathname.includes("/call");
-
-  useVideoCallRingtone(hasIncomingAlert && !onCallPage, "incoming");
+  void hasIncomingAlert;
 
   const dismiss = useCallback((alert: VideoCallAlertItem) => {
     localStorage.setItem(dismissKey(alert), "1");
@@ -158,7 +160,7 @@ export function VideoCallAlertsBanner({
 
           const href =
             alert.kind === "incoming"
-              ? `/messages/${alert.call.connectionId}/call?callId=${encodeURIComponent(alert.call.id)}`
+              ? `/messages/${alert.call.connectionId}/call?callId=${encodeURIComponent(alert.call.id)}&autoJoin=1`
               : `/messages/${alert.call.connectionId}`;
 
           return (

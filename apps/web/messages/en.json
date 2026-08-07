@@ -2624,6 +2624,12 @@
     "connectingVideo": "Connecting video…",
     "partnerJoining": "Setting up the video room…",
     "incomingCall": "Incoming video call",
+    "incomingOverlayTitle": "{partner} is calling you",
+    "incomingOverlayHint": "Answer to join the video call. You can stay on this page — the call will open in full screen.",
+    "tapToEnableSound": "Tap to enable sound",
+    "dockLabel": "Active video call",
+    "dockInCall": "Call in progress",
+    "dockExpand": "Open",
     "accept": "Accept",
     "decline": "Decline",
     "ringing": "Calling… waiting for answer",
@@ -2639,6 +2645,12 @@
     "cancelCall": "Cancel call",
     "endCall": "End call",
     "mediaPermissionDenied": "Camera and microphone access is required for video calls.",
+    "layout": {
+      "speaker": "Speaker view",
+      "gallery": "Gallery",
+      "compact": "Compact",
+      "waitingForVideo": "Waiting for video…"
+    },
     "controls": {
       "toolbar": "Call media controls",
       "micOn": "Mic on",

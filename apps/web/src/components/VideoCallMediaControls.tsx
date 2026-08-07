@@ -4,7 +4,11 @@ import { useLocalParticipant, useRoomContext } from "@livekit/components-react";
 import { Track } from "livekit-client";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
-import { enableCameraWithRetry } from "@/lib/video-call-media";
+import {
+  enableCameraWithRetry,
+  enableMicrophoneWithRetry,
+  kickMediaUserGesture,
+} from "@/lib/video-call-media";
 
 type VideoCallMediaControlsProps = {
   compact?: boolean;
@@ -45,74 +49,54 @@ export function VideoCallMediaControls({
     }
   }, [lastMicrophoneError, onDeviceError]);
 
-  const unlockPlayback = useCallback(async () => {
-    await room.startAudio();
-    await room.startVideo();
-  }, [room]);
-
-  const toggleMic = useCallback(async () => {
-    if (pending) return;
-    setPending("mic");
-    try {
-      await unlockPlayback();
-      const publication = await localParticipant.setMicrophoneEnabled(
-        !isMicrophoneEnabled,
-      );
-      if (!isMicrophoneEnabled && !publication) {
-        throw (
-          localParticipant.lastMicrophoneError ??
-          new Error(t("micEnableFailed"))
-        );
-      }
-    } catch (error) {
-      const err =
-        error instanceof Error ? error : new Error(t("micEnableFailed"));
-      onDeviceError?.(Track.Source.Microphone, err);
-    } finally {
-      setPending(null);
-    }
-  }, [
-    pending,
-    unlockPlayback,
-    localParticipant,
-    isMicrophoneEnabled,
-    onDeviceError,
-    t,
-  ]);
-
-  const setCamera = useCallback(
+  const runMicToggle = useCallback(
     async (targetEnabled: boolean) => {
-      if (targetEnabled) {
-        const publication = localParticipant.getTrackPublication(
-          Track.Source.Camera,
-        );
-        if (publication?.isMuted) {
-          await publication.unmute();
-          return;
+      if (pending) return;
+      setPending("mic");
+      try {
+        if (targetEnabled) {
+          await enableMicrophoneWithRetry(localParticipant);
+        } else {
+          await localParticipant.setMicrophoneEnabled(false);
         }
-        await enableCameraWithRetry(localParticipant);
-        return;
+      } catch (error) {
+        const err =
+          error instanceof Error ? error : new Error(t("micEnableFailed"));
+        onDeviceError?.(Track.Source.Microphone, err);
+      } finally {
+        setPending(null);
       }
-      await localParticipant.setCameraEnabled(false);
     },
-    [localParticipant],
+    [localParticipant, onDeviceError, pending, t],
   );
 
-  const toggleCamera = useCallback(async () => {
-    if (pending) return;
-    setPending("camera");
-    const targetEnabled = !isCameraEnabled;
-    try {
-      await unlockPlayback();
-      await setCamera(targetEnabled);
-    } catch (error) {
-      const err =
-        error instanceof Error ? error : new Error(t("cameraEnableFailed"));
-      onDeviceError?.(Track.Source.Camera, err);
-    } finally {
-      setPending(null);
-    }
-  }, [pending, unlockPlayback, setCamera, isCameraEnabled, onDeviceError, t]);
+  const runCameraToggle = useCallback(
+    async (targetEnabled: boolean) => {
+      if (pending) return;
+      setPending("camera");
+      try {
+        if (targetEnabled) {
+          const publication = localParticipant.getTrackPublication(
+            Track.Source.Camera,
+          );
+          if (publication?.isMuted) {
+            await publication.unmute();
+          } else {
+            await enableCameraWithRetry(localParticipant);
+          }
+        } else {
+          await localParticipant.setCameraEnabled(false);
+        }
+      } catch (error) {
+        const err =
+          error instanceof Error ? error : new Error(t("cameraEnableFailed"));
+        onDeviceError?.(Track.Source.Camera, err);
+      } finally {
+        setPending(null);
+      }
+    },
+    [localParticipant, onDeviceError, pending, t],
+  );
 
   const buttonClass = compact
     ? "min-h-11 rounded-full px-3 py-2.5 text-xs font-semibold sm:text-sm"
@@ -133,7 +117,13 @@ export function VideoCallMediaControls({
         } disabled:opacity-60`}
         aria-pressed={isMicrophoneEnabled}
         disabled={pending === "mic"}
-        onClick={() => void toggleMic()}
+        onPointerDown={() => {
+          kickMediaUserGesture(room, { audio: true, video: false });
+        }}
+        onClick={() => {
+          kickMediaUserGesture(room, { audio: true, video: false });
+          void runMicToggle(!isMicrophoneEnabled);
+        }}
       >
         {isMicrophoneEnabled ? t("micOn") : t("micOff")}
       </button>
@@ -146,7 +136,15 @@ export function VideoCallMediaControls({
         } disabled:opacity-60`}
         aria-pressed={isCameraEnabled}
         disabled={pending === "camera"}
-        onClick={() => void toggleCamera()}
+        onPointerDown={() => {
+          const turningOn = !isCameraEnabled;
+          kickMediaUserGesture(room, { audio: true, video: turningOn });
+        }}
+        onClick={() => {
+          const turningOn = !isCameraEnabled;
+          kickMediaUserGesture(room, { audio: true, video: turningOn });
+          void runCameraToggle(turningOn);
+        }}
       >
         {isCameraEnabled ? t("cameraOn") : t("cameraOff")}
       </button>

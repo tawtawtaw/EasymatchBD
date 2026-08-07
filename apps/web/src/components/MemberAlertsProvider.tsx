@@ -12,7 +12,7 @@ import {
 } from "react";
 import { isStaffRole } from "@easymatch/shared";
 import { AUTH_TOKEN_KEY } from "@/lib/api";
-import { useAuthSession, useAuthSessionPollDeferMs } from "@/hooks/use-auth-session";
+import { useAuthSession } from "@/hooks/use-auth-session";
 import { useMounted } from "@/hooks/use-mounted";
 import { usePathname } from "@/i18n/routing";
 import {
@@ -22,7 +22,9 @@ import {
 } from "@/lib/member-alerts";
 
 const POLL_MS = 20_000;
-const MIN_REFRESH_GAP_MS = 8_000;
+const POLL_MS_INCOMING = 2_000;
+const POLL_MS_ON_CALL = 6_000;
+const MIN_REFRESH_GAP_MS = 1_500;
 const VIDEO_CALL_PATH = /\/(?:mobile\/video-call|messages\/[^/]+\/call)(?:\/|$)/;
 
 function isVideoCallPath(pathname: string): boolean {
@@ -42,6 +44,7 @@ const emptySummary: MemberAlertsSummary = {
 type MemberAlertsContextValue = {
   summary: MemberAlertsSummary;
   refresh: (options?: { forceFresh?: boolean }) => Promise<void>;
+  dismissIncomingCall: (callId: string) => void;
 };
 
 const MemberAlertsContext = createContext<MemberAlertsContextValue | null>(null);
@@ -51,7 +54,6 @@ export function MemberAlertsProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const onVideoCall = isVideoCallPath(pathname);
   const { user, loggedIn, ready } = useAuthSession();
-  const pollDeferMs = useAuthSessionPollDeferMs();
   const [summary, setSummary] = useState<MemberAlertsSummary>(emptySummary);
   const [pollingEnabled, setPollingEnabled] = useState(false);
   const lastFetchedAt = useRef(0);
@@ -106,6 +108,28 @@ export function MemberAlertsProvider({ children }: { children: ReactNode }) {
     [isMember],
   );
 
+  const dismissIncomingCall = useCallback((callId: string) => {
+    setSummary((prev) => {
+      const hadIncoming = prev.callAlerts.some(
+        (alert) => alert.kind === "incoming" && alert.call.id === callId,
+      );
+      const callAlerts = prev.callAlerts.filter(
+        (alert) => !(alert.kind === "incoming" && alert.call.id === callId),
+      );
+      return {
+        ...prev,
+        callAlerts,
+        incomingCalls: hadIncoming
+          ? Math.max(0, prev.incomingCalls - 1)
+          : prev.incomingCalls,
+        incomingCallAlert:
+          prev.incomingCallAlert?.call.id === callId
+            ? null
+            : prev.incomingCallAlert,
+      };
+    });
+  }, []);
+
   useEffect(() => {
     if (!mounted || !isMember) {
       setSummary(emptySummary);
@@ -116,17 +140,35 @@ export function MemberAlertsProvider({ children }: { children: ReactNode }) {
     const deferTimer = window.setTimeout(() => {
       setPollingEnabled(true);
       void refresh({ forceFresh: true });
-    }, pollDeferMs);
+    }, 300);
 
     return () => window.clearTimeout(deferTimer);
-  }, [isMember, mounted, pollDeferMs, refresh]);
+  }, [isMember, mounted, refresh]);
 
   useEffect(() => {
-    if (!mounted || !isMember || !pollingEnabled || onVideoCall) return;
+    if (!mounted || !isMember) return;
+    void refresh({ forceFresh: true });
+  }, [isMember, mounted, refresh]);
 
-    const interval = window.setInterval(() => void refresh(), POLL_MS);
+  useEffect(() => {
+    if (!mounted || !isMember || !pollingEnabled) return;
+
+    const hasIncoming =
+      summary.incomingCalls > 0 ||
+      summary.callAlerts.some((alert) => alert.kind === "incoming");
+
+    const pollMs = onVideoCall
+      ? POLL_MS_ON_CALL
+      : hasIncoming
+        ? POLL_MS_INCOMING
+        : POLL_MS;
+
+    const interval = window.setInterval(
+      () => void refresh({ forceFresh: true }),
+      pollMs,
+    );
     const onVisibility = () => {
-      if (document.visibilityState === "visible" && !isVideoCallPath(pathname)) {
+      if (document.visibilityState === "visible") {
         void refresh({ forceFresh: true });
       }
     };
@@ -136,14 +178,23 @@ export function MemberAlertsProvider({ children }: { children: ReactNode }) {
       window.clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [isMember, mounted, onVideoCall, pathname, pollingEnabled, refresh]);
+  }, [
+    isMember,
+    mounted,
+    onVideoCall,
+    pollingEnabled,
+    refresh,
+    summary.callAlerts,
+    summary.incomingCalls,
+  ]);
 
   const value = useMemo(
     () => ({
       summary,
       refresh,
+      dismissIncomingCall,
     }),
-    [refresh, summary],
+    [refresh, summary, dismissIncomingCall],
   );
 
   return (

@@ -18,12 +18,24 @@ import {
   type VideoCallItem,
 } from "@/lib/video-calls";
 import { getMemberLiveKitToken } from "@/lib/video-call-guests";
+import {
+  CALL_VIDEO_SLOT_ID,
+} from "@/components/GlobalLiveKitCallHost";
 import { LiveKitVideoCallRoom } from "@/components/LiveKitVideoCallRoom";
 import { VideoCallGuestPanel } from "@/components/VideoCallGuestPanel";
-import { useVideoCallRingtone } from "@/hooks/use-video-call-ringtone";
+import {
+  phaseFromCallStatus,
+  useGlobalCallSession,
+} from "@/components/GlobalCallSessionProvider";
+import { useMemberAlerts } from "@/components/MemberAlertsProvider";
 import { unlockVideoCallRingtone } from "@/lib/video-call-ringtone";
 import { notifyMobileVideoCallState } from "@/lib/mobile-video-call";
 import { DisconnectReason } from "livekit-client";
+import {
+  persistVideoCallEnded,
+  shouldEndCallAfterLiveKitDisconnect,
+  VIDEO_CALL_MAX_RECONNECT_ATTEMPTS,
+} from "@/lib/video-call-disconnect";
 
 type VideoCallRoomProps = {
   connectionId: string;
@@ -79,8 +91,37 @@ export function VideoCallRoom({
   const autoStartAttemptedRef = useRef(false);
   const autoJoinAttemptedRef = useRef(false);
   const reconnectTimerRef = useRef<number | null>(null);
+  const reconnectAttemptsRef = useRef(0);
+  const abortedFinalizeRef = useRef(false);
   const refreshInFlightRef = useRef(false);
   const [joiningCall, setJoiningCall] = useState(autoJoin);
+  const [callUiEnded, setCallUiEnded] = useState(false);
+  const persistActiveCallRef = useRef(false);
+  const livekitSnapshotRef = useRef({
+    url: null as string | null,
+    token: null as string | null,
+    sessionKey: 0,
+  });
+  const {
+    session: globalCallSession,
+    setCallSession,
+    patchCallSession,
+    suppressIncomingCall,
+    clearCallSession,
+  } = useGlobalCallSession();
+  const { refresh: refreshMemberAlerts, dismissIncomingCall } =
+    useMemberAlerts();
+
+  const syncAlertsAfterCallAction = useCallback(async () => {
+    dismissIncomingCall(callId);
+    suppressIncomingCall(callId);
+    await refreshMemberAlerts({ forceFresh: true });
+  }, [
+    callId,
+    dismissIncomingCall,
+    refreshMemberAlerts,
+    suppressIncomingCall,
+  ]);
 
   const refreshCall = useCallback(async () => {
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
@@ -100,6 +141,129 @@ export function VideoCallRoom({
       refreshInFlightRef.current = false;
     }
   }, [callId]);
+
+  useEffect(() => {
+    setCallSession((current) => {
+      if (
+        current?.callId === callId &&
+        current.livekit &&
+        (current.phase === "active" || current.phase === "connecting")
+      ) {
+        return {
+          ...current,
+          connectionId,
+          memberName,
+          joining: joiningCall,
+        };
+      }
+      return {
+        callId,
+        connectionId,
+        memberName,
+        phase: "loading",
+        joining: joiningCall,
+        livekit: current?.callId === callId ? current.livekit : undefined,
+      };
+    });
+
+    return () => {
+      setCallSession((current) => {
+        if (!current || current.callId !== callId) {
+          return current;
+        }
+        if (persistActiveCallRef.current) {
+          const snap = livekitSnapshotRef.current;
+          return {
+            ...current,
+            memberName,
+            livekit:
+              snap.url && snap.token
+                ? {
+                    url: snap.url,
+                    token: snap.token,
+                    sessionKey: snap.sessionKey,
+                  }
+                : current.livekit,
+          };
+        }
+        if (current.phase === "active" || current.phase === "connecting") {
+          return current;
+        }
+        return null;
+      });
+    };
+  }, [callId, connectionId, joiningCall, memberName, setCallSession]);
+
+  useEffect(() => {
+    if (globalCallSession?.callId !== callId || !globalCallSession.livekit) {
+      return;
+    }
+    setLivekitUrl(globalCallSession.livekit.url);
+    setLivekitToken(globalCallSession.livekit.token);
+    setLivekitSessionKey(globalCallSession.livekit.sessionKey);
+    setLivekitConfigured(true);
+  }, [callId, globalCallSession?.callId, globalCallSession?.livekit]);
+
+  useEffect(() => {
+    livekitSnapshotRef.current = {
+      url: livekitUrl,
+      token: livekitToken,
+      sessionKey: livekitSessionKey,
+    };
+    if (livekitUrl && livekitToken) {
+      patchCallSession({
+        livekit: {
+          url: livekitUrl,
+          token: livekitToken,
+          sessionKey: livekitSessionKey,
+        },
+        memberName,
+      });
+    }
+  }, [
+    livekitUrl,
+    livekitToken,
+    livekitSessionKey,
+    memberName,
+    patchCallSession,
+  ]);
+
+  useEffect(() => {
+    persistActiveCallRef.current = call?.status === "active";
+  }, [call?.status]);
+
+  useEffect(() => {
+    if (!call) return;
+    patchCallSession({
+      callId,
+      connectionId,
+      phase: phaseFromCallStatus(call.status, call.isInitiator),
+      joining: joiningCall,
+    });
+  }, [call, callId, connectionId, joiningCall, patchCallSession]);
+
+  useEffect(() => {
+    if (!call) return;
+    const terminal = new Set([
+      "completed",
+      "cancelled",
+      "declined",
+      "missed",
+    ]);
+    if (!terminal.has(call.status)) return;
+
+    suppressIncomingCall(callId);
+    dismissIncomingCall(callId);
+    clearCallSession();
+    void refreshMemberAlerts({ forceFresh: true });
+  }, [
+    call?.status,
+    callId,
+    clearCallSession,
+    dismissIncomingCall,
+    refreshMemberAlerts,
+    suppressIncomingCall,
+  ]);
 
   useEffect(() => {
     if (!nativeShell) return;
@@ -158,6 +322,31 @@ export function VideoCallRoom({
     setLivekitToken(null);
   }, []);
 
+  const finalizeAbortedCall = useCallback(async () => {
+    if (abortedFinalizeRef.current || endingIntentionallyRef.current) {
+      return;
+    }
+    abortedFinalizeRef.current = true;
+    reconnectAttemptsRef.current = 0;
+    setCallUiEnded(true);
+    setJoiningCall(false);
+    setConnectionLost(false);
+    patchCallSession({ phase: "ended", livekit: undefined, joining: false });
+    cleanupMedia();
+    await persistVideoCallEnded(callId);
+    await syncAlertsAfterCallAction();
+    clearCallSession();
+    await refreshCall();
+    notifyMobileVideoCallState("ended");
+  }, [
+    callId,
+    cleanupMedia,
+    clearCallSession,
+    patchCallSession,
+    refreshCall,
+    syncAlertsAfterCallAction,
+  ]);
+
   const releaseWarmUpStream = useCallback(() => {
     localStreamRef.current?.getTracks().forEach((track) => track.stop());
     localStreamRef.current = null;
@@ -166,11 +355,39 @@ export function VideoCallRoom({
     }
   }, []);
 
-  useEffect(() => () => cleanupMedia(), [cleanupMedia]);
+  useEffect(() => {
+    return () => {
+      if (!persistActiveCallRef.current) {
+        cleanupMedia();
+      }
+    };
+  }, [cleanupMedia]);
 
   const loadLiveKit = useCallback(async () => {
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
     if (!token) return false;
+
+    const existing = globalCallSession?.livekit;
+    if (
+      globalCallSession?.callId === callId &&
+      existing?.url &&
+      existing.token
+    ) {
+      releaseWarmUpStream();
+      setLivekitConfigured(true);
+      setLivekitUrl(existing.url);
+      setLivekitToken(existing.token);
+      setLivekitSessionKey(existing.sessionKey);
+      setConnectionLost(false);
+      reconnectAttemptsRef.current = 0;
+      patchCallSession({
+        phase: "active",
+        livekit: existing,
+        memberName,
+      });
+      return true;
+    }
+
     releaseWarmUpStream();
     try {
       const session = await getMemberLiveKitToken(token, callId);
@@ -183,6 +400,16 @@ export function VideoCallRoom({
       setLivekitUrl(session.url);
       setLivekitToken(session.token);
       setConnectionLost(false);
+      reconnectAttemptsRef.current = 0;
+      patchCallSession({
+        phase: "connecting",
+        livekit: {
+          url: session.url,
+          token: session.token,
+          sessionKey: livekitSessionKey,
+        },
+        memberName,
+      });
       return true;
     } catch (err) {
       if (call?.status === "active") {
@@ -190,7 +417,16 @@ export function VideoCallRoom({
       }
       return false;
     }
-  }, [call?.status, callId, releaseWarmUpStream, t]);
+  }, [
+    call?.status,
+    callId,
+    globalCallSession?.callId,
+    globalCallSession?.livekit,
+    memberName,
+    patchCallSession,
+    releaseWarmUpStream,
+    t,
+  ]);
 
   const warmUpMedia = useCallback(async () => {
     if (localStreamRef.current) return;
@@ -337,8 +573,29 @@ export function VideoCallRoom({
 
   useEffect(() => {
     if (call?.status !== "active") return;
+
+    if (
+      globalCallSession?.callId === callId &&
+      globalCallSession.livekit?.url &&
+      globalCallSession.livekit.token
+    ) {
+      setLivekitUrl(globalCallSession.livekit.url);
+      setLivekitToken(globalCallSession.livekit.token);
+      setLivekitSessionKey(globalCallSession.livekit.sessionKey);
+      setLivekitConfigured(true);
+      setConnectionLost(false);
+      return;
+    }
+
     void loadLiveKit();
-  }, [call?.status, loadLiveKit, reconnectAttempt]);
+  }, [
+    call?.status,
+    callId,
+    globalCallSession?.callId,
+    globalCallSession?.livekit,
+    loadLiveKit,
+    reconnectAttempt,
+  ]);
 
   useEffect(() => {
     if (call?.status === "active" && livekitConfigured === false) {
@@ -359,11 +616,23 @@ export function VideoCallRoom({
     if (!token) return;
     setError(null);
     setJoiningCall(true);
+    patchCallSession({ joining: true, phase: "connecting" });
     try {
       const updated = await acceptVideoCall(token, callId);
       setCall(updated);
+      suppressIncomingCall(callId);
+      dismissIncomingCall(callId);
+      patchCallSession({
+        phase: phaseFromCallStatus(updated.status, updated.isInitiator),
+        joining: false,
+      });
+      void refreshMemberAlerts({ forceFresh: true });
       void loadLiveKit();
     } catch (err) {
+      patchCallSession({
+        phase: phaseFromCallStatus(call?.status, call?.isInitiator ?? false),
+        joining: false,
+      });
       setError(err instanceof Error ? err.message : t("actions.error"));
     } finally {
       setJoiningCall(false);
@@ -394,6 +663,9 @@ export function VideoCallRoom({
     try {
       await declineVideoCall(token, callId);
       cleanupMedia();
+      await syncAlertsAfterCallAction();
+      clearCallSession();
+      await refreshCall();
     } catch (err) {
       setError(err instanceof Error ? err.message : t("actions.error"));
     }
@@ -416,10 +688,15 @@ export function VideoCallRoom({
 
     if (endingIntentionallyRef.current) return;
     endingIntentionallyRef.current = true;
+    setCallUiEnded(true);
+    setJoiningCall(false);
+    patchCallSession({ phase: "ended", livekit: undefined, joining: false });
     setEnding(true);
     try {
       await endVideoCall(token, callId);
       cleanupMedia();
+      await syncAlertsAfterCallAction();
+      clearCallSession();
       await refreshCall();
     } catch (err) {
       const message = err instanceof Error ? err.message : t("actions.error");
@@ -427,6 +704,8 @@ export function VideoCallRoom({
         setError(message);
       } else {
         cleanupMedia();
+        await syncAlertsAfterCallAction();
+        clearCallSession();
         await refreshCall();
       }
     } finally {
@@ -442,9 +721,21 @@ export function VideoCallRoom({
       return;
     }
 
+    if (shouldEndCallAfterLiveKitDisconnect(reason)) {
+      void finalizeAbortedCall();
+      return;
+    }
+
+    if (reconnectAttemptsRef.current >= VIDEO_CALL_MAX_RECONNECT_ATTEMPTS) {
+      void finalizeAbortedCall();
+      return;
+    }
+
+    reconnectAttemptsRef.current += 1;
     setConnectionLost(true);
     setLivekitUrl(null);
     setLivekitToken(null);
+    patchCallSession({ livekit: undefined, phase: "connecting" });
 
     if (reconnectTimerRef.current != null) {
       window.clearTimeout(reconnectTimerRef.current);
@@ -454,30 +745,40 @@ export function VideoCallRoom({
       setReconnectAttempt((attempt) => attempt + 1);
       setLivekitSessionKey((key) => key + 1);
       void loadLiveKit().then((connected) => {
-        if (!connected) {
+        if (connected) {
+          reconnectAttemptsRef.current = 0;
+          setConnectionLost(false);
+          return;
+        }
+        if (reconnectAttemptsRef.current >= VIDEO_CALL_MAX_RECONNECT_ATTEMPTS) {
+          void finalizeAbortedCall();
+        } else {
           setConnectionLost(true);
         }
       });
     }, 2000);
   }
 
+  useEffect(() => {
+    if (!callUiEnded || call?.status !== "active") return;
+
+    void persistVideoCallEnded(callId).then((ok) => {
+      if (ok) void refreshCall();
+    });
+
+    const interval = window.setInterval(() => {
+      void persistVideoCallEnded(callId).then((ok) => {
+        if (ok) void refreshCall();
+      });
+    }, 5000);
+
+    return () => window.clearInterval(interval);
+  }, [call?.status, callId, callUiEnded, refreshCall]);
+
   const ended =
-    call &&
-    ["completed", "cancelled", "declined", "missed"].includes(call.status);
-
-  const shouldPlayIncomingRing =
-    call?.status === "ringing" && !call.isInitiator && !autoJoin && !joiningCall;
-  const shouldPlayOutgoingRing =
-    call?.status === "ringing" && call.isInitiator;
-
-  useVideoCallRingtone(
-    shouldPlayIncomingRing || shouldPlayOutgoingRing,
-    shouldPlayIncomingRing
-      ? "incoming"
-      : shouldPlayOutgoingRing
-        ? "outgoing"
-        : null,
-  );
+    callUiEnded ||
+    (call &&
+      ["completed", "cancelled", "declined", "missed"].includes(call.status));
 
   const useLiveKit =
     call?.status === "active" &&
@@ -572,7 +873,11 @@ export function VideoCallRoom({
         </p>
       ) : ended ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6">
-          <p className="text-lg">{t(`status.${call.status}`)}</p>
+          <p className="text-lg">
+            {call
+              ? t(`status.${call.status}`)
+              : t("status.completed")}
+          </p>
           <Link
             href={`/messages/${connectionId}`}
             className="rounded-lg bg-rose-800 px-4 py-2 text-sm font-semibold hover:bg-rose-900"
@@ -674,37 +979,44 @@ export function VideoCallRoom({
             {t("cancelCall")}
           </button>
         </div>
-      ) : connectingVideo ? (
+      ) : !ended && connectingVideo ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
           <p className="text-lg font-semibold">{t("connectingVideo")}</p>
           <p className="max-w-sm text-sm text-zinc-400">{t("partnerJoining")}</p>
         </div>
       ) : useLiveKit ? (
         <>
-          {livekitMediaReady ? (
-            <LiveKitVideoCallRoom
-              key={livekitSessionKey}
-              serverUrl={livekitUrl}
-              token={livekitToken}
-              embeddedMobile={embeddedMobile}
-              nativeShell={nativeShell}
-              showEndCall
-              ending={ending}
-              onEndCall={() => void handleEnd()}
-              onDisconnected={handleLiveKitDisconnected}
-              onMediaDeviceError={(_source, error) => {
-                setMediaError(error.message);
-                if (nativeShell) {
-                  notifyMobileVideoCallState("active", {
-                    mediaError: error.message,
-                  });
-                }
-              }}
-            />
+          {embeddedMobile || nativeShell ? (
+            livekitMediaReady ? (
+              <LiveKitVideoCallRoom
+                key={livekitSessionKey}
+                serverUrl={livekitUrl!}
+                token={livekitToken!}
+                embeddedMobile={embeddedMobile}
+                nativeShell={nativeShell}
+                showEndCall
+                ending={ending}
+                onEndCall={() => void handleEnd()}
+                onDisconnected={handleLiveKitDisconnected}
+                onMediaDeviceError={(_source, error) => {
+                  setMediaError(error.message);
+                  if (nativeShell) {
+                    notifyMobileVideoCallState("active", {
+                      mediaError: error.message,
+                    });
+                  }
+                }}
+              />
+            ) : (
+              <div className="flex items-center justify-center px-4 py-8 text-sm text-zinc-400">
+                {t("connectingVideo")}
+              </div>
+            )
           ) : (
-            <div className="flex items-center justify-center px-4 py-8 text-sm text-zinc-400">
-              {t("connectingVideo")}
-            </div>
+            <div
+              id={CALL_VIDEO_SLOT_ID}
+              className="relative flex min-h-[min(70dvh,32rem)] flex-1 flex-col bg-black"
+            />
           )}
           <VideoCallGuestPanel
             callId={callId}

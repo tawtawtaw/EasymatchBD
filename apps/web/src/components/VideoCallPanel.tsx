@@ -99,12 +99,14 @@ export function VideoCallPanel({
 
   useEffect(() => {
     void refresh();
+    const hasRinging = calls.some((call) => call.status === "ringing");
+    const intervalMs = hasRinging ? 2_000 : 8_000;
     const interval = window.setInterval(() => {
       if (document.visibilityState === "hidden") return;
       void refresh();
-    }, 8_000);
+    }, intervalMs);
     return () => window.clearInterval(interval);
-  }, [refresh]);
+  }, [refresh, calls]);
 
   async function handleIncludeConsultant(callId: string) {
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
@@ -258,10 +260,39 @@ export function VideoCallPanel({
       call.status === "active",
   );
 
+  const incomingRinging = upcoming.find(
+    (call) => call.status === "ringing" && !call.isInitiator,
+  );
+
   return (
     <section className="mb-4 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
       <h2 className="text-sm font-semibold text-zinc-900">{t("title")}</h2>
       <p className="mt-1 text-xs text-zinc-500">{t("subtitle", { name: memberName })}</p>
+
+      {incomingRinging ? (
+        <div
+          className="mt-3 rounded-xl border-2 border-emerald-500 bg-gradient-to-r from-emerald-50 to-white p-4 shadow-md ring-2 ring-emerald-400/40"
+          role="alert"
+        >
+          <p className="text-base font-bold text-emerald-950">
+            {t("incomingCall")}
+          </p>
+          <p className="mt-1 text-sm text-emerald-900">{t("instantRingingHint")}</p>
+          <button
+            type="button"
+            disabled={loading}
+            onClick={() => {
+              unlockVideoCallRingtone();
+              router.push(
+                `/messages/${connectionId}/call?callId=${encodeURIComponent(incomingRinging.id)}&autoJoin=1`,
+              );
+            }}
+            className="mt-3 w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-500 disabled:opacity-60 sm:w-auto"
+          >
+            {t("answer")}
+          </button>
+        </div>
+      ) : null}
 
       {error ? (
         <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
@@ -355,7 +386,7 @@ export function VideoCallPanel({
                       disabled={loading}
                       onClick={() =>
                         router.push(
-                          `/messages/${connectionId}/call?callId=${encodeURIComponent(call.id)}`,
+                          `/messages/${connectionId}/call?callId=${encodeURIComponent(call.id)}${call.status === "ringing" && !call.isInitiator ? "&autoJoin=1" : ""}`,
                         )
                       }
                       className="rounded-lg bg-rose-800 px-2 py-1 text-xs font-semibold text-white hover:bg-rose-900 disabled:opacity-60"

@@ -50,6 +50,8 @@ export async function getMemberAlertsSummary(
     invalidateDedupeCache("alerts-summary");
   }
 
+  const dedupeMs = forceFresh ? 0 : 2_000;
+
   return dedupeRequest(
     "alerts-summary",
     async () => {
@@ -58,7 +60,7 @@ export async function getMemberAlertsSummary(
       });
       return parseResponse<MemberAlertsSummary>(res);
     },
-    12_000,
+    dedupeMs,
   );
 }
 

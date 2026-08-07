@@ -2600,6 +2600,12 @@
     "connectingVideo": "ভিডিও সংযোগ হচ্ছে…",
     "partnerJoining": "ভিডিও রুম প্রস্তুত করা হচ্ছে…",
     "incomingCall": "আগত ভিডিও কল",
+    "incomingOverlayTitle": "{partner} আপনাকে কল করছেন",
+    "incomingOverlayHint": "ভিডিও কলে যোগ দিতে উত্তর দিন। আপনি এই পৃষ্ঠায় থাকতে পারেন — কল পূর্ণ স্ক্রিনে খুলবে।",
+    "tapToEnableSound": "শব্দ চালু করতে ট্যাপ করুন",
+    "dockLabel": "সক্রিয় ভিডিও কল",
+    "dockInCall": "কল চলছে",
+    "dockExpand": "খুলুন",
     "accept": "গ্রহণ",
     "decline": "প্রত্যাখ্যান",
     "ringing": "কল করা হচ্ছে… উত্তরের অপেক্ষায়",
@@ -2615,6 +2621,12 @@
     "cancelCall": "কল বাতিল",
     "endCall": "কল শেষ",
     "mediaPermissionDenied": "ভিডিও কলের জন্য ক্যামেরা ও মাইক্রোফোন অনুমতি প্রয়োজন।",
+    "layout": {
+      "speaker": "স্পিকার ভিউ",
+      "gallery": "গ্যালারি",
+      "compact": "কমপ্যাক্ট",
+      "waitingForVideo": "ভিডিওর জন্য অপেক্ষা…"
+    },
     "controls": {
       "toolbar": "কল মিডিয়া নিয়ন্ত্রণ",
       "micOn": "মাইক চালু",

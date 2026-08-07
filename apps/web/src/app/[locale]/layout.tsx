@@ -12,6 +12,9 @@ import { MemberAlertsProvider } from "@/components/MemberAlertsProvider";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { VideoCallAlertsBanner } from "@/components/VideoCallAlertsBanner";
+import { GlobalCallSessionProvider } from "@/components/GlobalCallSessionProvider";
+import { CallRuntimeUi } from "@/components/CallRuntimeUi";
+import { ChunkLoadRecovery } from "@/components/ChunkLoadRecovery";
 import { WhatsAppSupport } from "@/components/WhatsAppSupport";
 import { LocaleShell } from "@/components/LocaleShell";
 import "../globals.css";
@@ -79,11 +82,14 @@ export default async function LocaleLayout({
         className={`${bodyFont} ${geistMono.variable} bg-white text-zinc-950 antialiased`}
         suppressHydrationWarning
       >
+        <ChunkLoadRecovery />
         <NextIntlClientProvider locale={locale} messages={messages}>
           <AuthSessionProvider>
             <StaffAlertsProvider>
             <MemberAlertsProvider>
+              <GlobalCallSessionProvider>
               <FeatureCommandPaletteProvider>
+                <CallRuntimeUi />
                 <LocaleShell
                   header={
                     <>
@@ -97,6 +103,7 @@ export default async function LocaleLayout({
                   {children}
                 </LocaleShell>
               </FeatureCommandPaletteProvider>
+              </GlobalCallSessionProvider>
             </MemberAlertsProvider>
             </StaffAlertsProvider>
           </AuthSessionProvider>
