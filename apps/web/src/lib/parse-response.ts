@@ -45,6 +45,15 @@ export async function readJsonResponse<T>(res: Response): Promise<T> {
     data = JSON.parse(text) as T & ApiErrorBody;
   } catch {
     const preview = text.trim().slice(0, 120).replace(/\s+/g, " ");
+    const isLocalDev =
+      typeof window !== "undefined" &&
+      (window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1");
+    if (preview.startsWith("Internal") && isLocalDev) {
+      throw new Error(
+        `Cannot reach the API server. Start both dev apps from the repo root (npm run dev), or run npm run dev:api — API should listen on http://localhost:${EASYMATCH_API_PORT}`,
+      );
+    }
     throw new Error(
       preview.startsWith("Internal")
         ? "The server encountered an error. Please try again in a moment."

@@ -7,6 +7,8 @@ import { spawn } from "node:child_process";
 const env = {
   ...process.env,
   NODE_ENV: "development",
+  NGROK_DEV_ORIGIN:
+    process.env.NGROK_DEV_ORIGIN?.trim() || "https://easymatchbd.ngrok.dev",
 };
 
 const cmd =

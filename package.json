@@ -20,7 +20,7 @@
     "predev": "npm run kill-ports && npm run build -w @easymatch/shared",
     "dev": "node scripts/dev.mjs",
     "dev:web": "npx kill-port 4100 && npm run dev -w @easymatch/web",
-    "dev:api": "npx kill-port 4101 && npm run start:dev -w @easymatch/api",
+    "dev:api": "node scripts/dev-api.mjs",
     "dev:mobile": "npm run start:go -w @easymatch/mobile",
     "dev:mobile:live": "npm run start:go:live -w @easymatch/mobile",
     "dev:mobile:ngrok": "npm run start:go:ngrok -w @easymatch/mobile",

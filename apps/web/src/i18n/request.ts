@@ -6,10 +6,15 @@ import { routing } from "./routing";
 async function loadMessages(locale: string) {
   if (process.env.NODE_ENV === "development") {
     const filePath = join(process.cwd(), "messages", `${locale}.json`);
-    return JSON.parse(await readFile(filePath, "utf8")) as Record<
-      string,
-      unknown
-    >;
+    const raw = await readFile(filePath, "utf8");
+    if (!raw.trim()) {
+      return (await import(`../../messages/${locale}.json`)).default;
+    }
+    try {
+      return JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      return (await import(`../../messages/${locale}.json`)).default;
+    }
   }
 
   return (await import(`../../messages/${locale}.json`)).default;

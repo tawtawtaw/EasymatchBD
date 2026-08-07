@@ -7,7 +7,27 @@ const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 /** Dev-only rewrite target when NEXT_PUBLIC_API_URL is unset (matches @easymatch/shared). */
 const LOCAL_API_PORT = 4101;
 
-const ngrokDevOrigin = process.env.NGROK_DEV_ORIGIN?.trim();
+/** Next.js allowedDevOrigins expects hostnames only (no https://). */
+function normalizeAllowedDevOriginHost(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  try {
+    if (trimmed.includes("://")) {
+      return new URL(trimmed).host;
+    }
+  } catch {
+    /* use trimmed value below */
+  }
+  return trimmed.replace(/\/$/, "");
+}
+
+const allowedDevOrigins = [
+  "easymatchbd.ngrok.dev",
+  ...(process.env.NGROK_DEV_ORIGIN ?? "")
+    .split(",")
+    .map(normalizeAllowedDevOriginHost)
+    .filter(Boolean),
+].filter((host, index, all) => all.indexOf(host) === index);
 
 /** Accept either var on Railway; Next inlines NEXT_PUBLIC_* at build time. */
 const whatsappSupportNumber =
@@ -33,8 +53,8 @@ const nextConfig: NextConfig = {
     // Pre-existing strict TS issues; dev uses `next dev` without blocking on these.
     ignoreBuildErrors: true,
   },
-  // Lets Next dev accept requests via ngrok (e.g. easymatchbd.ngrok.dev).
-  ...(ngrokDevOrigin ? { allowedDevOrigins: [ngrokDevOrigin] } : {}),
+  // HMR + dev assets when using ngrok (hostname only — see normalizeAllowedDevOriginHost).
+  allowedDevOrigins,
   async rewrites() {
     const configured = process.env.NEXT_PUBLIC_API_URL?.trim();
     if (configured) {
