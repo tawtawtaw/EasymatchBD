@@ -17,7 +17,6 @@ import {
   parseAndroidCallPushData,
   presentAndroidIncomingCallTelecom,
 } from "./android-incoming-call-telecom";
-import { registerBackgroundIncomingCallTask } from "../tasks/background-incoming-call";
 
 /** Android remote push was removed from Expo Go in SDK 53+. */
 function isAndroidExpoGo(): boolean {
@@ -317,7 +316,6 @@ async function ensureAndroidChannels() {
 }
 
 function attachPushListeners() {
-  void registerBackgroundIncomingCallTask();
   if (!responseListener) {
     responseListener = Notifications.addNotificationResponseReceivedListener(
       (response) => {

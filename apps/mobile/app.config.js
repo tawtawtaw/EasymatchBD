@@ -23,6 +23,18 @@ module.exports = () => {
     return includeDevClient || name !== "expo-dev-client";
   });
 
+  plugins.push([
+    "expo-build-properties",
+    {
+      android: {
+        newArchEnabled: false,
+      },
+      ios: {
+        newArchEnabled: false,
+      },
+    },
+  ]);
+
   return {
     expo: {
       ...appJson.expo,
