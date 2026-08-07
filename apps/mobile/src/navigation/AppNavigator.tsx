@@ -13,7 +13,7 @@ import { useOnboardingStore } from "../store/onboardingStore";
 import { useLocaleStore } from "../store/localeStore";
 import { API_BASE_URL } from "../services/api/client";
 import { enablePushNotificationsOnLogin } from "../services/push-notifications";
-import { flushPendingIncomingCallNavigation } from "../services/incoming-call-navigation";
+import { flushPendingIncomingCallNavigation, hasPendingIncomingCallNavigation, subscribeIncomingCallNavigation } from "../services/incoming-call-navigation";
 import { tNavigation } from "../i18n/messages";
 import { colors } from "../theme/colors";
 import { AuthNavigator } from "./AuthNavigator";
@@ -37,6 +37,13 @@ export function AppNavigator() {
   const refreshOnboarding = useOnboardingStore((s) => s.refresh);
   const resetOnboarding = useOnboardingStore((s) => s.reset);
   const [showSkip, setShowSkip] = useState(false);
+  const [incomingCallLaunch, setIncomingCallLaunch] = useState(false);
+
+  useEffect(() => {
+    return subscribeIncomingCallNavigation(() => {
+      setIncomingCallLaunch(hasPendingIncomingCallNavigation());
+    });
+  }, []);
 
   useEffect(() => {
     if (!user) {
@@ -68,7 +75,11 @@ export function AppNavigator() {
     }
   }, [isBootstrapping, userId]);
 
-  if (isBootstrapping) {
+  if (
+    isBootstrapping &&
+    !incomingCallLaunch &&
+    !hasPendingIncomingCallNavigation()
+  ) {
     return (
       <View
         style={{

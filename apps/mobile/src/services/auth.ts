@@ -182,3 +182,28 @@ export async function bootstrapAuth(): Promise<
 
   return { status: "unauthenticated" };
 }
+
+/** Restores JWT for calls without clearing storage on failure (WhatsApp-style answer from notification). */
+export async function trySilentSessionRestore(): Promise<string | null> {
+  const existing = await sessionStorage.getAccessToken();
+  if (existing) {
+    try {
+      await getMe(false);
+      return existing;
+    } catch {
+      /* JWT may be expired; try remembered device below */
+    }
+  }
+
+  const device = await sessionStorage.getDeviceSession();
+  if (!device) {
+    return null;
+  }
+
+  try {
+    const restored = await restoreDeviceSession(device.phone, device.deviceToken);
+    return restored.accessToken;
+  } catch {
+    return null;
+  }
+}

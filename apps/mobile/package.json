@@ -13,6 +13,7 @@
     "android": "expo run:android",
     "build:dev": "node scripts/verify-google-services.mjs && eas build --platform android --profile development",
     "build:preview": "node scripts/verify-google-services.mjs && eas build --platform android --profile preview",
+    "build:preview-live": "node scripts/verify-google-services.mjs && eas build --platform android --profile preview-live",
     "build:production": "node scripts/verify-google-services.mjs && eas build --platform android --profile production",
     "ios": "expo run:ios",
     "eas-build-pre-install": "node scripts/verify-google-services.mjs",

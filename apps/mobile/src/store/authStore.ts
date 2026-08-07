@@ -51,7 +51,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ user: null, session: null });
       }
     } catch {
-      await AuthService.signOut();
+      const token = await sessionStorage.getAccessToken();
+      if (!token) {
+        await AuthService.signOut();
+      }
       set({ user: null, session: null });
     } finally {
       set({ isBootstrapping: false });

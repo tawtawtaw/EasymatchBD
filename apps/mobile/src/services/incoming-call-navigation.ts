@@ -1,7 +1,7 @@
 import type { RootStackParamList } from "../navigation/types";
 import { navigationRef } from "../navigation/navigationRef";
+import { trySilentSessionRestore } from "./auth";
 import { acceptVideoCall } from "./video-calls";
-import { sessionStorage } from "./session-storage";
 import { useAuthStore } from "../store/authStore";
 import { useMemberAlertsStore } from "../store/memberAlertsStore";
 
@@ -13,23 +13,36 @@ export type IncomingCallNavigationParams = {
 };
 
 let pendingIncomingCall: IncomingCallNavigationParams | null = null;
+const navigationListeners = new Set<() => void>();
+
+function notifyIncomingCallNavigationListeners() {
+  for (const listener of navigationListeners) {
+    listener();
+  }
+}
+
+export function subscribeIncomingCallNavigation(listener: () => void): () => void {
+  navigationListeners.add(listener);
+  return () => {
+    navigationListeners.delete(listener);
+  };
+}
+
+export function hasPendingIncomingCallNavigation(): boolean {
+  return pendingIncomingCall !== null;
+}
 
 export async function restoreSessionForIncomingCall(): Promise<boolean> {
-  const token = await sessionStorage.getAccessToken();
+  const token = await trySilentSessionRestore();
   if (!token) {
     return false;
   }
-  if (useAuthStore.getState().user) {
-    return true;
+
+  if (!useAuthStore.getState().user) {
+    void useAuthStore.getState().bootstrap().catch(() => undefined);
   }
-  try {
-    await useAuthStore.getState().bootstrap();
-  } catch {
-    /* WebView may still use stored JWT */
-  }
-  return Boolean(
-    useAuthStore.getState().user ?? (await sessionStorage.getAccessToken()),
-  );
+
+  return true;
 }
 
 function primeIncomingCallAlert(params: IncomingCallNavigationParams) {
@@ -41,6 +54,7 @@ function primeIncomingCallAlert(params: IncomingCallNavigationParams) {
 function pushCallScreen(params: IncomingCallNavigationParams) {
   if (!navigationRef.isReady()) {
     pendingIncomingCall = params;
+    notifyIncomingCallNavigationListeners();
     return false;
   }
 
@@ -51,6 +65,7 @@ function pushCallScreen(params: IncomingCallNavigationParams) {
     autoJoin: params.autoJoin ?? true,
   });
   pendingIncomingCall = null;
+  notifyIncomingCallNavigationListeners();
   return true;
 }
 
@@ -58,10 +73,12 @@ export async function openIncomingVideoCall(
   params: IncomingCallNavigationParams,
 ): Promise<boolean> {
   pendingIncomingCall = params;
+  notifyIncomingCallNavigationListeners();
   primeIncomingCallAlert(params);
 
   const hasSession = await restoreSessionForIncomingCall();
   if (!hasSession) {
+    notifyIncomingCallNavigationListeners();
     return false;
   }
 
@@ -83,6 +100,7 @@ export function flushPendingIncomingCallNavigation() {
 
 export function clearPendingIncomingCallNavigation() {
   pendingIncomingCall = null;
+  notifyIncomingCallNavigationListeners();
 }
 
 export type RootVideoCallParams = RootStackParamList["VideoCallRoom"];

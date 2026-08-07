@@ -7,7 +7,6 @@ import {
   handleColdStartNotification,
 } from "../services/push-notifications";
 import { flushPendingIncomingCallNavigation } from "../services/incoming-call-navigation";
-import { sessionStorage } from "../services/session-storage";
 
 /** Keeps push delivery working while logged out; registers token when logged in. */
 export function PushNotificationHost() {
@@ -22,10 +21,8 @@ export function PushNotificationHost() {
     void (async () => {
       if (!userId) {
         await ensurePushNotificationsWhileLoggedOut();
-        const token = await sessionStorage.getAccessToken();
-        if (token) {
-          flushPendingIncomingCallNavigation();
-        }
+        await handleColdStartNotification();
+        flushPendingIncomingCallNavigation();
         return;
       }
 

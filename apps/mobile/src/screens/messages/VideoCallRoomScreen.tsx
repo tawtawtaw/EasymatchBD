@@ -6,6 +6,7 @@ import { ErrorState, LoadingState } from "../../components/ScreenState";
 import { tVideoCalls } from "../../i18n/video-calls";
 import type { VideoCallRoomScreenProps } from "../../navigation/types";
 import { acceptVideoCall, endVideoCall } from "../../services/video-calls";
+import { trySilentSessionRestore } from "../../services/auth";
 import { endAndroidTelecomCall } from "../../services/android-incoming-call-telecom";
 import { sessionStorage } from "../../services/session-storage";
 import { useAuthStore } from "../../store/authStore";
@@ -73,7 +74,10 @@ export default function VideoCallRoomScreen({
   const loadToken = useCallback(async () => {
     setLoading(true);
     try {
-      const token = await sessionStorage.getAccessToken();
+      let token = await sessionStorage.getAccessToken();
+      if (!token) {
+        token = await trySilentSessionRestore();
+      }
       setAccessToken(token);
     } finally {
       setLoading(false);

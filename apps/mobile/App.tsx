@@ -7,6 +7,7 @@ import { AndroidCallKeepHost } from "./src/components/AndroidCallKeepHost";
 import { AppNavigator } from "./src/navigation/AppNavigator";
 import { useAuthStore } from "./src/store/authStore";
 import { useLocaleStore } from "./src/store/localeStore";
+import { handleColdStartNotification } from "./src/services/push-notifications";
 
 export default function App() {
   const bootstrap = useAuthStore((s) => s.bootstrap);
@@ -14,7 +15,10 @@ export default function App() {
 
   useEffect(() => {
     void bootstrapLocale();
-    void bootstrap();
+    void (async () => {
+      await handleColdStartNotification();
+      await bootstrap();
+    })();
   }, [bootstrap, bootstrapLocale]);
 
   return (
