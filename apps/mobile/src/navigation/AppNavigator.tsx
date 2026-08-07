@@ -5,6 +5,7 @@ import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import MembershipCheckoutScreen from "../screens/membership/MembershipCheckoutScreen";
 import ConsultantCheckoutScreen from "../screens/consultant/ConsultantCheckoutScreen";
 import ConsultantCaseScreen from "../screens/consultant/ConsultantCaseScreen";
+import VideoCallRoomScreen from "../screens/messages/VideoCallRoomScreen";
 import { MainAppShell } from "../components/MainAppShell";
 import { PushNotificationHost } from "../components/PushNotificationHost";
 import { useAuthStore } from "../store/authStore";
@@ -12,6 +13,7 @@ import { useOnboardingStore } from "../store/onboardingStore";
 import { useLocaleStore } from "../store/localeStore";
 import { API_BASE_URL } from "../services/api/client";
 import { enablePushNotificationsOnLogin } from "../services/push-notifications";
+import { flushPendingIncomingCallNavigation } from "../services/incoming-call-navigation";
 import { tNavigation } from "../i18n/messages";
 import { colors } from "../theme/colors";
 import { AuthNavigator } from "./AuthNavigator";
@@ -60,6 +62,12 @@ export function AppNavigator() {
     return () => clearTimeout(timer);
   }, [isBootstrapping]);
 
+  useEffect(() => {
+    if (!isBootstrapping) {
+      flushPendingIncomingCallNavigation();
+    }
+  }, [isBootstrapping, userId]);
+
   if (isBootstrapping) {
     return (
       <View
@@ -106,7 +114,12 @@ export function AppNavigator() {
   const needsOnboarding = user && onboardingPhase !== "complete";
 
   return (
-    <NavigationContainer ref={navigationRef}>
+    <NavigationContainer
+      ref={navigationRef}
+      onReady={() => {
+        flushPendingIncomingCallNavigation();
+      }}
+    >
       <PushNotificationHost />
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {user ? (
@@ -157,6 +170,16 @@ export function AppNavigator() {
         ) : (
           <Stack.Screen name="Auth" component={AuthNavigator} />
         )}
+        <Stack.Screen
+          name="VideoCallRoom"
+          component={VideoCallRoomScreen}
+          options={{
+            headerShown: false,
+            presentation: "fullScreenModal",
+            animation: "fade",
+            gestureEnabled: false,
+          }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );

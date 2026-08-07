@@ -12,7 +12,12 @@ import { useAuthStore } from "../store/authStore";
 import { PUSH_AUTO_ENABLE_ATTEMPTED_KEY } from "../constants/storage-keys";
 import { registerPushToken, registerPushTokenViaDevice, removePushToken, getPushTokenStatus } from "./alerts";
 import { sessionStorage } from "./session-storage";
-import { acceptVideoCall } from "./video-calls";
+import { openIncomingVideoCall } from "./incoming-call-navigation";
+import {
+  parseAndroidCallPushData,
+  presentAndroidIncomingCallTelecom,
+} from "./android-incoming-call-telecom";
+import { registerBackgroundIncomingCallTask } from "../tasks/background-incoming-call";
 
 /** Android remote push was removed from Expo Go in SDK 53+. */
 function isAndroidExpoGo(): boolean {
@@ -23,6 +28,14 @@ Notifications.setNotificationHandler({
   handleNotification: async (notification) => {
     const data = notification.request.content.data as Record<string, unknown>;
     const type = typeof data?.type === "string" ? data.type : null;
+    const callPayload =
+      type === "call" && Platform.OS === "android"
+        ? parseAndroidCallPushData(data)
+        : null;
+    let telecomIncomingUi = false;
+    if (callPayload) {
+      telecomIncomingUi = await presentAndroidIncomingCallTelecom(callPayload);
+    }
     const priority =
       type === "call"
         ? Notifications.AndroidNotificationPriority.MAX
@@ -35,11 +48,11 @@ Notifications.setNotificationHandler({
           ? Notifications.AndroidNotificationPriority.HIGH
           : Notifications.AndroidNotificationPriority.DEFAULT;
     return {
-      shouldShowAlert: true,
-      shouldPlaySound: true,
+      shouldShowAlert: type === "call" && telecomIncomingUi ? false : true,
+      shouldPlaySound: type === "call" && telecomIncomingUi ? false : true,
       shouldSetBadge: true,
-      shouldShowBanner: true,
-      shouldShowList: true,
+      shouldShowBanner: type === "call" && telecomIncomingUi ? false : true,
+      shouldShowList: type === "call" && telecomIncomingUi ? false : true,
       priority,
     };
   },
@@ -135,6 +148,12 @@ function handleIncomingCallPush(data: Record<string, unknown>) {
   const callId = typeof data.callId === "string" ? data.callId : null;
   if (connectionId && callId) {
     useMemberAlertsStore.getState().primeIncomingCall(connectionId, callId);
+    if (Platform.OS === "android") {
+      const payload = parseAndroidCallPushData(data);
+      if (payload) {
+        void presentAndroidIncomingCallTelecom(payload);
+      }
+    }
     return;
   }
   if (useAuthStore.getState().user) {
@@ -167,6 +186,28 @@ function navigateFromPushData(data: Record<string, unknown> | undefined) {
     return;
   }
 
+  const type = typeof data.type === "string" ? data.type : null;
+  if (!type) return;
+
+  if (
+    type === "call" &&
+    typeof data.connectionId === "string" &&
+    typeof data.callId === "string"
+  ) {
+    handleIncomingCallPush(data);
+    void openIncomingVideoCall({
+      connectionId: data.connectionId,
+      callId: data.callId,
+      memberName: "Video call",
+      autoJoin: true,
+    }).then((opened) => {
+      if (!opened && !useAuthStore.getState().user) {
+        pendingPushData = data;
+      }
+    });
+    return;
+  }
+
   if (!useAuthStore.getState().user) {
     pendingPushData = data;
     return;
@@ -176,9 +217,6 @@ function navigateFromPushData(data: Record<string, unknown> | undefined) {
     pendingPushData = data;
     return;
   }
-
-  const type = typeof data.type === "string" ? data.type : null;
-  if (!type) return;
 
   if (type === "message" && typeof data.connectionId === "string") {
     handleIncomingActivityPush();
@@ -227,29 +265,6 @@ function navigateFromPushData(data: Record<string, unknown> | undefined) {
     handleVerificationPush();
     navigateToProfileMedia();
     return;
-  }
-
-  if (
-    type === "call" &&
-    typeof data.connectionId === "string" &&
-    typeof data.callId === "string"
-  ) {
-    handleIncomingCallPush(data);
-    void acceptVideoCall(data.callId).catch(() => {
-      /* WebView can retry accept if this fails */
-    });
-    navigationRef.navigate("Main", {
-      screen: "Messages",
-      params: {
-        screen: "VideoCallRoom",
-        params: {
-          connectionId: data.connectionId,
-          callId: data.callId,
-          memberName: "Video call",
-          autoJoin: true,
-        },
-      },
-    });
   }
 }
 
@@ -302,6 +317,7 @@ async function ensureAndroidChannels() {
 }
 
 function attachPushListeners() {
+  void registerBackgroundIncomingCallTask();
   if (!responseListener) {
     responseListener = Notifications.addNotificationResponseReceivedListener(
       (response) => {

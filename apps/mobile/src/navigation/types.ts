@@ -58,6 +58,12 @@ export type RootStackParamList = {
   Auth: undefined;
   Onboarding: undefined;
   Main: NavigatorScreenParams<MainTabParamList> | undefined;
+  VideoCallRoom: {
+    connectionId: string;
+    callId: string;
+    memberName: string;
+    autoJoin?: boolean;
+  };
   MembershipCheckout: undefined;
   ConsultantCheckout: {
     connectionId: string;
@@ -122,7 +128,7 @@ export type VideoCallsScreenProps = NativeStackScreenProps<
   "VideoCalls"
 >;
 export type VideoCallRoomScreenProps = NativeStackScreenProps<
-  MessagesStackParamList,
+  RootStackParamList,
   "VideoCallRoom"
 >;
 export type ProfileHomeScreenProps = NativeStackScreenProps<

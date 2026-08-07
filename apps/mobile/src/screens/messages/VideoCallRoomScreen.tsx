@@ -6,7 +6,9 @@ import { ErrorState, LoadingState } from "../../components/ScreenState";
 import { tVideoCalls } from "../../i18n/video-calls";
 import type { VideoCallRoomScreenProps } from "../../navigation/types";
 import { acceptVideoCall, endVideoCall } from "../../services/video-calls";
+import { endAndroidTelecomCall } from "../../services/android-incoming-call-telecom";
 import { sessionStorage } from "../../services/session-storage";
+import { useAuthStore } from "../../store/authStore";
 import { useMemberAlertsStore } from "../../store/memberAlertsStore";
 import { useLocaleStore } from "../../store/localeStore";
 import { colors } from "../../theme/colors";
@@ -57,7 +59,15 @@ export default function VideoCallRoomScreen({
       return;
     }
 
-    navigation.navigate("MessagesList");
+    if (useAuthStore.getState().user) {
+      navigation.navigate("Main", {
+        screen: "Messages",
+        params: { screen: "MessagesList" },
+      });
+      return;
+    }
+
+    navigation.navigate("Auth");
   }, [navigation]);
 
   const loadToken = useCallback(async () => {
@@ -98,6 +108,7 @@ export default function VideoCallRoomScreen({
       /* call may already be ended */
     } finally {
       setEnding(false);
+      void endAndroidTelecomCall(callId);
       exitCallScreen();
     }
   }, [callId, ending, exitCallScreen]);
@@ -106,6 +117,7 @@ export default function VideoCallRoomScreen({
     (status: string) => {
       setCallStatus(status);
       if (status === "ended") {
+        void endAndroidTelecomCall(callId);
         exitCallScreen();
       }
     },

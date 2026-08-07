@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, Vibration, View } from "react-native";
-import { useNavigation } from "@react-navigation/native";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useEffect, useRef, useState } from "react";
+import { Platform, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { tVideoCalls } from "../i18n/video-calls";
 import { getApiErrorMessage } from "../lib/api-error";
+import {
+  startIncomingCallRing,
+  stopIncomingCallRing,
+} from "../lib/incoming-call-ringtone";
 import { useActiveRouteName } from "../navigation/active-route";
-import type { RootStackParamList } from "../navigation/types";
-import { acceptVideoCall } from "../services/video-calls";
+import { openIncomingVideoCall } from "../services/incoming-call-navigation";
+import { isAndroidConnectionServiceEnabled } from "../services/android-incoming-call-telecom";
 import { useMemberAlertsStore } from "../store/memberAlertsStore";
 import { useLocaleStore } from "../store/localeStore";
 import { colors } from "../theme/colors";
@@ -18,7 +20,6 @@ export function IncomingCallBanner() {
   const alert = useMemberAlertsStore((s) => s.incomingCallAlert);
   const dismissIncomingCall = useMemberAlertsStore((s) => s.dismissIncomingCall);
   const routeName = useActiveRouteName();
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
@@ -27,35 +28,29 @@ export function IncomingCallBanner() {
   useEffect(() => {
     if (alert?.kind !== "incoming") {
       lastRungCallId.current = null;
+      void stopIncomingCallRing();
+      return;
+    }
+    if (routeName === "VideoCallRoom") {
+      void stopIncomingCallRing();
       return;
     }
     if (alert.call.id === lastRungCallId.current) {
       return;
     }
     lastRungCallId.current = alert.call.id;
-    Vibration.vibrate([0, 600, 200, 600, 200, 600]);
-  }, [alert]);
-
-  const openCallRoom = useCallback(
-    (partnerName: string) => {
-      if (!alert) return;
-      navigation.navigate("Main", {
-        screen: "Messages",
-        params: {
-          screen: "VideoCallRoom",
-          params: {
-            connectionId: alert.call.connectionId,
-            callId: alert.call.id,
-            memberName: partnerName,
-            autoJoin: true,
-          },
-        },
-      });
-    },
-    [alert, navigation],
-  );
+    Vibration.vibrate([0, 700, 200, 700, 200, 700, 200, 900]);
+    void startIncomingCallRing(alert.call.id);
+    return () => {
+      void stopIncomingCallRing();
+    };
+  }, [alert, routeName]);
 
   if (!alert || alert.kind !== "incoming") {
+    return null;
+  }
+
+  if (Platform.OS === "android" && isAndroidConnectionServiceEnabled()) {
     return null;
   }
 
@@ -86,10 +81,19 @@ export function IncomingCallBanner() {
           if (!alert) return;
           setJoinError(null);
           setJoining(true);
-          void acceptVideoCall(alert.call.id)
-            .then(() => {
-              dismissIncomingCall();
-              openCallRoom(partner);
+          void openIncomingVideoCall({
+            connectionId: alert.call.connectionId,
+            callId: alert.call.id,
+            memberName: partner,
+            autoJoin: true,
+          })
+            .then((opened) => {
+              if (opened) {
+                void stopIncomingCallRing();
+                dismissIncomingCall();
+                return;
+              }
+              setJoinError(copy.signInRequired);
             })
             .catch((err) => {
               setJoinError(getApiErrorMessage(err, copy.actionsError));

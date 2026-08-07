@@ -26,7 +26,15 @@
         "READ_MEDIA_IMAGES",
         "RECORD_AUDIO",
         "MODIFY_AUDIO_SETTINGS",
-        "POST_NOTIFICATIONS"
+        "POST_NOTIFICATIONS",
+        "CALL_PHONE",
+        "READ_PHONE_STATE",
+        "READ_PHONE_NUMBERS",
+        "MANAGE_OWN_CALLS",
+        "USE_FULL_SCREEN_INTENT",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_PHONE_CALL",
+        "WAKE_LOCK"
       ],
       "queries": [
         {
@@ -58,6 +66,7 @@
     },
     "plugins": [
       "expo-dev-client",
+      "expo-task-manager",
       "@react-native-community/datetimepicker",
       [
         "expo-image-picker",
