@@ -1,11 +1,7 @@
 import * as Notifications from "expo-notifications";
 import * as TaskManager from "expo-task-manager";
 import { Platform } from "react-native";
-import {
-  parseAndroidCallPushData,
-  presentAndroidIncomingCallTelecom,
-  setupAndroidIncomingCallTelecom,
-} from "../services/android-incoming-call-telecom";
+import { parseAndroidCallPushData } from "../services/incoming-call-push";
 
 export const BACKGROUND_INCOMING_CALL_TASK = "easymatch-background-incoming-call";
 
@@ -31,8 +27,9 @@ TaskManager.defineTask(BACKGROUND_INCOMING_CALL_TASK, ({ data, error }) => {
   }
 
   void (async () => {
-    await setupAndroidIncomingCallTelecom();
-    await presentAndroidIncomingCallTelecom(call);
+    const telecom = await import("../services/android-incoming-call-telecom");
+    await telecom.setupAndroidIncomingCallTelecom();
+    await telecom.presentAndroidIncomingCallTelecom(call);
   })();
 });
 

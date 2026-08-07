@@ -34,7 +34,7 @@
       "android": {
         "buildType": "apk"
       },
-      "prebuildCommand": "node scripts/verify-google-services.mjs && npx expo prebuild --platform android --no-install"
+      "prebuildCommand": "node scripts/verify-google-services.mjs && npx expo prebuild --platform android --clean --no-install"
     },
     "production": {
       "android": {

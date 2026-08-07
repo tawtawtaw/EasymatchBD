@@ -1,15 +1,27 @@
 import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import RNCallKeep, { type EventsPayload } from "react-native-callkeep";
+import type { EventsPayload } from "react-native-callkeep";
 import { TELECOM_PENDING_CALLS_KEY } from "../constants/storage-keys";
 import { declineVideoCall } from "./video-calls";
 import { openIncomingVideoCall } from "./incoming-call-navigation";
+import {
+  parseAndroidCallPushData,
+  type AndroidIncomingCallPayload,
+} from "./incoming-call-push";
 
-export type AndroidIncomingCallPayload = {
-  connectionId: string;
-  callId: string;
-  memberName?: string;
-};
+export type { AndroidIncomingCallPayload };
+export { parseAndroidCallPushData };
+
+type CallKeepModule = typeof import("react-native-callkeep").default;
+
+let callKeepModule: CallKeepModule | null = null;
+
+async function getCallKeep(): Promise<CallKeepModule> {
+  if (!callKeepModule) {
+    callKeepModule = (await import("react-native-callkeep")).default;
+  }
+  return callKeepModule;
+}
 
 const activeTelecomCalls = new Map<string, AndroidIncomingCallPayload>();
 
@@ -74,6 +86,7 @@ async function handleAnswer(callUuid: string) {
     return;
   }
 
+  const RNCallKeep = await getCallKeep();
   try {
     await RNCallKeep.backToForeground();
   } catch {
@@ -105,11 +118,13 @@ async function handleEnd(callUuid: string) {
   });
 }
 
-function registerAndroidTelecomListeners() {
+async function registerAndroidTelecomListeners() {
   if (listenersRegistered || Platform.OS !== "android") {
     return;
   }
   listenersRegistered = true;
+
+  const RNCallKeep = await getCallKeep();
 
   RNCallKeep.addEventListener("answerCall", ({ callUUID }: EventsPayload["answerCall"]) => {
     void handleAnswer(callUUID);
@@ -125,9 +140,9 @@ export async function setupAndroidIncomingCallTelecom(): Promise<boolean> {
     return Platform.OS === "android" && setupComplete;
   }
 
-  registerAndroidTelecomListeners();
-
   try {
+    await registerAndroidTelecomListeners();
+    const RNCallKeep = await getCallKeep();
     await hydrateTelecomCallsFromStorage();
     const supported = await RNCallKeep.supportConnectionService();
     if (!supported) {
@@ -214,6 +229,7 @@ export async function presentAndroidIncomingCallTelecom(
   const callerName = payload.memberName?.trim() || "EasymatchBD video call";
 
   try {
+    const RNCallKeep = await getCallKeep();
     await RNCallKeep.displayIncomingCall(
       callUuid,
       payload.connectionId,
@@ -238,26 +254,9 @@ export async function endAndroidTelecomCall(callId: string) {
   const callUuid = telecomUuid(callId);
   forgetCall(callUuid);
   try {
+    const RNCallKeep = await getCallKeep();
     await RNCallKeep.endCall(callUuid);
   } catch {
     /* already ended */
   }
-}
-
-export function parseAndroidCallPushData(
-  data: Record<string, unknown>,
-): AndroidIncomingCallPayload | null {
-  const connectionId =
-    typeof data.connectionId === "string" ? data.connectionId : null;
-  const callId = typeof data.callId === "string" ? data.callId : null;
-  if (!connectionId || !callId) {
-    return null;
-  }
-  const memberName =
-    typeof data.callerName === "string"
-      ? data.callerName
-      : typeof data.memberName === "string"
-        ? data.memberName
-        : undefined;
-  return { connectionId, callId, memberName };
 }

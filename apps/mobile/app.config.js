@@ -15,6 +15,13 @@ module.exports = () => {
   const apiUrl = (process.env.EXPO_PUBLIC_API_URL || "").trim();
   const webUrl = (process.env.EXPO_PUBLIC_WEB_URL || "").trim();
   const videoCallWebUrl = (process.env.EXPO_PUBLIC_VIDEO_CALL_WEB_URL || "").trim();
+  const buildProfile = (process.env.EAS_BUILD_PROFILE || "").trim();
+  const includeDevClient = buildProfile === "development";
+
+  const plugins = (appJson.expo.plugins || []).filter((entry) => {
+    const name = Array.isArray(entry) ? entry[0] : entry;
+    return includeDevClient || name !== "expo-dev-client";
+  });
 
   return {
     expo: {
@@ -23,7 +30,7 @@ module.exports = () => {
         ...appJson.expo.android,
         googleServicesFile: "./google-services.json",
       },
-      plugins: [...(appJson.expo.plugins || [])],
+      plugins,
       extra: {
         ...(appJson.expo.extra || {}),
         apiBaseUrl: apiUrl,
