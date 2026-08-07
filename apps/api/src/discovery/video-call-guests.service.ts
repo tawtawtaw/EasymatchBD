@@ -244,19 +244,13 @@ export class VideoCallGuestsService {
         relation: relation?.trim() || null,
         token,
         expiresAt,
-        approvedByUserLow: isUserLow,
-        approvedByUserHigh: isUserHigh,
-        status: 'pending_approval',
+        approvedByUserLow: true,
+        approvedByUserHigh: true,
+        status: 'approved',
       },
     });
 
-    const updated =
-      guest.approvedByUserLow && guest.approvedByUserHigh
-        ? await this.prisma.videoCallGuest.update({
-            where: { id: guest.id },
-            data: { status: 'approved' },
-          })
-        : guest;
+    const updated = guest;
 
     const baseUrl = this.webPublicUrl();
     this.clearGuestsCache(call.id);
@@ -459,7 +453,7 @@ export class VideoCallGuestsService {
 
     if (guest.status !== 'approved' && guest.status !== 'joined') {
       throw new ForbiddenException(
-        'This invite is waiting for both members to approve before you can join',
+        'This invite is no longer available. Ask the member to send a new link.',
       );
     }
 

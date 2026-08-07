@@ -59,10 +59,24 @@ export class DropdownsService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    void this.warmup().catch((err) => {
+    void this.warmupWithRetry();
+  }
+
+  private async warmupWithRetry(attempt = 1): Promise<void> {
+    try {
+      await this.warmup();
+    } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      if (attempt < 6) {
+        const delayMs = Math.min(2_000 * attempt, 10_000);
+        this.logger.warn(
+          `Dropdown warmup attempt ${attempt}/6 failed (${message}); retrying in ${delayMs / 1000}s…`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        return this.warmupWithRetry(attempt + 1);
+      }
       this.logger.warn(`Dropdown warmup failed (${message})`);
-    });
+    }
   }
 
   private async warmup() {

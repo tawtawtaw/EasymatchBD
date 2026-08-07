@@ -15,6 +15,12 @@ import { SubscriptionAccessService } from '../subscriptions/subscription-access.
 import { PushNotificationService, MEMBER_INCOMING_PUSH, PUSH_CHANNEL_MESSAGES } from '../push/push-notification.service';
 import { ProfilePauseService } from '../profiles/profile-pause.service';
 
+function isDatabaseUnreachableError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const code = (error as { code?: string }).code;
+  return code === 'P1001' || code === 'P1002';
+}
+
 const memberProfileSelect = {
   id: true,
   profileCode: true,
@@ -211,13 +217,21 @@ export class MessagesService {
     }
 
     const request = (async () => {
-      await this.requirePaid(userId);
-      const unreadCount = await this.countTotalUnread(userId);
-      this.unreadCountCache.set(userId, {
-        expiresAt: Date.now() + MessagesService.UNREAD_COUNT_CACHE_TTL_MS,
-        value: unreadCount,
-      });
-      return { unreadCount };
+      try {
+        await this.requirePaid(userId);
+        const unreadCount = await this.countTotalUnread(userId);
+        this.unreadCountCache.set(userId, {
+          expiresAt: Date.now() + MessagesService.UNREAD_COUNT_CACHE_TTL_MS,
+          value: unreadCount,
+        });
+        return { unreadCount };
+      } catch (error) {
+        if (isDatabaseUnreachableError(error)) {
+          const stale = this.unreadCountCache.get(userId);
+          return { unreadCount: stale?.value ?? 0 };
+        }
+        throw error;
+      }
     })().finally(() => {
       this.unreadCountInflight.delete(userId);
     });
@@ -242,6 +256,10 @@ export class MessagesService {
           expiresAt: Date.now() + MessagesService.UNREAD_COUNT_CACHE_TTL_MS,
           value: unreadCount,
         });
+      } catch (error) {
+        if (!isDatabaseUnreachableError(error)) {
+          throw error;
+        }
       } finally {
         this.unreadCountRefreshing.delete(userId);
       }
