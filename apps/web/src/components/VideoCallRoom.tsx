@@ -93,7 +93,6 @@ export function VideoCallRoom({
   const autoJoinAttemptedRef = useRef(false);
   const reconnectTimerRef = useRef<number | null>(null);
   const reconnectAttemptsRef = useRef(0);
-  const abortedFinalizeRef = useRef(false);
   const refreshInFlightRef = useRef(false);
   const [joiningCall, setJoiningCall] = useState(autoJoin);
   const [callUiEnded, setCallUiEnded] = useState(false);
