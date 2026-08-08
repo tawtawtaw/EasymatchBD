@@ -4,6 +4,7 @@ export type MobileVideoCallState =
   | "joining"
   | "connecting"
   | "active"
+  | "needs_media_tap"
   | "ended";
 
 export function notifyMobileVideoCallState(

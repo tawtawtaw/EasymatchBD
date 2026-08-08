@@ -700,7 +700,6 @@ export function VideoCallRoom({
     }
 
     if (nativeShell) {
-      setConnectionLost(true);
       return;
     }
 
@@ -842,11 +841,6 @@ export function VideoCallRoom({
           {t("connectionLost")}
         </p>
       ) : null}
-      {connectionLost && nativeShell ? (
-        <p className="mx-4 mt-3 rounded-lg bg-amber-900/50 px-3 py-2 text-sm text-amber-100">
-          {t("nativeShellConnectionLost")}
-        </p>
-      ) : null}
 
       {!call ? (
         <p className="flex flex-1 items-center justify-center text-zinc-400">
@@ -986,15 +980,16 @@ export function VideoCallRoom({
                     notifyMobileVideoCallState("active");
                   }
                 }}
-                onDisconnected={handleLiveKitDisconnected}
-                onMediaDeviceError={(_source, error) => {
-                  setMediaError(error.message);
-                  if (nativeShell) {
-                    notifyMobileVideoCallState("active", {
-                      mediaError: error.message,
-                    });
-                  }
-                }}
+                onDisconnected={
+                  nativeShell ? undefined : handleLiveKitDisconnected
+                }
+                onMediaDeviceError={
+                  nativeShell
+                    ? undefined
+                    : (_source, error) => {
+                        setMediaError(error.message);
+                      }
+                }
               />
             ) : (
               <div className="flex items-center justify-center px-4 py-8 text-sm text-zinc-400">

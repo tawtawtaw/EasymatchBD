@@ -28,6 +28,7 @@ const videoCalls = {
     inCall: "In call",
     callEnded: "Call ended",
     endCall: "End call",
+    tapToEnableCallMedia: "Tap to enable microphone & sound",
     loadCallError:
       "Could not load the call screen. Ensure the web app is running and EXPO_PUBLIC_VIDEO_CALL_WEB_URL uses HTTPS (ngrok) on a physical device.",
     backToChat: "← Back to chat",
@@ -87,6 +88,7 @@ const videoCalls = {
     inCall: "কল চলছে",
     callEnded: "কল শেষ",
     endCall: "কল শেষ করুন",
+    tapToEnableCallMedia: "মাইক ও শব্দ চালু করতে ট্যাপ করুন",
     loadCallError:
       "কল স্ক্রিন লোড করা যায়নি। ওয়েব অ্যাপ চালু আছে কিনা দেখুন এবং ফিজিক্যাল ডিভাইসে EXPO_PUBLIC_VIDEO_CALL_WEB_URL HTTPS (ngrok) সেট করুন।",
     backToChat: "← চ্যাটে ফিরুন",

@@ -62,7 +62,7 @@ function ConferenceLayout({
       {!nativeShell ? (
         <DeferredCallCamera onDeviceError={onMediaDeviceError} />
       ) : null}
-      <LiveKitAudioBootstrap />
+      <LiveKitAudioBootstrap nativeShell={nativeShell} />
       <RoomAudioRenderer />
     </>
   );
@@ -119,9 +119,13 @@ export function LiveKitVideoCallRoom({
         options={roomOptions}
         onConnected={onConnected}
         onDisconnected={onDisconnected}
-        onError={(error) => {
-          onMediaDeviceError?.(Track.Source.Camera, error);
-        }}
+        onError={
+          nativeShell
+            ? undefined
+            : (error) => {
+                onMediaDeviceError?.(Track.Source.Camera, error);
+              }
+        }
         data-lk-theme="default"
         className="flex flex-col"
       >

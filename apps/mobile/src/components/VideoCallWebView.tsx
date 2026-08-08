@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   PermissionsAndroid,
@@ -18,6 +18,23 @@ import {
 } from "../lib/webview-external-url";
 import type { AppLocale } from "../lib/locale";
 import { colors } from "../theme/colors";
+
+const NATIVE_MEDIA_TAP_JS = `
+(function () {
+  var btn = document.getElementById("easymatch-native-media-start");
+  if (btn) {
+    btn.click();
+    return;
+  }
+  var fallback = document.querySelector("[data-native-media-start]");
+  if (fallback) fallback.click();
+})();
+true;
+`;
+
+export type VideoCallWebViewHandle = {
+  triggerNativeMediaStart: () => void;
+};
 
 type Props = {
   locale: AppLocale;
@@ -50,16 +67,20 @@ async function ensureCallMediaPermissions(): Promise<void> {
   }
 }
 
-export function VideoCallWebView({
-  locale,
-  connectionId,
-  callId,
-  accessToken,
-  memberName,
-  autoJoin = false,
-  loadErrorLabel = "Could not load the call screen. Check the web app is running and EXPO_PUBLIC_VIDEO_CALL_WEB_URL points to HTTPS (ngrok) for physical devices.",
-  onCallStateChange,
-}: Props) {
+export const VideoCallWebView = forwardRef<VideoCallWebViewHandle, Props>(
+  function VideoCallWebView(
+    {
+      locale,
+      connectionId,
+      callId,
+      accessToken,
+      memberName,
+      autoJoin = false,
+      loadErrorLabel = "Could not load the call screen. Check the web app is running and EXPO_PUBLIC_VIDEO_CALL_WEB_URL points to HTTPS (ngrok) for physical devices.",
+      onCallStateChange,
+    },
+    ref,
+  ) {
   const webViewRef = useRef<WebView>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -70,8 +91,13 @@ export function VideoCallWebView({
     nativeShell: true,
   });
 
+  useImperativeHandle(ref, () => ({
+    triggerNativeMediaStart() {
+      webViewRef.current?.injectJavaScript(NATIVE_MEDIA_TAP_JS);
+    },
+  }));
+
   useEffect(() => {
-    if (Platform.OS !== "android") return;
     void ensureCallMediaPermissions()
       .then(() => setPermissionsReady(true))
       .catch((err) => {
@@ -186,7 +212,8 @@ export function VideoCallWebView({
       />
     </View>
   );
-}
+},
+);
 
 const styles = StyleSheet.create({
   container: {

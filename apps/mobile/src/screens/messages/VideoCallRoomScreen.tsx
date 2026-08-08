@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { VideoCallWebView } from "../../components/VideoCallWebView";
+import {
+  VideoCallWebView,
+  type VideoCallWebViewHandle,
+} from "../../components/VideoCallWebView";
 import { ErrorState, LoadingState } from "../../components/ScreenState";
 import { tVideoCalls } from "../../i18n/video-calls";
 import type { VideoCallRoomScreenProps } from "../../navigation/types";
@@ -49,6 +52,8 @@ export default function VideoCallRoomScreen({
   const [loading, setLoading] = useState(true);
   const [ending, setEnding] = useState(false);
   const [callStatus, setCallStatus] = useState("loading");
+  const [needsMediaTap, setNeedsMediaTap] = useState(false);
+  const webViewRef = useRef<VideoCallWebViewHandle>(null);
   const exitedRef = useRef(false);
 
   const exitCallScreen = useCallback(() => {
@@ -118,12 +123,19 @@ export default function VideoCallRoomScreen({
   const handleCallStateChange = useCallback(
     (status: string) => {
       setCallStatus(status);
+      if (status === "needs_media_tap") {
+        setNeedsMediaTap(true);
+        return;
+      }
+      if (status === "active") {
+        setNeedsMediaTap(false);
+      }
       if (status === "ended") {
         void endAndroidTelecomCall(callId);
         exitCallScreen();
       }
     },
-    [exitCallScreen],
+    [callId, exitCallScreen],
   );
 
   if (loading) {
@@ -165,7 +177,18 @@ export default function VideoCallRoomScreen({
         </Pressable>
       </View>
       <View style={styles.webviewHost}>
+        {needsMediaTap ? (
+          <Pressable
+            style={styles.mediaTapBanner}
+            onPress={() => {
+              webViewRef.current?.triggerNativeMediaStart();
+            }}
+          >
+            <Text style={styles.mediaTapBannerText}>{copy.tapToEnableCallMedia}</Text>
+          </Pressable>
+        ) : null}
         <VideoCallWebView
+          ref={webViewRef}
           locale={locale}
           connectionId={connectionId}
           callId={callId}
@@ -200,6 +223,19 @@ const styles = StyleSheet.create({
   webviewHost: {
     flex: 1,
     minHeight: 0,
+  },
+  mediaTapBanner: {
+    backgroundColor: "#f59e0b",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(0,0,0,0.12)",
+  },
+  mediaTapBannerText: {
+    color: "#18181b",
+    fontSize: 14,
+    fontWeight: "800",
+    textAlign: "center",
   },
   partnerName: {
     color: colors.white,
