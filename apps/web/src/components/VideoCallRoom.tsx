@@ -9,6 +9,7 @@ import {
   canJoinScheduledCall,
   declineVideoCall,
   endVideoCall,
+  cancelVideoCall,
   getLiveKitStatus,
   getVideoCall,
   pollVideoCallSignals,
@@ -32,7 +33,6 @@ import { unlockVideoCallRingtone } from "@/lib/video-call-ringtone";
 import { notifyMobileVideoCallState } from "@/lib/mobile-video-call";
 import { DisconnectReason } from "livekit-client";
 import {
-  persistVideoCallEnded,
   shouldEndCallAfterLiveKitDisconnect,
   VIDEO_CALL_MAX_RECONNECT_ATTEMPTS,
   NATIVE_SHELL_VIDEO_CALL_MAX_RECONNECT_ATTEMPTS,
@@ -323,37 +323,7 @@ export function VideoCallRoom({
     setLivekitToken(null);
   }, []);
 
-  const finalizeAbortedCall = useCallback(async () => {
-    if (abortedFinalizeRef.current || endingIntentionallyRef.current) {
-      return;
-    }
-    abortedFinalizeRef.current = true;
-    reconnectAttemptsRef.current = 0;
-    setCallUiEnded(true);
-    setJoiningCall(false);
-    setConnectionLost(false);
-    patchCallSession({ phase: "ended", livekit: undefined, joining: false });
-    cleanupMedia();
-    if (!nativeShell) {
-      await persistVideoCallEnded(callId);
-    }
-    await syncAlertsAfterCallAction();
-    if (!nativeShell) {
-      clearCallSession();
-    }
-    await refreshCall();
-    notifyMobileVideoCallState("ended");
-  }, [
-    callId,
-    cleanupMedia,
-    clearCallSession,
-    nativeShell,
-    patchCallSession,
-    refreshCall,
-    syncAlertsAfterCallAction,
-  ]);
-
-  const releaseWarmUpStream = useCallback(() => {
+  const loadLiveKit = useCallback(async () => {
     localStreamRef.current?.getTracks().forEach((track) => track.stop());
     localStreamRef.current = null;
     if (localVideoRef.current) {
@@ -699,7 +669,11 @@ export function VideoCallRoom({
     patchCallSession({ phase: "ended", livekit: undefined, joining: false });
     setEnding(true);
     try {
-      await endVideoCall(token, callId);
+      if (call?.status === "ringing" && call.isInitiator) {
+        await cancelVideoCall(token, callId);
+      } else {
+        await endVideoCall(token, callId);
+      }
       cleanupMedia();
       await syncAlertsAfterCallAction();
       clearCallSession();
@@ -732,21 +706,17 @@ export function VideoCallRoom({
       : VIDEO_CALL_MAX_RECONNECT_ATTEMPTS;
 
     if (shouldEndCallAfterLiveKitDisconnect(reason)) {
-      if (nativeShell) {
-        setConnectionLost(true);
-        return;
-      }
-      void finalizeAbortedCall();
+      setConnectionLost(true);
+      setMediaError(t("connectionLost"));
+      setLivekitUrl(null);
+      setLivekitToken(null);
+      patchCallSession({ livekit: undefined, phase: "connecting" });
       return;
     }
 
     if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
-      if (nativeShell) {
-        setConnectionLost(true);
-        setMediaError(t("connectionLost"));
-        return;
-      }
-      void finalizeAbortedCall();
+      setConnectionLost(true);
+      setMediaError(t("connectionLost"));
       return;
     }
 
@@ -770,34 +740,15 @@ export function VideoCallRoom({
           return;
         }
         if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
-          if (nativeShell) {
-            setConnectionLost(true);
-            setMediaError(t("connectionLost"));
-            return;
-          }
-          void finalizeAbortedCall();
+          setConnectionLost(true);
+          setMediaError(t("connectionLost"));
+          return;
         } else {
           setConnectionLost(true);
         }
       });
     }, 2000);
   }
-
-  useEffect(() => {
-    if (!callUiEnded || call?.status !== "active") return;
-
-    void persistVideoCallEnded(callId).then((ok) => {
-      if (ok) void refreshCall();
-    });
-
-    const interval = window.setInterval(() => {
-      void persistVideoCallEnded(callId).then((ok) => {
-        if (ok) void refreshCall();
-      });
-    }, 5000);
-
-    return () => window.clearInterval(interval);
-  }, [call?.status, callId, callUiEnded, refreshCall]);
 
   const ended =
     callUiEnded ||

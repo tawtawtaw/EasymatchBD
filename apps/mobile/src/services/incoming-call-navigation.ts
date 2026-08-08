@@ -1,7 +1,6 @@
 import type { RootStackParamList } from "../navigation/types";
 import { navigationRef } from "../navigation/navigationRef";
 import { trySilentSessionRestore } from "./auth";
-import { acceptVideoCall } from "./video-calls";
 import { useAuthStore } from "../store/authStore";
 import { useMemberAlertsStore } from "../store/memberAlertsStore";
 
@@ -80,12 +79,6 @@ export async function openIncomingVideoCall(
   if (!hasSession) {
     notifyIncomingCallNavigationListeners();
     return false;
-  }
-
-  if (params.autoJoin !== false) {
-    void acceptVideoCall(params.callId).catch(() => {
-      /* call room / WebView retries accept */
-    });
   }
 
   return pushCallScreen(params);

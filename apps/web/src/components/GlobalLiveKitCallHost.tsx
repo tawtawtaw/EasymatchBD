@@ -8,7 +8,6 @@ import { AUTH_TOKEN_KEY } from "@/lib/api";
 import { endVideoCall } from "@/lib/video-calls";
 import { getMemberLiveKitToken } from "@/lib/video-call-guests";
 import {
-  persistVideoCallEnded,
   shouldEndCallAfterLiveKitDisconnect,
   VIDEO_CALL_MAX_RECONNECT_ATTEMPTS,
 } from "@/lib/video-call-disconnect";
@@ -73,21 +72,6 @@ export function GlobalLiveKitCallHost() {
   const [slotEl, setSlotEl] = useState<HTMLElement | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const reconnectTimerRef = useRef<number | null>(null);
-  const finalizeInFlightRef = useRef(false);
-
-  const finalizeAbortedCall = useCallback(
-    async (callId: string) => {
-      if (finalizeInFlightRef.current) return;
-      finalizeInFlightRef.current = true;
-      reconnectAttemptsRef.current = 0;
-      patchCallSession({ phase: "ended", livekit: undefined });
-      clearCallSession();
-      await persistVideoCallEnded(callId);
-      await refresh({ forceFresh: true });
-      finalizeInFlightRef.current = false;
-    },
-    [clearCallSession, patchCallSession, refresh],
-  );
 
   const handleUnexpectedDisconnect = useCallback(
     (reason?: DisconnectReason) => {
@@ -95,12 +79,12 @@ export function GlobalLiveKitCallHost() {
       const callId = session.callId;
 
       if (shouldEndCallAfterLiveKitDisconnect(reason)) {
-        void finalizeAbortedCall(callId);
+        patchCallSession({ phase: "connecting", livekit: undefined });
         return;
       }
 
       if (reconnectAttemptsRef.current >= VIDEO_CALL_MAX_RECONNECT_ATTEMPTS) {
-        void finalizeAbortedCall(callId);
+        patchCallSession({ phase: "connecting", livekit: undefined });
         return;
       }
 
@@ -114,7 +98,6 @@ export function GlobalLiveKitCallHost() {
       reconnectTimerRef.current = window.setTimeout(() => {
         const token = localStorage.getItem(AUTH_TOKEN_KEY);
         if (!token) {
-          void finalizeAbortedCall(callId);
           return;
         }
         void getMemberLiveKitToken(token, callId)
@@ -136,14 +119,14 @@ export function GlobalLiveKitCallHost() {
             if (
               reconnectAttemptsRef.current >= VIDEO_CALL_MAX_RECONNECT_ATTEMPTS
             ) {
-              void finalizeAbortedCall(callId);
+              patchCallSession({ phase: "connecting", livekit: undefined });
             } else {
               handleUnexpectedDisconnect(reason);
             }
           });
       }, 2000);
     },
-    [finalizeAbortedCall, patchCallSession, session],
+    [patchCallSession, session],
   );
 
   useEffect(() => {
