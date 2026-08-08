@@ -32,8 +32,38 @@ const NATIVE_MEDIA_TAP_JS = `
 true;
 `;
 
+const NATIVE_TOGGLE_MIC_JS = `
+(function () {
+  if (window.__easymatchNativeCallMedia && window.__easymatchNativeCallMedia.toggleMic) {
+    window.__easymatchNativeCallMedia.toggleMic();
+    return;
+  }
+  var bar = document.querySelector(".easymatch-media-controls");
+  if (!bar) return;
+  var micBtn = bar.querySelectorAll("button")[0];
+  if (micBtn) micBtn.click();
+})();
+true;
+`;
+
+const NATIVE_TOGGLE_CAMERA_JS = `
+(function () {
+  if (window.__easymatchNativeCallMedia && window.__easymatchNativeCallMedia.toggleCamera) {
+    window.__easymatchNativeCallMedia.toggleCamera();
+    return;
+  }
+  var bar = document.querySelector(".easymatch-media-controls");
+  if (!bar) return;
+  var camBtn = bar.querySelectorAll("button")[1];
+  if (camBtn) camBtn.click();
+})();
+true;
+`;
+
 export type VideoCallWebViewHandle = {
   triggerNativeMediaStart: () => void;
+  toggleMic: () => void;
+  toggleCamera: () => void;
 };
 
 type Props = {
@@ -94,6 +124,12 @@ export const VideoCallWebView = forwardRef<VideoCallWebViewHandle, Props>(
   useImperativeHandle(ref, () => ({
     triggerNativeMediaStart() {
       webViewRef.current?.injectJavaScript(NATIVE_MEDIA_TAP_JS);
+    },
+    toggleMic() {
+      webViewRef.current?.injectJavaScript(NATIVE_TOGGLE_MIC_JS);
+    },
+    toggleCamera() {
+      webViewRef.current?.injectJavaScript(NATIVE_TOGGLE_CAMERA_JS);
     },
   }));
 

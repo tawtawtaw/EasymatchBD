@@ -43,6 +43,23 @@
   height: 100%;
 }
 
+.easymatch-gallery-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  height: 100%;
+  min-height: 0;
+  padding: 0.5rem;
+  align-items: stretch;
+  justify-content: stretch;
+}
+
+.easymatch-video-tile--stack {
+  flex: 1 1 0;
+  min-height: 0;
+  width: 100%;
+}
+
 .easymatch-video-tile .lk-participant-tile {
   height: 100%;
   width: 100%;

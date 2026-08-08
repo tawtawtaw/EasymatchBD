@@ -14,6 +14,7 @@ export type VideoCallLayoutMode = "speaker" | "gallery" | "compact";
 
 type VideoCallAdaptiveLayoutProps = {
   embeddedMobile?: boolean;
+  nativeShell?: boolean;
 };
 
 function trackKey(track: TrackReferenceOrPlaceholder): string {
@@ -73,6 +74,7 @@ function VideoTile({
 
 export function VideoCallAdaptiveLayout({
   embeddedMobile = false,
+  nativeShell = false,
 }: VideoCallAdaptiveLayoutProps) {
   const t = useTranslations("videoCalls.layout");
   const rawTracks = useTracks(
@@ -130,6 +132,7 @@ export function VideoCallAdaptiveLayout({
   }, [dominantTrack, tracks]);
 
   const showLayoutToggle = participantCount >= 3 && !embeddedMobile;
+  const useNativeStack = embeddedMobile && nativeShell;
 
   return (
     <div
@@ -182,13 +185,15 @@ export function VideoCallAdaptiveLayout({
       ) : (
         <div
           className={
-            effectiveMode === "compact"
-              ? "easymatch-gallery-grid easymatch-gallery-grid--compact h-full min-h-0"
-              : `easymatch-gallery-grid h-full min-h-0${
-                  embeddedMobile && participantCount <= 2
-                    ? " easymatch-gallery-grid--pair"
-                    : ""
-                }`
+            useNativeStack
+              ? "easymatch-gallery-stack h-full min-h-0"
+              : effectiveMode === "compact"
+                ? "easymatch-gallery-grid easymatch-gallery-grid--compact h-full min-h-0"
+                : `easymatch-gallery-grid h-full min-h-0${
+                    embeddedMobile && participantCount <= 2
+                      ? " easymatch-gallery-grid--pair"
+                      : ""
+                  }`
           }
         >
           {tracks.map((trackRef) => (
@@ -196,13 +201,15 @@ export function VideoCallAdaptiveLayout({
               key={trackKey(trackRef)}
               trackRef={trackRef}
               className={
-                embeddedMobile && participantCount <= 2
-                  ? "easymatch-video-tile--embedded-pair min-h-0"
-                  : participantCount <= 2
-                    ? "min-h-[160px] sm:min-h-[200px]"
-                    : effectiveMode === "compact"
-                      ? "min-h-[100px]"
-                      : "min-h-[120px] sm:min-h-[140px]"
+                useNativeStack
+                  ? "easymatch-video-tile--stack min-h-0 flex-1"
+                  : embeddedMobile && participantCount <= 2
+                    ? "easymatch-video-tile--embedded-pair min-h-0"
+                    : participantCount <= 2
+                      ? "min-h-[160px] sm:min-h-[200px]"
+                      : effectiveMode === "compact"
+                        ? "min-h-[100px]"
+                        : "min-h-[120px] sm:min-h-[140px]"
               }
               highlighted={
                 dominantTrack != null &&

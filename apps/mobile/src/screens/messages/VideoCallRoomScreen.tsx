@@ -199,6 +199,26 @@ export default function VideoCallRoomScreen({
           onCallStateChange={handleCallStateChange}
         />
       </View>
+      <View style={[styles.toolbar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+        <Pressable
+          style={styles.mediaButton}
+          onPress={() => {
+            webViewRef.current?.triggerNativeMediaStart();
+            webViewRef.current?.toggleMic();
+          }}
+        >
+          <Text style={styles.mediaButtonText}>{copy.micToggle}</Text>
+        </Pressable>
+        <Pressable
+          style={styles.mediaButton}
+          onPress={() => {
+            webViewRef.current?.triggerNativeMediaStart();
+            webViewRef.current?.toggleCamera();
+          }}
+        >
+          <Text style={styles.mediaButtonText}>{copy.cameraToggle}</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -223,6 +243,28 @@ const styles = StyleSheet.create({
   webviewHost: {
     flex: 1,
     minHeight: 0,
+  },
+  toolbar: {
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingTop: 8,
+    backgroundColor: colors.zinc900,
+    borderTopWidth: 1,
+    borderTopColor: colors.zinc700,
+  },
+  mediaButton: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 48,
+    borderRadius: 999,
+    backgroundColor: colors.zinc700,
+  },
+  mediaButtonText: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: "800",
   },
   mediaTapBanner: {
     backgroundColor: "#f59e0b",

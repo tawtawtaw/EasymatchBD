@@ -10,6 +10,7 @@ import { DisconnectReason, Track } from "livekit-client";
 import { DeferredCallCamera } from "@/components/DeferredCallCamera";
 import { VideoCallAdaptiveLayout } from "@/components/VideoCallAdaptiveLayout";
 import { LiveKitAudioBootstrap } from "@/components/LiveKitAudioBootstrap";
+import { NativeCallMediaBridge } from "@/components/NativeCallMediaBridge";
 import { VideoCallMediaControls } from "@/components/VideoCallMediaControls";
 import { VIDEO_CALL_CAPTURE } from "@/lib/video-call-media";
 
@@ -41,32 +42,60 @@ function ConferenceLayout({
   onEndCall?: () => void;
   onMediaDeviceError?: (source: Track.Source, error: Error) => void;
 }) {
-  return (
-    <>
-      <div
-        className={`easymatch-video-call-stage overflow-hidden ${
-          embeddedMobile
-            ? `easymatch-video-call-stage--embedded${
-                nativeShell ? " min-h-0 flex-1" : ""
-              }`
-            : "easymatch-video-call-stage--web easymatch-video-call-stage--adaptive"
-        }`}
-      >
-        <VideoCallAdaptiveLayout embeddedMobile={embeddedMobile} />
-      </div>
-      <VideoCallMediaControls
-        compact={embeddedMobile}
+  const stage = (
+    <div
+      className={`easymatch-video-call-stage overflow-hidden ${
+        embeddedMobile
+          ? `easymatch-video-call-stage--embedded${
+              nativeShell ? " easymatch-video-call-stage--native-shell min-h-0 flex-1" : ""
+            }`
+          : "easymatch-video-call-stage--web easymatch-video-call-stage--adaptive"
+      }`}
+    >
+      <VideoCallAdaptiveLayout
+        embeddedMobile={embeddedMobile}
         nativeShell={nativeShell}
-        showEndCall={showEndCall && !nativeShell}
-        ending={ending}
-        onEndCall={onEndCall}
-        onDeviceError={onMediaDeviceError}
       />
+    </div>
+  );
+
+  const controls = (
+    <VideoCallMediaControls
+      compact={embeddedMobile}
+      nativeShell={nativeShell}
+      showEndCall={showEndCall && !nativeShell}
+      ending={ending}
+      onEndCall={onEndCall}
+      onDeviceError={onMediaDeviceError}
+    />
+  );
+
+  const extras = (
+    <>
       {!nativeShell ? (
         <DeferredCallCamera onDeviceError={onMediaDeviceError} />
       ) : null}
       <LiveKitAudioBootstrap nativeShell={nativeShell} />
+      {nativeShell ? <NativeCallMediaBridge nativeShell /> : null}
       <RoomAudioRenderer />
+    </>
+  );
+
+  if (nativeShell) {
+    return (
+      <div className="easymatch-native-conference flex min-h-0 flex-1 flex-col">
+        {stage}
+        {controls}
+        {extras}
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {stage}
+      {controls}
+      {extras}
     </>
   );
 }
@@ -136,7 +165,7 @@ export function LiveKitVideoCallRoom({
         data-lk-theme="default"
         className={
           nativeShell
-            ? "flex min-h-0 flex-1 flex-col"
+            ? "flex h-full min-h-0 flex-1 flex-col"
             : "flex flex-col"
         }
       >
