@@ -9,6 +9,7 @@ import {
   type TrackReferenceOrPlaceholder,
 } from "@livekit/components-react";
 import { Track } from "livekit-client";
+import { isNativeVideoCallShell } from "@/lib/mobile-video-call";
 
 export type VideoCallLayoutMode = "speaker" | "gallery" | "compact";
 
@@ -132,7 +133,17 @@ export function VideoCallAdaptiveLayout({
   }, [dominantTrack, tracks]);
 
   const showLayoutToggle = participantCount >= 3 && !embeddedMobile;
-  const useNativeStack = embeddedMobile && nativeShell;
+  const useNativeStack =
+    embeddedMobile && (nativeShell || isNativeVideoCallShell());
+
+  const orderedTracks = useMemo(() => {
+    if (!useNativeStack) return tracks;
+    return [...tracks].sort((a, b) => {
+      const aLocal = a.participant?.isLocal ? 1 : 0;
+      const bLocal = b.participant?.isLocal ? 1 : 0;
+      return aLocal - bLocal;
+    });
+  }, [tracks, useNativeStack]);
 
   return (
     <div
@@ -196,7 +207,7 @@ export function VideoCallAdaptiveLayout({
                   }`
           }
         >
-          {tracks.map((trackRef) => (
+          {orderedTracks.map((trackRef) => (
             <VideoTile
               key={trackKey(trackRef)}
               trackRef={trackRef}

@@ -1,19 +1,24 @@
 "use client";
 
 import { useLocalParticipant, useRoomContext } from "@livekit/components-react";
-import { useCallback, useEffect } from "react";
+import { ParticipantEvent, RoomEvent } from "livekit-client";
+import { useEffect, useRef } from "react";
 import {
   enableCameraWithRetry,
   enableMicrophoneWithRetry,
   kickMediaUserGesture,
 } from "@/lib/video-call-media";
+import { notifyMobileVideoCallMediaState } from "@/lib/mobile-video-call";
 
 declare global {
   interface Window {
     __easymatchNativeCallMedia?: {
       toggleMic: () => void;
       toggleCamera: () => void;
+      enableCallMedia: () => void;
     };
+    __easymatchNativeCommandQueue?: string[];
+    __easymatchRunNativeCommand?: (cmd: string) => boolean;
   }
 }
 
@@ -21,49 +26,132 @@ type Props = {
   nativeShell?: boolean;
 };
 
+function drainNativeCommandQueue() {
+  const queue = window.__easymatchNativeCommandQueue;
+  if (!queue?.length || !window.__easymatchRunNativeCommand) return;
+  while (queue.length > 0) {
+    const cmd = queue.shift();
+    if (cmd) window.__easymatchRunNativeCommand(cmd);
+  }
+}
+
 export function NativeCallMediaBridge({ nativeShell = false }: Props) {
   const room = useRoomContext();
-  const { localParticipant, isMicrophoneEnabled, isCameraEnabled } =
-    useLocalParticipant();
-
-  const toggleMic = useCallback(() => {
-    kickMediaUserGesture(room, { audio: true, video: false });
-    void (async () => {
-      try {
-        if (isMicrophoneEnabled) {
-          await localParticipant.setMicrophoneEnabled(false);
-        } else {
-          await enableMicrophoneWithRetry(localParticipant);
-        }
-      } catch {
-        /* errors shown in call UI when toggling from web controls */
-      }
-    })();
-  }, [isMicrophoneEnabled, localParticipant, room]);
-
-  const toggleCamera = useCallback(() => {
-    const turningOn = !isCameraEnabled;
-    kickMediaUserGesture(room, { audio: true, video: turningOn });
-    void (async () => {
-      try {
-        if (turningOn) {
-          await enableCameraWithRetry(localParticipant);
-        } else {
-          await localParticipant.setCameraEnabled(false);
-        }
-      } catch {
-        /* errors shown in call UI when toggling from web controls */
-      }
-    })();
-  }, [isCameraEnabled, localParticipant, room]);
+  const { localParticipant } = useLocalParticipant();
+  const localParticipantRef = useRef(localParticipant);
+  localParticipantRef.current = localParticipant;
 
   useEffect(() => {
     if (!nativeShell) return;
-    window.__easymatchNativeCallMedia = { toggleMic, toggleCamera };
-    return () => {
-      delete window.__easymatchNativeCallMedia;
+
+    const syncMediaState = () => {
+      const lp = room.localParticipant;
+      notifyMobileVideoCallMediaState(
+        lp.isMicrophoneEnabled,
+        lp.isCameraEnabled,
+      );
     };
-  }, [nativeShell, toggleCamera, toggleMic]);
+
+    const toggleMic = () => {
+      kickMediaUserGesture(room, { audio: true, video: false });
+      void (async () => {
+        const lp = room.localParticipant;
+        try {
+          if (lp.isMicrophoneEnabled) {
+            await lp.setMicrophoneEnabled(false);
+          } else {
+            await enableMicrophoneWithRetry(lp);
+          }
+        } catch {
+          /* parent shows mediaError when needed */
+        } finally {
+          syncMediaState();
+        }
+      })();
+    };
+
+    const toggleCamera = () => {
+      kickMediaUserGesture(room, { audio: true, video: true });
+      void (async () => {
+        const lp = room.localParticipant;
+        try {
+          if (lp.isCameraEnabled) {
+            await lp.setCameraEnabled(false);
+          } else {
+            await enableCameraWithRetry(lp);
+          }
+        } catch {
+          /* parent shows mediaError when needed */
+        } finally {
+          syncMediaState();
+        }
+      })();
+    };
+
+    const enableCallMedia = () => {
+      kickMediaUserGesture(room, { audio: true, video: true });
+      void (async () => {
+        const lp = room.localParticipant;
+        try {
+          await room.startAudio();
+          void room.startVideo().catch(() => undefined);
+          if (!lp.isMicrophoneEnabled) {
+            await enableMicrophoneWithRetry(lp);
+          }
+        } catch {
+          /* banner may remain */
+        } finally {
+          syncMediaState();
+        }
+      })();
+    };
+
+    window.__easymatchNativeCallMedia = {
+      toggleMic,
+      toggleCamera,
+      enableCallMedia,
+    };
+
+    window.__easymatchRunNativeCommand = (cmd: string) => {
+      const api = window.__easymatchNativeCallMedia;
+      if (!api) return false;
+      if (cmd === "toggleMic") {
+        api.toggleMic();
+        return true;
+      }
+      if (cmd === "toggleCamera") {
+        api.toggleCamera();
+        return true;
+      }
+      if (cmd === "enableCallMedia") {
+        api.enableCallMedia();
+        return true;
+      }
+      return false;
+    };
+
+    drainNativeCommandQueue();
+    syncMediaState();
+
+    const onConnected = () => syncMediaState();
+    const onLocalTrack = () => syncMediaState();
+
+    room.on(RoomEvent.Connected, onConnected);
+    localParticipant.on(ParticipantEvent.LocalTrackPublished, onLocalTrack);
+    localParticipant.on(ParticipantEvent.LocalTrackUnpublished, onLocalTrack);
+    localParticipant.on(ParticipantEvent.TrackMuted, onLocalTrack);
+    localParticipant.on(ParticipantEvent.TrackUnmuted, onLocalTrack);
+
+    return () => {
+      room.off(RoomEvent.Connected, onConnected);
+      localParticipant.off(ParticipantEvent.LocalTrackPublished, onLocalTrack);
+      localParticipant.off(ParticipantEvent.LocalTrackUnpublished, onLocalTrack);
+      localParticipant.off(ParticipantEvent.TrackMuted, onLocalTrack);
+      localParticipant.off(ParticipantEvent.TrackUnmuted, onLocalTrack);
+      delete window.__easymatchNativeCallMedia;
+      delete window.__easymatchRunNativeCommand;
+    };
+  }, [localParticipant, nativeShell, room]);
 
   return null;
 }

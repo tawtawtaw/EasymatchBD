@@ -31,6 +31,10 @@ const videoCalls = {
     tapToEnableCallMedia: "Tap to enable microphone & sound",
     micToggle: "Mic",
     cameraToggle: "Camera",
+    micOn: "Mic on",
+    micOff: "Mic off",
+    cameraOn: "Camera on",
+    cameraOff: "Camera off",
     loadCallError:
       "Could not load the call screen. Ensure the web app is running and EXPO_PUBLIC_VIDEO_CALL_WEB_URL uses HTTPS (ngrok) on a physical device.",
     backToChat: "← Back to chat",
@@ -93,6 +97,10 @@ const videoCalls = {
     tapToEnableCallMedia: "মাইক ও শব্দ চালু করতে ট্যাপ করুন",
     micToggle: "মাইক",
     cameraToggle: "ক্যামেরা",
+    micOn: "মাইক চালু",
+    micOff: "মাইক বন্ধ",
+    cameraOn: "ক্যামেরা চালু",
+    cameraOff: "ক্যামেরা বন্ধ",
     loadCallError:
       "কল স্ক্রিন লোড করা যায়নি। ওয়েব অ্যাপ চালু আছে কিনা দেখুন এবং ফিজিক্যাল ডিভাইসে EXPO_PUBLIC_VIDEO_CALL_WEB_URL HTTPS (ngrok) সেট করুন।",
     backToChat: "← চ্যাটে ফিরুন",

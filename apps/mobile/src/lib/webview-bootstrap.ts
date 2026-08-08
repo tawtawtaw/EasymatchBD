@@ -34,6 +34,7 @@ export function buildWebViewBootstrapScript({
           sessionStorage.setItem(${mobileKeyLiteral}, "1");
         }
         document.documentElement.dataset.easymatchNativeCall = "1";
+        window.__easymatchNativeCommandQueue = window.__easymatchNativeCommandQueue || [];
       } catch (e) {}
     })();
     true;

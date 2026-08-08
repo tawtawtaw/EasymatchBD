@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   isNativeVideoCallShell,
   notifyMobileVideoCallState,
+  notifyMobileVideoCallMediaState,
 } from "@/lib/mobile-video-call";
 
 type Props = {
@@ -38,6 +39,10 @@ export function LiveKitAudioBootstrap({ nativeShell = false }: Props) {
       setNeedsTap(false);
       if (inNativeShell) {
         notifyMobileVideoCallState("active");
+        notifyMobileVideoCallMediaState(
+          localParticipant.isMicrophoneEnabled,
+          localParticipant.isCameraEnabled,
+        );
       }
     } catch {
       setNeedsTap(true);

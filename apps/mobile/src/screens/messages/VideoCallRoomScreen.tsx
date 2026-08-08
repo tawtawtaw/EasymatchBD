@@ -53,6 +53,8 @@ export default function VideoCallRoomScreen({
   const [ending, setEnding] = useState(false);
   const [callStatus, setCallStatus] = useState("loading");
   const [needsMediaTap, setNeedsMediaTap] = useState(false);
+  const [micEnabled, setMicEnabled] = useState(false);
+  const [cameraEnabled, setCameraEnabled] = useState(false);
   const webViewRef = useRef<VideoCallWebViewHandle>(null);
   const exitedRef = useRef(false);
 
@@ -197,26 +199,49 @@ export default function VideoCallRoomScreen({
           autoJoin={autoJoin}
           loadErrorLabel={copy.loadCallError}
           onCallStateChange={handleCallStateChange}
+          onMediaStateChange={({ micEnabled: mic, cameraEnabled: cam }) => {
+            setMicEnabled(mic);
+            setCameraEnabled(cam);
+            if (mic || cam) {
+              setNeedsMediaTap(false);
+            }
+          }}
         />
       </View>
       <View style={[styles.toolbar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
         <Pressable
-          style={styles.mediaButton}
+          style={[
+            styles.mediaButton,
+            micEnabled ? styles.mediaButtonOn : styles.mediaButtonOff,
+          ]}
           onPress={() => {
-            webViewRef.current?.triggerNativeMediaStart();
+            if (needsMediaTap) {
+              webViewRef.current?.triggerNativeMediaStart();
+              return;
+            }
             webViewRef.current?.toggleMic();
           }}
         >
-          <Text style={styles.mediaButtonText}>{copy.micToggle}</Text>
+          <Text style={styles.mediaButtonText}>
+            {micEnabled ? copy.micOn : copy.micOff}
+          </Text>
         </Pressable>
         <Pressable
-          style={styles.mediaButton}
+          style={[
+            styles.mediaButton,
+            cameraEnabled ? styles.mediaButtonOn : styles.mediaButtonOff,
+          ]}
           onPress={() => {
-            webViewRef.current?.triggerNativeMediaStart();
+            if (needsMediaTap) {
+              webViewRef.current?.triggerNativeMediaStart();
+              return;
+            }
             webViewRef.current?.toggleCamera();
           }}
         >
-          <Text style={styles.mediaButtonText}>{copy.cameraToggle}</Text>
+          <Text style={styles.mediaButtonText}>
+            {cameraEnabled ? copy.cameraOn : copy.cameraOff}
+          </Text>
         </Pressable>
       </View>
     </View>
@@ -259,7 +284,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     minHeight: 48,
     borderRadius: 999,
+  },
+  mediaButtonOn: {
     backgroundColor: colors.zinc700,
+  },
+  mediaButtonOff: {
+    backgroundColor: colors.red600,
   },
   mediaButtonText: {
     color: colors.white,

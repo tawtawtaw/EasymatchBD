@@ -21,41 +21,35 @@ import { colors } from "../theme/colors";
 
 const NATIVE_MEDIA_TAP_JS = `
 (function () {
-  var btn = document.getElementById("easymatch-native-media-start");
-  if (btn) {
-    btn.click();
+  if (window.__easymatchRunNativeCommand && window.__easymatchRunNativeCommand("enableCallMedia")) {
     return;
   }
-  var fallback = document.querySelector("[data-native-media-start]");
-  if (fallback) fallback.click();
+  window.__easymatchNativeCommandQueue = window.__easymatchNativeCommandQueue || [];
+  window.__easymatchNativeCommandQueue.push("enableCallMedia");
+  var btn = document.getElementById("easymatch-native-media-start");
+  if (btn) btn.click();
 })();
 true;
 `;
 
 const NATIVE_TOGGLE_MIC_JS = `
 (function () {
-  if (window.__easymatchNativeCallMedia && window.__easymatchNativeCallMedia.toggleMic) {
-    window.__easymatchNativeCallMedia.toggleMic();
+  if (window.__easymatchRunNativeCommand && window.__easymatchRunNativeCommand("toggleMic")) {
     return;
   }
-  var bar = document.querySelector(".easymatch-media-controls");
-  if (!bar) return;
-  var micBtn = bar.querySelectorAll("button")[0];
-  if (micBtn) micBtn.click();
+  window.__easymatchNativeCommandQueue = window.__easymatchNativeCommandQueue || [];
+  window.__easymatchNativeCommandQueue.push("toggleMic");
 })();
 true;
 `;
 
 const NATIVE_TOGGLE_CAMERA_JS = `
 (function () {
-  if (window.__easymatchNativeCallMedia && window.__easymatchNativeCallMedia.toggleCamera) {
-    window.__easymatchNativeCallMedia.toggleCamera();
+  if (window.__easymatchRunNativeCommand && window.__easymatchRunNativeCommand("toggleCamera")) {
     return;
   }
-  var bar = document.querySelector(".easymatch-media-controls");
-  if (!bar) return;
-  var camBtn = bar.querySelectorAll("button")[1];
-  if (camBtn) camBtn.click();
+  window.__easymatchNativeCommandQueue = window.__easymatchNativeCommandQueue || [];
+  window.__easymatchNativeCommandQueue.push("toggleCamera");
 })();
 true;
 `;
@@ -75,6 +69,7 @@ type Props = {
   autoJoin?: boolean;
   loadErrorLabel?: string;
   onCallStateChange?: (status: string) => void;
+  onMediaStateChange?: (state: { micEnabled: boolean; cameraEnabled: boolean }) => void;
 };
 
 async function ensureCallMediaPermissions(): Promise<void> {
@@ -108,6 +103,7 @@ export const VideoCallWebView = forwardRef<VideoCallWebViewHandle, Props>(
       autoJoin = false,
       loadErrorLabel = "Could not load the call screen. Check the web app is running and EXPO_PUBLIC_VIDEO_CALL_WEB_URL points to HTTPS (ngrok) for physical devices.",
       onCallStateChange,
+      onMediaStateChange,
     },
     ref,
   ) {
@@ -163,9 +159,17 @@ export const VideoCallWebView = forwardRef<VideoCallWebViewHandle, Props>(
       const data = JSON.parse(event.nativeEvent.data) as {
         type?: string;
         status?: string;
+        micEnabled?: boolean;
+        cameraEnabled?: boolean;
       };
       if (data.type === "video_call" && data.status) {
         onCallStateChange?.(data.status);
+      }
+      if (data.type === "video_call_media") {
+        onMediaStateChange?.({
+          micEnabled: Boolean(data.micEnabled),
+          cameraEnabled: Boolean(data.cameraEnabled),
+        });
       }
     } catch {
       /* ignore non-json messages */

@@ -24,6 +24,24 @@ export function notifyMobileVideoCallState(
   bridge?.postMessage(payload);
 }
 
+export function notifyMobileVideoCallMediaState(
+  micEnabled: boolean,
+  cameraEnabled: boolean,
+): void {
+  const bridge = (
+    window as Window & {
+      ReactNativeWebView?: { postMessage: (message: string) => void };
+    }
+  ).ReactNativeWebView;
+  bridge?.postMessage(
+    JSON.stringify({
+      type: "video_call_media",
+      micEnabled,
+      cameraEnabled,
+    }),
+  );
+}
+
 export function isNativeVideoCallShell(): boolean {
   if (typeof window === "undefined") return false;
   return (
