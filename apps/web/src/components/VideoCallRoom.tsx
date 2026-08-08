@@ -322,7 +322,7 @@ export function VideoCallRoom({
     setLivekitToken(null);
   }, []);
 
-  const loadLiveKit = useCallback(async () => {
+  const releaseWarmUpStream = useCallback(() => {
     localStreamRef.current?.getTracks().forEach((track) => track.stop());
     localStreamRef.current = null;
     if (localVideoRef.current) {
