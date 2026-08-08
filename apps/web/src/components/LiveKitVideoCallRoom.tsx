@@ -21,6 +21,7 @@ type LiveKitVideoCallRoomProps = {
   showEndCall?: boolean;
   ending?: boolean;
   onEndCall?: () => void;
+  onConnected?: () => void;
   onDisconnected?: (reason?: DisconnectReason) => void;
   onMediaDeviceError?: (source: Track.Source, error: Error) => void;
 };
@@ -58,7 +59,9 @@ function ConferenceLayout({
         onEndCall={onEndCall}
         onDeviceError={onMediaDeviceError}
       />
-      <DeferredCallCamera onDeviceError={onMediaDeviceError} />
+      {!nativeShell ? (
+        <DeferredCallCamera onDeviceError={onMediaDeviceError} />
+      ) : null}
       <LiveKitAudioBootstrap />
       <RoomAudioRenderer />
     </>
@@ -73,9 +76,32 @@ export function LiveKitVideoCallRoom({
   showEndCall = false,
   ending = false,
   onEndCall,
+  onConnected,
   onDisconnected,
   onMediaDeviceError,
 }: LiveKitVideoCallRoomProps) {
+  const roomOptions = nativeShell
+    ? {
+        adaptiveStream: false,
+        dynacast: false,
+        disconnectOnPageLeave: false,
+        audioCaptureDefaults: {
+          autoGainControl: true,
+          echoCancellation: true,
+          noiseSuppression: true,
+        },
+      }
+    : {
+        adaptiveStream: true,
+        dynacast: true,
+        videoCaptureDefaults: VIDEO_CALL_CAPTURE,
+        audioCaptureDefaults: {
+          autoGainControl: true,
+          echoCancellation: true,
+          noiseSuppression: true,
+        },
+      };
+
   return (
     <div
       className={`easymatch-video-call-room ${
@@ -88,18 +114,10 @@ export function LiveKitVideoCallRoom({
         serverUrl={serverUrl}
         token={token}
         connect
-        audio
+        audio={!nativeShell}
         video={false}
-        options={{
-          adaptiveStream: true,
-          dynacast: true,
-          videoCaptureDefaults: VIDEO_CALL_CAPTURE,
-          audioCaptureDefaults: {
-            autoGainControl: true,
-            echoCancellation: true,
-            noiseSuppression: true,
-          },
-        }}
+        options={roomOptions}
+        onConnected={onConnected}
         onDisconnected={onDisconnected}
         onError={(error) => {
           onMediaDeviceError?.(Track.Source.Camera, error);

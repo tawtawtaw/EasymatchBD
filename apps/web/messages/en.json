@@ -2642,6 +2642,7 @@
     "startingScheduled": "Starting scheduled call…",
     "joiningScheduled": "Joining…",
     "connectionLost": "Connection interrupted — reconnecting. Use End call if you want to leave.",
+    "nativeShellConnectionLost": "Connection unstable. Wait a moment, then tap the mic button if you have no audio.",
     "cancelCall": "Cancel call",
     "endCall": "End call",
     "mediaPermissionDenied": "Camera and microphone access is required for video calls.",

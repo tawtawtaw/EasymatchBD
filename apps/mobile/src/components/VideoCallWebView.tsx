@@ -136,6 +136,7 @@ export function VideoCallWebView({
       ) : null}
       <WebView
         ref={webViewRef}
+        androidLayerType="hardware"
         source={{ uri }}
         style={styles.webview}
         injectedJavaScriptBeforeContentLoaded={injectedJavaScriptBeforeContentLoaded}

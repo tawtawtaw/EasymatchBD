@@ -35,7 +35,6 @@ import { DisconnectReason } from "livekit-client";
 import {
   shouldEndCallAfterLiveKitDisconnect,
   VIDEO_CALL_MAX_RECONNECT_ATTEMPTS,
-  NATIVE_SHELL_VIDEO_CALL_MAX_RECONNECT_ATTEMPTS,
 } from "@/lib/video-call-disconnect";
 
 type VideoCallRoomProps = {
@@ -700,9 +699,12 @@ export function VideoCallRoom({
       return;
     }
 
-    const maxReconnectAttempts = nativeShell
-      ? NATIVE_SHELL_VIDEO_CALL_MAX_RECONNECT_ATTEMPTS
-      : VIDEO_CALL_MAX_RECONNECT_ATTEMPTS;
+    if (nativeShell) {
+      setConnectionLost(true);
+      return;
+    }
+
+    const maxReconnectAttempts = VIDEO_CALL_MAX_RECONNECT_ATTEMPTS;
 
     if (shouldEndCallAfterLiveKitDisconnect(reason)) {
       setConnectionLost(true);
@@ -835,9 +837,14 @@ export function VideoCallRoom({
           {mediaError}
         </p>
       ) : null}
-      {connectionLost ? (
+      {connectionLost && !nativeShell ? (
         <p className="mx-4 mt-3 rounded-lg bg-amber-900/50 px-3 py-2 text-sm text-amber-100">
           {t("connectionLost")}
+        </p>
+      ) : null}
+      {connectionLost && nativeShell ? (
+        <p className="mx-4 mt-3 rounded-lg bg-amber-900/50 px-3 py-2 text-sm text-amber-100">
+          {t("nativeShellConnectionLost")}
         </p>
       ) : null}
 
@@ -971,6 +978,14 @@ export function VideoCallRoom({
                 showEndCall
                 ending={ending}
                 onEndCall={() => void handleEnd()}
+                onConnected={() => {
+                  reconnectAttemptsRef.current = 0;
+                  setConnectionLost(false);
+                  setMediaError(null);
+                  if (nativeShell) {
+                    notifyMobileVideoCallState("active");
+                  }
+                }}
                 onDisconnected={handleLiveKitDisconnected}
                 onMediaDeviceError={(_source, error) => {
                   setMediaError(error.message);
