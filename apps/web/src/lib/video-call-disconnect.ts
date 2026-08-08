@@ -3,6 +3,7 @@ import { AUTH_TOKEN_KEY } from "@/lib/api";
 import { endVideoCall } from "@/lib/video-calls";
 
 export const VIDEO_CALL_MAX_RECONNECT_ATTEMPTS = 3;
+export const NATIVE_SHELL_VIDEO_CALL_MAX_RECONNECT_ATTEMPTS = 10;
 
 const FATAL_LIVEKIT_DISCONNECT = new Set<DisconnectReason>([
   DisconnectReason.ROOM_DELETED,

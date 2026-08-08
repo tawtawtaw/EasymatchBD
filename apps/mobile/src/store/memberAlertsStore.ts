@@ -4,7 +4,8 @@ import { invalidateConnectionsCache, refreshMemberStatusOnForeground } from "../
 import { getAlertsSummary } from "../services/alerts";
 import type { VideoCallAlertItem } from "../types/video-calls";
 
-const SUMMARY_POLL_MS = 8_000;
+const SUMMARY_POLL_MS = 3_000;
+const SUMMARY_POLL_INCOMING_MS = 2_000;
 
 type MemberAlertsState = {
   unreadMessages: number;
@@ -38,17 +39,30 @@ function clearSummaryTimer() {
   }
 }
 
-function startSummaryTimer(set: (partial: Partial<MemberAlertsState>) => void) {
+function summaryPollIntervalMs(state: MemberAlertsState) {
+  if (state.incomingCallAlert?.kind === "incoming" || state.incomingCalls > 0) {
+    return SUMMARY_POLL_INCOMING_MS;
+  }
+  return SUMMARY_POLL_MS;
+}
+
+function startSummaryTimer(
+  set: (partial: Partial<MemberAlertsState>) => void,
+  getState: () => MemberAlertsState,
+) {
   clearSummaryTimer();
   if (pollingPaused) return;
-  summaryTimer = setInterval(() => {
-    void refreshSummary(set, false);
-  }, SUMMARY_POLL_MS);
+  const tick = () => {
+    void refreshSummary(set, false, getState);
+  };
+  tick();
+  summaryTimer = setInterval(tick, summaryPollIntervalMs(getState()));
 }
 
 async function refreshSummary(
   set: (partial: Partial<MemberAlertsState>) => void,
   forceFresh = false,
+  getState?: () => MemberAlertsState,
 ) {
   if (refreshInFlight) {
     await refreshInFlight;
@@ -61,13 +75,20 @@ async function refreshSummary(
         invalidateConnectionsCache();
       }
       const summary = await getAlertsSummary(forceFresh);
+      const prev = getState?.();
+      const keepPrimedIncoming =
+        !summary.incomingCallAlert &&
+        prev?.incomingCallAlert?.kind === "incoming" &&
+        prev.incomingCallAlert.call.status === "ringing";
       set({
         unreadMessages: summary.unreadMessages,
         incomingInterests: summary.incomingInterests,
         outgoingInterests: summary.outgoingInterests,
         connections: summary.connections,
         incomingCalls: summary.incomingCalls,
-        incomingCallAlert: summary.incomingCallAlert,
+        incomingCallAlert:
+          summary.incomingCallAlert ??
+          (keepPrimedIncoming ? prev!.incomingCallAlert : null),
         callAlerts: summary.callAlerts ?? [],
         alertsSynced: true,
       });
@@ -95,7 +116,7 @@ export const useMemberAlertsStore = create<MemberAlertsState>((set, get) => ({
   pollingUserId: null,
 
   refresh: async () => {
-    await refreshSummary(set, true);
+    await refreshSummary(set, true, get);
   },
 
   primeIncomingCall: (connectionId, callId) => {
@@ -119,7 +140,7 @@ export const useMemberAlertsStore = create<MemberAlertsState>((set, get) => ({
         },
       },
     });
-    void get().refresh();
+    startSummaryTimer(set, get);
   },
 
   dismissIncomingCall: () => {
@@ -137,7 +158,7 @@ export const useMemberAlertsStore = create<MemberAlertsState>((set, get) => ({
   resumePolling: () => {
     pollingPaused = false;
     if (pollingUserId) {
-      startSummaryTimer(set);
+      startSummaryTimer(set, get);
     }
   },
 
@@ -168,7 +189,7 @@ export const useMemberAlertsStore = create<MemberAlertsState>((set, get) => ({
     });
 
     void get().refresh();
-    startSummaryTimer(set);
+    startSummaryTimer(set, get);
 
     const onAppStateChange = (nextState: AppStateStatus) => {
       if (nextState !== "active") {
@@ -179,7 +200,7 @@ export const useMemberAlertsStore = create<MemberAlertsState>((set, get) => ({
       void refreshMemberStatusOnForeground();
       void get().refresh();
       if (pollingUserId) {
-        startSummaryTimer(set);
+        startSummaryTimer(set, get);
       }
     };
 

@@ -35,6 +35,7 @@ import {
   persistVideoCallEnded,
   shouldEndCallAfterLiveKitDisconnect,
   VIDEO_CALL_MAX_RECONNECT_ATTEMPTS,
+  NATIVE_SHELL_VIDEO_CALL_MAX_RECONNECT_ATTEMPTS,
 } from "@/lib/video-call-disconnect";
 
 type VideoCallRoomProps = {
@@ -333,15 +334,20 @@ export function VideoCallRoom({
     setConnectionLost(false);
     patchCallSession({ phase: "ended", livekit: undefined, joining: false });
     cleanupMedia();
-    await persistVideoCallEnded(callId);
+    if (!nativeShell) {
+      await persistVideoCallEnded(callId);
+    }
     await syncAlertsAfterCallAction();
-    clearCallSession();
+    if (!nativeShell) {
+      clearCallSession();
+    }
     await refreshCall();
     notifyMobileVideoCallState("ended");
   }, [
     callId,
     cleanupMedia,
     clearCallSession,
+    nativeShell,
     patchCallSession,
     refreshCall,
     syncAlertsAfterCallAction,
@@ -721,12 +727,25 @@ export function VideoCallRoom({
       return;
     }
 
+    const maxReconnectAttempts = nativeShell
+      ? NATIVE_SHELL_VIDEO_CALL_MAX_RECONNECT_ATTEMPTS
+      : VIDEO_CALL_MAX_RECONNECT_ATTEMPTS;
+
     if (shouldEndCallAfterLiveKitDisconnect(reason)) {
+      if (nativeShell) {
+        setConnectionLost(true);
+        return;
+      }
       void finalizeAbortedCall();
       return;
     }
 
-    if (reconnectAttemptsRef.current >= VIDEO_CALL_MAX_RECONNECT_ATTEMPTS) {
+    if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
+      if (nativeShell) {
+        setConnectionLost(true);
+        setMediaError(t("connectionLost"));
+        return;
+      }
       void finalizeAbortedCall();
       return;
     }
@@ -750,7 +769,12 @@ export function VideoCallRoom({
           setConnectionLost(false);
           return;
         }
-        if (reconnectAttemptsRef.current >= VIDEO_CALL_MAX_RECONNECT_ATTEMPTS) {
+        if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
+          if (nativeShell) {
+            setConnectionLost(true);
+            setMediaError(t("connectionLost"));
+            return;
+          }
           void finalizeAbortedCall();
         } else {
           setConnectionLost(true);

@@ -19,7 +19,7 @@ export async function getAlertsSummary(forceFresh = false) {
   return dedupeRequest(
     "alerts-summary",
     () => apiRequest<AlertsSummary>("/discovery/alerts-summary"),
-    7_000,
+    forceFresh ? 0 : 3_000,
   );
 }
 

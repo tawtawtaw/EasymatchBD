@@ -1,7 +1,7 @@
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Platform } from "react-native";
+import { Platform, AppState } from "react-native";
 import Constants from "expo-constants";
 import { navigationRef } from "../navigation/navigationRef";
 import { navigateToProfileMedia } from "../navigation/navigateProfileMedia";
@@ -27,14 +27,6 @@ Notifications.setNotificationHandler({
   handleNotification: async (notification) => {
     const data = notification.request.content.data as Record<string, unknown>;
     const type = typeof data?.type === "string" ? data.type : null;
-    const callPayload =
-      type === "call" && Platform.OS === "android"
-        ? parseAndroidCallPushData(data)
-        : null;
-    let telecomIncomingUi = false;
-    if (callPayload) {
-      telecomIncomingUi = await presentAndroidIncomingCallTelecom(callPayload);
-    }
     const priority =
       type === "call"
         ? Notifications.AndroidNotificationPriority.MAX
@@ -46,12 +38,15 @@ Notifications.setNotificationHandler({
             type === "verification"
           ? Notifications.AndroidNotificationPriority.HIGH
           : Notifications.AndroidNotificationPriority.DEFAULT;
+    const appInForeground = AppState.currentState === "active";
+    const suppressCallTrayUi =
+      type === "call" && (appInForeground || Platform.OS === "ios");
     return {
-      shouldShowAlert: type === "call" && telecomIncomingUi ? false : true,
-      shouldPlaySound: type === "call" && telecomIncomingUi ? false : true,
+      shouldShowAlert: suppressCallTrayUi ? false : true,
+      shouldPlaySound: type === "call" && appInForeground ? false : true,
       shouldSetBadge: true,
-      shouldShowBanner: type === "call" && telecomIncomingUi ? false : true,
-      shouldShowList: type === "call" && telecomIncomingUi ? false : true,
+      shouldShowBanner: suppressCallTrayUi ? false : true,
+      shouldShowList: suppressCallTrayUi ? false : true,
       priority,
     };
   },
@@ -147,6 +142,7 @@ function handleIncomingCallPush(data: Record<string, unknown>) {
   const callId = typeof data.callId === "string" ? data.callId : null;
   if (connectionId && callId) {
     useMemberAlertsStore.getState().primeIncomingCall(connectionId, callId);
+    void useMemberAlertsStore.getState().refresh();
     if (Platform.OS === "android") {
       const payload = parseAndroidCallPushData(data);
       if (payload) {

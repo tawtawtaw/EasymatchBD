@@ -2,7 +2,7 @@ import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 
 const INCOMING_CALL_CHANNEL = "incoming_calls";
-const RING_INTERVAL_MS = 2400;
+const RING_INTERVAL_MS = 1800;
 
 let ringTimer: ReturnType<typeof setInterval> | null = null;
 let activeCallId: string | null = null;

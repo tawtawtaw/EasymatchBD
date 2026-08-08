@@ -71,7 +71,7 @@ export class VideoCallsService {
     string,
     { expiresAt: number; value: VideoCallAlert[] }
   >();
-  private static readonly CALL_ALERTS_CACHE_TTL_MS = 15_000;
+  private static readonly CALL_ALERTS_CACHE_TTL_MS = 3_000;
   private static readonly CALL_ALERTS_STALE_TTL_MS = 30_000;
   private readonly listCallsCache = new Map<
     string,

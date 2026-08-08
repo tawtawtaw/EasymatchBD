@@ -5,7 +5,7 @@ import { VideoCallWebView } from "../../components/VideoCallWebView";
 import { ErrorState, LoadingState } from "../../components/ScreenState";
 import { tVideoCalls } from "../../i18n/video-calls";
 import type { VideoCallRoomScreenProps } from "../../navigation/types";
-import { acceptVideoCall, endVideoCall } from "../../services/video-calls";
+import { endVideoCall } from "../../services/video-calls";
 import { trySilentSessionRestore } from "../../services/auth";
 import { endAndroidTelecomCall } from "../../services/android-incoming-call-telecom";
 import { sessionStorage } from "../../services/session-storage";
@@ -96,12 +96,10 @@ export default function VideoCallRoomScreen({
   }, [pausePolling, resumePolling]);
 
   useEffect(() => {
-    if (!autoJoin) return;
-    dismissIncomingCall();
-    void acceptVideoCall(callId).catch(() => {
-      /* WebView page will retry accept if needed */
-    });
-  }, [autoJoin, callId, dismissIncomingCall]);
+    if (autoJoin) {
+      dismissIncomingCall();
+    }
+  }, [autoJoin, dismissIncomingCall]);
 
   const handleEndCall = useCallback(async () => {
     if (ending) return;
