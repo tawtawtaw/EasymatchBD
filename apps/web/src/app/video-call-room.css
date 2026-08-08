@@ -31,6 +31,18 @@
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
 }
 
+.easymatch-gallery-grid--pair {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: stretch;
+  flex: 1;
+  min-height: 0;
+}
+
+.easymatch-video-tile--embedded-pair {
+  min-height: 0;
+  height: 100%;
+}
+
 .easymatch-video-tile .lk-participant-tile {
   height: 100%;
   width: 100%;

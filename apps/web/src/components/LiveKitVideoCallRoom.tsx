@@ -46,7 +46,9 @@ function ConferenceLayout({
       <div
         className={`easymatch-video-call-stage overflow-hidden ${
           embeddedMobile
-            ? "easymatch-video-call-stage--embedded"
+            ? `easymatch-video-call-stage--embedded${
+                nativeShell ? " min-h-0 flex-1" : ""
+              }`
             : "easymatch-video-call-stage--web easymatch-video-call-stage--adaptive"
         }`}
       >
@@ -54,6 +56,7 @@ function ConferenceLayout({
       </div>
       <VideoCallMediaControls
         compact={embeddedMobile}
+        nativeShell={nativeShell}
         showEndCall={showEndCall && !nativeShell}
         ending={ending}
         onEndCall={onEndCall}
@@ -106,7 +109,11 @@ export function LiveKitVideoCallRoom({
     <div
       className={`easymatch-video-call-room ${
         embeddedMobile
-          ? "easymatch-video-call-room--embedded shrink-0 bg-zinc-950"
+          ? `easymatch-video-call-room--embedded bg-zinc-950${
+              nativeShell
+                ? " easymatch-video-call-room--native-shell flex min-h-0 flex-1 flex-col"
+                : " shrink-0"
+            }`
           : "easymatch-video-call-room--web bg-zinc-950"
       }`}
     >
@@ -127,7 +134,11 @@ export function LiveKitVideoCallRoom({
               }
         }
         data-lk-theme="default"
-        className="flex flex-col"
+        className={
+          nativeShell
+            ? "flex min-h-0 flex-1 flex-col"
+            : "flex flex-col"
+        }
       >
         <ConferenceLayout
           embeddedMobile={embeddedMobile}

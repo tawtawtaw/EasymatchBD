@@ -803,7 +803,9 @@ export function VideoCallRoom({
     <div
       className={`flex flex-col bg-zinc-900 text-white ${
         embeddedMobile
-          ? "easymatch-mobile-call-shell flex h-full min-h-0 flex-1 flex-col overflow-y-auto shadow-none"
+          ? `easymatch-mobile-call-shell flex h-full min-h-0 flex-1 flex-col shadow-none${
+              nativeShell ? " overflow-hidden" : " overflow-y-auto"
+            }`
           : useLiveKit
             ? "flex max-h-[calc(100dvh-6rem)] min-h-0 flex-col overflow-y-auto rounded-xl border border-zinc-200 shadow-lg"
             : "min-h-[70vh] rounded-xl border border-zinc-200 shadow-lg"
@@ -960,7 +962,11 @@ export function VideoCallRoom({
           <p className="max-w-sm text-sm text-zinc-400">{t("partnerJoining")}</p>
         </div>
       ) : useLiveKit ? (
-        <>
+        <div
+          className={
+            nativeShell ? "flex min-h-0 flex-1 flex-col" : undefined
+          }
+        >
           {embeddedMobile || nativeShell ? (
             livekitMediaReady ? (
               <LiveKitVideoCallRoom
@@ -983,13 +989,13 @@ export function VideoCallRoom({
                 onDisconnected={
                   nativeShell ? undefined : handleLiveKitDisconnected
                 }
-                onMediaDeviceError={
-                  nativeShell
-                    ? undefined
-                    : (_source, error) => {
-                        setMediaError(error.message);
-                      }
-                }
+                onMediaDeviceError={(_source, error) => {
+                  if (nativeShell) {
+                    setMediaError(error.message);
+                    return;
+                  }
+                  setMediaError(error.message);
+                }}
               />
             ) : (
               <div className="flex items-center justify-center px-4 py-8 text-sm text-zinc-400">
@@ -1007,8 +1013,9 @@ export function VideoCallRoom({
             callActive
             livekitConfigured={livekitConfigured}
             compactMobile={embeddedMobile}
+            enabled={!nativeShell}
           />
-        </>
+        </div>
       ) : (
         <>
           <div className="relative flex-1 bg-black">

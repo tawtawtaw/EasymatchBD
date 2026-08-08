@@ -28,6 +28,7 @@ export function LiveKitAudioBootstrap({ nativeShell = false }: Props) {
   const enableCallAudio = useCallback(async () => {
     try {
       await unlockRemoteAudio();
+      void room.startVideo().catch(() => undefined);
       if (!initialMicBootstrapRef.current) {
         initialMicBootstrapRef.current = true;
         if (!localParticipant.isMicrophoneEnabled) {

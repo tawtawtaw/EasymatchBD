@@ -32,3 +32,51 @@ html[data-easymatch-native-call="1"]
 html[data-easymatch-native-call="1"] .lk-disconnect-button {
   display: none !important;
 }
+
+html[data-easymatch-native-call="1"] .easymatch-mobile-call-shell {
+  overflow: hidden;
+}
+
+html[data-easymatch-native-call="1"] .easymatch-video-call-room--native-shell {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+html[data-easymatch-native-call="1"]
+  .easymatch-video-call-room--native-shell
+  .lk-room-container {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto !important;
+}
+
+html[data-easymatch-native-call="1"]
+  .easymatch-video-call-room--embedded.easymatch-video-call-room--native-shell
+  .easymatch-video-call-stage--embedded {
+  flex: 1 1 auto;
+  min-height: min(240px, 32vh);
+  max-height: none;
+  height: auto;
+}
+
+html[data-easymatch-native-call="1"] .easymatch-media-controls {
+  position: relative;
+  z-index: 30;
+}
+
+html[data-easymatch-native-call="1"] #easymatch-native-media-start {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+html[data-easymatch-native-call="1"] .easymatch-media-controls button {
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}

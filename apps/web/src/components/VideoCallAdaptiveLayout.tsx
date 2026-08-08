@@ -23,6 +23,34 @@ function trackKey(track: TrackReferenceOrPlaceholder): string {
   return track.publication?.trackSid ?? "track";
 }
 
+function participantIdentity(track: TrackReferenceOrPlaceholder): string {
+  return track.participant?.identity ?? trackKey(track);
+}
+
+function trackHasVideo(track: TrackReferenceOrPlaceholder): boolean {
+  return Boolean(track.publication && !track.publication.isMuted);
+}
+
+/** One camera tile per participant; prefer subscribed video over empty placeholders. */
+function dedupeCameraTracks(
+  tracks: TrackReferenceOrPlaceholder[],
+): TrackReferenceOrPlaceholder[] {
+  const byParticipant = new Map<string, TrackReferenceOrPlaceholder>();
+  for (const track of tracks) {
+    if (track.source !== Track.Source.Camera) continue;
+    const id = participantIdentity(track);
+    const existing = byParticipant.get(id);
+    if (!existing) {
+      byParticipant.set(id, track);
+      continue;
+    }
+    if (!trackHasVideo(existing) && trackHasVideo(track)) {
+      byParticipant.set(id, track);
+    }
+  }
+  return Array.from(byParticipant.values());
+}
+
 function VideoTile({
   trackRef,
   className,
@@ -47,20 +75,27 @@ export function VideoCallAdaptiveLayout({
   embeddedMobile = false,
 }: VideoCallAdaptiveLayoutProps) {
   const t = useTranslations("videoCalls.layout");
-  const tracks = useTracks(
+  const rawTracks = useTracks(
     [
       { source: Track.Source.Camera, withPlaceholder: true },
       { source: Track.Source.ScreenShare, withPlaceholder: false },
     ],
     { onlySubscribed: false },
   );
+  const tracks = useMemo(
+    () => dedupeCameraTracks(rawTracks),
+    [rawTracks],
+  );
   const participants = useParticipants();
-  const participantCount = Math.max(participants.length, tracks.length);
+  const participantCount = embeddedMobile
+    ? tracks.length
+    : Math.max(participants.length, tracks.length);
   const [mode, setMode] = useState<VideoCallLayoutMode>(
     participantCount >= 3 ? "speaker" : "gallery",
   );
 
-  const effectiveMode = participantCount <= 2 ? "gallery" : mode;
+  const effectiveMode =
+    embeddedMobile || participantCount <= 2 ? "gallery" : mode;
 
   const dominantTrack = useMemo(() => {
     const speaking = participants
@@ -149,7 +184,11 @@ export function VideoCallAdaptiveLayout({
           className={
             effectiveMode === "compact"
               ? "easymatch-gallery-grid easymatch-gallery-grid--compact h-full min-h-0"
-              : "easymatch-gallery-grid h-full min-h-0"
+              : `easymatch-gallery-grid h-full min-h-0${
+                  embeddedMobile && participantCount <= 2
+                    ? " easymatch-gallery-grid--pair"
+                    : ""
+                }`
           }
         >
           {tracks.map((trackRef) => (
@@ -157,11 +196,13 @@ export function VideoCallAdaptiveLayout({
               key={trackKey(trackRef)}
               trackRef={trackRef}
               className={
-                participantCount <= 2
-                  ? "min-h-[160px] sm:min-h-[200px]"
-                  : effectiveMode === "compact"
-                    ? "min-h-[100px]"
-                    : "min-h-[120px] sm:min-h-[140px]"
+                embeddedMobile && participantCount <= 2
+                  ? "easymatch-video-tile--embedded-pair min-h-0"
+                  : participantCount <= 2
+                    ? "min-h-[160px] sm:min-h-[200px]"
+                    : effectiveMode === "compact"
+                      ? "min-h-[100px]"
+                      : "min-h-[120px] sm:min-h-[140px]"
               }
               highlighted={
                 dominantTrack != null &&
