@@ -17,10 +17,7 @@ import {
   parseAndroidCallPushData,
   presentAndroidIncomingCallTelecom,
 } from "./android-incoming-call-telecom";
-import {
-  getActiveVideoCallId,
-  isActiveVideoCall,
-} from "./active-call-session";
+import { isActiveVideoCall } from "./active-call-session";
 
 /** Android remote push was removed from Expo Go in SDK 53+. */
 function isAndroidExpoGo(): boolean {
