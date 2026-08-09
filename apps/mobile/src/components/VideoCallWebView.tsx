@@ -157,6 +157,8 @@ export const VideoCallWebView = forwardRef<unknown, Props>(
         originWhitelist={["*"]}
         mixedContentMode="always"
         setSupportMultipleWindows={false}
+        // Dev chunk filenames are stable, so a cached bundle hides web edits.
+        cacheEnabled={!__DEV__}
         startInLoadingState
         onMessage={handleMessage}
         onLoadEnd={() => {

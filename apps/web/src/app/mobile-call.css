@@ -160,3 +160,17 @@ html[data-easymatch-native-call="1"] .lk-participant-tile .lk-participant-media 
 html[data-easymatch-native-call="1"] #easymatch-native-media-start {
   display: none !important;
 }
+
+/*
+ * The room is sized to the full shell height, so any banner in normal flow
+ * pushes the controls past the clipped bottom edge. Float them instead.
+ */
+html[data-easymatch-native-call="1"] .easymatch-native-toast {
+  position: fixed;
+  top: 22px;
+  left: 8px;
+  right: 8px;
+  z-index: 60;
+  margin: 0;
+  pointer-events: none;
+}

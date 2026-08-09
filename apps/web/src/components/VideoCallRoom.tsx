@@ -829,12 +829,20 @@ export function VideoCallRoom({
       ) : null}
 
       {error ? (
-        <p className="mx-4 mt-3 rounded-lg bg-red-900/50 px-3 py-2 text-sm text-red-100">
+        <p
+          className={`mx-4 mt-3 rounded-lg bg-red-900/50 px-3 py-2 text-sm text-red-100${
+            nativeShell ? " easymatch-native-toast" : ""
+          }`}
+        >
           {error}
         </p>
       ) : null}
       {mediaError ? (
-        <p className="mx-4 mt-3 rounded-lg bg-amber-900/50 px-3 py-2 text-sm text-amber-100">
+        <p
+          className={`mx-4 mt-3 rounded-lg bg-amber-900/50 px-3 py-2 text-sm text-amber-100${
+            nativeShell ? " easymatch-native-toast" : ""
+          }`}
+        >
           {mediaError}
         </p>
       ) : null}

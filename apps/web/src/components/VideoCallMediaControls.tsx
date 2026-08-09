@@ -8,6 +8,7 @@ import {
   enableCameraWithRetry,
   enableMicrophoneWithRetry,
   kickMediaUserGesture,
+  setNativeCallTrackMuted,
 } from "@/lib/video-call-media";
 import { notifyMobileVideoCallMediaState } from "@/lib/mobile-video-call";
 
@@ -38,7 +39,8 @@ export function VideoCallMediaControls({
     lastCameraError,
     lastMicrophoneError,
   } = useLocalParticipant();
-  const [pending, setPending] = useState<"mic" | "camera" | null>(null);
+  const [micPending, setMicPending] = useState(false);
+  const [cameraPending, setCameraPending] = useState(false);
 
   useEffect(() => {
     if (lastCameraError) {
@@ -67,15 +69,21 @@ export function VideoCallMediaControls({
     void room.startVideo().catch(() => undefined);
 
     const turningOn = !localParticipant.isMicrophoneEnabled;
-    if (pending) return;
-    setPending("mic");
+    if (micPending) return;
+    setMicPending(true);
     void (async () => {
       try {
-        if (turningOn) {
+        if (
+          nativeShell &&
+          localParticipant.getTrackPublication(Track.Source.Microphone)?.track
+        ) {
+          await setNativeCallTrackMuted(
+            localParticipant,
+            Track.Source.Microphone,
+            !turningOn,
+          );
+        } else if (turningOn) {
           await enableMicrophoneWithRetry(localParticipant);
-          if (nativeShell && !localParticipant.isCameraEnabled) {
-            await enableCameraWithRetry(localParticipant);
-          }
         } else {
           await localParticipant.setMicrophoneEnabled(false);
         }
@@ -84,15 +92,15 @@ export function VideoCallMediaControls({
           error instanceof Error ? error : new Error(t("micEnableFailed"));
         onDeviceError?.(Track.Source.Microphone, err);
       } finally {
-        setPending(null);
+        setMicPending(false);
         syncNativeMedia();
       }
     })();
   }, [
     localParticipant,
+    micPending,
     nativeShell,
     onDeviceError,
-    pending,
     room,
     syncNativeMedia,
     t,
@@ -104,11 +112,20 @@ export function VideoCallMediaControls({
     void room.startVideo().catch(() => undefined);
 
     const turningOn = !localParticipant.isCameraEnabled;
-    if (pending) return;
-    setPending("camera");
+    if (cameraPending) return;
+    setCameraPending(true);
     void (async () => {
       try {
-        if (turningOn) {
+        if (
+          nativeShell &&
+          localParticipant.getTrackPublication(Track.Source.Camera)?.track
+        ) {
+          await setNativeCallTrackMuted(
+            localParticipant,
+            Track.Source.Camera,
+            !turningOn,
+          );
+        } else if (turningOn) {
           await enableCameraWithRetry(localParticipant);
         } else {
           await localParticipant.setCameraEnabled(false);
@@ -118,14 +135,15 @@ export function VideoCallMediaControls({
           error instanceof Error ? error : new Error(t("cameraEnableFailed"));
         onDeviceError?.(Track.Source.Camera, err);
       } finally {
-        setPending(null);
+        setCameraPending(false);
         syncNativeMedia();
       }
     })();
   }, [
+    cameraPending,
     localParticipant,
+    nativeShell,
     onDeviceError,
-    pending,
     room,
     syncNativeMedia,
     t,
@@ -151,7 +169,7 @@ export function VideoCallMediaControls({
             : "bg-red-800 text-white hover:bg-red-700"
         } disabled:opacity-60`}
         aria-pressed={isMicrophoneEnabled}
-        disabled={pending === "mic"}
+        disabled={micPending}
         onPointerDown={() => {
           kickMediaUserGesture(room, { audio: true, video: true });
         }}
@@ -167,7 +185,7 @@ export function VideoCallMediaControls({
             : "bg-red-800 text-white hover:bg-red-700"
         } disabled:opacity-60`}
         aria-pressed={isCameraEnabled}
-        disabled={pending === "camera"}
+        disabled={cameraPending}
         onPointerDown={() => {
           kickMediaUserGesture(room, { audio: true, video: true });
         }}

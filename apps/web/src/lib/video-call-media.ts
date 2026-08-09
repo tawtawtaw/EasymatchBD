@@ -27,6 +27,38 @@ function delay(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
+/**
+ * getUserMedia can hang forever in the Android WebView instead of rejecting,
+ * which would otherwise wedge the caller's pending state. "timeout" is a
+ * retryable message, so a stalled attempt is simply retried.
+ */
+const MEDIA_ENABLE_TIMEOUT_MS = 8000;
+
+export function isMediaTimeoutError(error: unknown): boolean {
+  return error instanceof Error && error.name === "MediaTimeoutError";
+}
+
+function withMediaTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      const error = new Error(`${label} timeout`);
+      error.name = "MediaTimeoutError";
+      reject(error);
+    }, MEDIA_ENABLE_TIMEOUT_MS);
+
+    promise.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        window.clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
 export function isRetryableMediaDeviceError(error: Error): boolean {
   const message = error.message.toLowerCase();
   return (
@@ -45,9 +77,20 @@ export function isRetryableCameraError(error: Error): boolean {
   return isRetryableMediaDeviceError(error);
 }
 
+/**
+ * Some Android WebViews never settle getUserMedia when the audio processing
+ * constraints are set, so the second attempt asks for a plain capture. Each
+ * stalled attempt leaves a request pending in the WebView and blocks later
+ * camera capture, so keep the ladder short.
+ */
+const MICROPHONE_CONSTRAINTS = [
+  { autoGainControl: true, echoCancellation: true, noiseSuppression: true },
+  { autoGainControl: false, echoCancellation: false, noiseSuppression: false },
+];
+
 export async function enableMicrophoneWithRetry(
   localParticipant: LocalParticipant,
-  attempts = 3,
+  attempts = MICROPHONE_CONSTRAINTS.length,
 ): Promise<void> {
   let lastError: Error | undefined;
 
@@ -62,15 +105,19 @@ export async function enableMicrophoneWithRetry(
         Track.Source.Microphone,
       );
       if (publication?.isMuted) {
-        await publication.unmute();
+        await withMediaTimeout(publication.unmute(), "microphone");
         return;
       }
 
-      const created = await localParticipant.setMicrophoneEnabled(true, {
-        autoGainControl: true,
-        echoCancellation: true,
-        noiseSuppression: true,
-      });
+      const created = await withMediaTimeout(
+        localParticipant.setMicrophoneEnabled(
+          true,
+          MICROPHONE_CONSTRAINTS[
+            Math.min(attempt, MICROPHONE_CONSTRAINTS.length - 1)
+          ],
+        ),
+        "microphone",
+      );
       if (created) {
         return;
       }
@@ -96,6 +143,24 @@ export async function enableMicrophoneWithRetry(
   throw lastError ?? new Error("Microphone could not be started.");
 }
 
+/**
+ * Stopping a track does not release the device in time to take it again in the
+ * Android WebView, so toggles mute the published track instead of ending it.
+ */
+export async function setNativeCallTrackMuted(
+  localParticipant: LocalParticipant,
+  source: Track.Source.Microphone | Track.Source.Camera,
+  muted: boolean,
+): Promise<void> {
+  const publication = localParticipant.getTrackPublication(source);
+  if (!publication || publication.isMuted === muted) return;
+
+  await withMediaTimeout(
+    muted ? publication.mute() : publication.unmute(),
+    source === Track.Source.Microphone ? "microphone" : "camera",
+  );
+}
+
 export async function enableCameraWithRetry(
   localParticipant: LocalParticipant,
   attempts = 3,
@@ -112,13 +177,13 @@ export async function enableCameraWithRetry(
     try {
       const existing = localParticipant.getTrackPublication(Track.Source.Camera);
       if (existing?.isMuted) {
-        await existing.unmute();
+        await withMediaTimeout(existing.unmute(), "camera");
         return;
       }
 
-      const publication = await localParticipant.setCameraEnabled(
-        true,
-        VIDEO_CALL_CAPTURE,
+      const publication = await withMediaTimeout(
+        localParticipant.setCameraEnabled(true, VIDEO_CALL_CAPTURE),
+        "camera",
       );
       if (publication) {
         return;
@@ -129,6 +194,11 @@ export async function enableCameraWithRetry(
     } catch (error) {
       lastError =
         error instanceof Error ? error : new Error("Camera could not be started.");
+    }
+
+    // A stalled request stays pending in the WebView; retrying only adds more.
+    if (isMediaTimeoutError(lastError)) {
+      throw lastError;
     }
 
     if (lastError && !isRetryableMediaDeviceError(lastError) && attempt === attempts - 1) {
