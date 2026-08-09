@@ -6,6 +6,54 @@ import type { VideoCallAlertItem } from "../types/video-calls";
 
 const SUMMARY_POLL_MS = 3_000;
 const SUMMARY_POLL_INCOMING_MS = 2_000;
+const SUPPRESSED_CALL_TTL_MS = 10 * 60 * 1000;
+
+function pruneSuppressedCallIds(
+  suppressedCallIds: Record<string, number>,
+): Record<string, number> {
+  const now = Date.now();
+  const next: Record<string, number> = {};
+  for (const [callId, at] of Object.entries(suppressedCallIds)) {
+    if (now - at < SUPPRESSED_CALL_TTL_MS) {
+      next[callId] = at;
+    }
+  }
+  return next;
+}
+
+function isSuppressedCallId(
+  suppressedCallIds: Record<string, number>,
+  callId: string,
+): boolean {
+  const at = suppressedCallIds[callId];
+  if (!at) return false;
+  return Date.now() - at < SUPPRESSED_CALL_TTL_MS;
+}
+
+function sanitizeIncomingCallAlert(
+  alert: VideoCallAlertItem | null | undefined,
+  suppressedCallIds: Record<string, number>,
+): VideoCallAlertItem | null {
+  if (!alert) return null;
+  if (isSuppressedCallId(suppressedCallIds, alert.call.id)) {
+    return null;
+  }
+  if (alert.kind === "incoming" && alert.call.status !== "ringing") {
+    return null;
+  }
+  return alert;
+}
+
+function sanitizeCallAlerts(
+  alerts: VideoCallAlertItem[],
+  suppressedCallIds: Record<string, number>,
+): VideoCallAlertItem[] {
+  return alerts.filter(
+    (alert) =>
+      !isSuppressedCallId(suppressedCallIds, alert.call.id) &&
+      !(alert.kind === "incoming" && alert.call.status !== "ringing"),
+  );
+}
 
 type MemberAlertsState = {
   unreadMessages: number;
@@ -17,11 +65,14 @@ type MemberAlertsState = {
   callAlerts: VideoCallAlertItem[];
   alertsSynced: boolean;
   pollingUserId: string | null;
+  suppressedCallIds: Record<string, number>;
   startPolling: (userId: string) => void;
   stopPolling: () => void;
   refresh: () => Promise<void>;
   primeIncomingCall: (connectionId: string, callId: string) => void;
   dismissIncomingCall: () => void;
+  markCallHandled: (callId: string) => void;
+  isCallSuppressed: (callId: string) => boolean;
   pausePolling: () => void;
   resumePolling: () => void;
 };
@@ -76,21 +127,29 @@ async function refreshSummary(
       }
       const summary = await getAlertsSummary(forceFresh);
       const prev = getState?.();
+      const suppressedCallIds = pruneSuppressedCallIds(
+        prev?.suppressedCallIds ?? {},
+      );
       const keepPrimedIncoming =
         !summary.incomingCallAlert &&
         prev?.incomingCallAlert?.kind === "incoming" &&
-        prev.incomingCallAlert.call.status === "ringing";
+        prev.incomingCallAlert.call.status === "ringing" &&
+        !isSuppressedCallId(suppressedCallIds, prev.incomingCallAlert.call.id);
+      const incomingCallAlert = sanitizeIncomingCallAlert(
+        summary.incomingCallAlert ??
+          (keepPrimedIncoming ? prev!.incomingCallAlert : null),
+        suppressedCallIds,
+      );
       set({
         unreadMessages: summary.unreadMessages,
         incomingInterests: summary.incomingInterests,
         outgoingInterests: summary.outgoingInterests,
         connections: summary.connections,
-        incomingCalls: summary.incomingCalls,
-        incomingCallAlert:
-          summary.incomingCallAlert ??
-          (keepPrimedIncoming ? prev!.incomingCallAlert : null),
-        callAlerts: summary.callAlerts ?? [],
+        incomingCalls: incomingCallAlert ? Math.max(1, summary.incomingCalls) : 0,
+        incomingCallAlert,
+        callAlerts: sanitizeCallAlerts(summary.callAlerts ?? [], suppressedCallIds),
         alertsSynced: true,
+        suppressedCallIds,
       });
     } catch {
       // ignore polling errors
@@ -114,12 +173,16 @@ export const useMemberAlertsStore = create<MemberAlertsState>((set, get) => ({
   callAlerts: [],
   alertsSynced: false,
   pollingUserId: null,
+  suppressedCallIds: {},
 
   refresh: async () => {
     await refreshSummary(set, true, get);
   },
 
   primeIncomingCall: (connectionId, callId) => {
+    if (get().isCallSuppressed(callId)) {
+      return;
+    }
     const now = new Date().toISOString();
     set({
       incomingCalls: Math.max(1, get().incomingCalls),
@@ -148,6 +211,30 @@ export const useMemberAlertsStore = create<MemberAlertsState>((set, get) => ({
       incomingCallAlert: null,
       incomingCalls: 0,
     });
+  },
+
+  markCallHandled: (callId) => {
+    const trimmed = callId.trim();
+    if (!trimmed) return;
+    set((state) => {
+      const suppressedCallIds = {
+        ...pruneSuppressedCallIds(state.suppressedCallIds),
+        [trimmed]: Date.now(),
+      };
+      const dropIncoming = state.incomingCallAlert?.call.id === trimmed;
+      return {
+        suppressedCallIds,
+        incomingCallAlert: dropIncoming ? null : state.incomingCallAlert,
+        incomingCalls: dropIncoming ? 0 : state.incomingCalls,
+        callAlerts: state.callAlerts.filter(
+          (alert) => alert.call.id !== trimmed,
+        ),
+      };
+    });
+  },
+
+  isCallSuppressed: (callId) => {
+    return isSuppressedCallId(get().suppressedCallIds, callId.trim());
   },
 
   pausePolling: () => {

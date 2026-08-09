@@ -17,6 +17,10 @@ import {
   parseAndroidCallPushData,
   presentAndroidIncomingCallTelecom,
 } from "./android-incoming-call-telecom";
+import {
+  getActiveVideoCallId,
+  isActiveVideoCall,
+} from "./active-call-session";
 
 /** Android remote push was removed from Expo Go in SDK 53+. */
 function isAndroidExpoGo(): boolean {
@@ -39,11 +43,21 @@ Notifications.setNotificationHandler({
           ? Notifications.AndroidNotificationPriority.HIGH
           : Notifications.AndroidNotificationPriority.DEFAULT;
     const appInForeground = AppState.currentState === "active";
+    const callId = typeof data?.callId === "string" ? data.callId : null;
+    const suppressStaleCallPush =
+      type === "call" &&
+      callId != null &&
+      (isActiveVideoCall(callId) ||
+        useMemberAlertsStore.getState().isCallSuppressed(callId));
     const suppressCallTrayUi =
-      type === "call" && (appInForeground || Platform.OS === "ios");
+      type === "call" &&
+      (appInForeground || Platform.OS === "ios" || suppressStaleCallPush);
     return {
       shouldShowAlert: suppressCallTrayUi ? false : true,
-      shouldPlaySound: type === "call" && appInForeground ? false : true,
+      shouldPlaySound:
+        type === "call" && (appInForeground || suppressStaleCallPush)
+          ? false
+          : true,
       shouldSetBadge: true,
       shouldShowBanner: suppressCallTrayUi ? false : true,
       shouldShowList: suppressCallTrayUi ? false : true,
@@ -141,6 +155,12 @@ function handleIncomingCallPush(data: Record<string, unknown>) {
     typeof data.connectionId === "string" ? data.connectionId : null;
   const callId = typeof data.callId === "string" ? data.callId : null;
   if (connectionId && callId) {
+    if (
+      isActiveVideoCall(callId) ||
+      useMemberAlertsStore.getState().isCallSuppressed(callId)
+    ) {
+      return;
+    }
     useMemberAlertsStore.getState().primeIncomingCall(connectionId, callId);
     void useMemberAlertsStore.getState().refresh();
     if (Platform.OS === "android") {

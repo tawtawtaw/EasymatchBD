@@ -86,10 +86,13 @@ export async function startScheduledVideoCall(callId: string) {
 }
 
 export async function endVideoCall(callId: string) {
-  return apiRequest<VideoCallItem>(
+  const result = await apiRequest<VideoCallItem>(
     `/discovery/calls/${encodeURIComponent(callId)}/end`,
     { method: "POST" },
   );
+  invalidateDedupeCache("video-call-alerts");
+  invalidateDedupeCache("alerts-summary");
+  return result;
 }
 
 export function canJoinScheduledCall(scheduledAt: string): boolean {

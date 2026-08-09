@@ -59,7 +59,7 @@ function ConferenceLayout({
     </div>
   );
 
-  const controls = (
+  const controls = nativeShell ? null : (
     <VideoCallMediaControls
       compact={embeddedMobile}
       nativeShell={nativeShell}
@@ -117,6 +117,7 @@ export function LiveKitVideoCallRoom({
         adaptiveStream: false,
         dynacast: false,
         disconnectOnPageLeave: false,
+        videoCaptureDefaults: VIDEO_CALL_CAPTURE,
         audioCaptureDefaults: {
           autoGainControl: true,
           echoCancellation: true,

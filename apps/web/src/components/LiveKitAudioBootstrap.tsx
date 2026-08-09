@@ -80,7 +80,7 @@ export function LiveKitAudioBootstrap({ nativeShell = false }: Props) {
     };
   }, [enableCallAudio, inNativeShell, room]);
 
-  if (!needsTap) {
+  if (!needsTap || inNativeShell) {
     return null;
   }
 

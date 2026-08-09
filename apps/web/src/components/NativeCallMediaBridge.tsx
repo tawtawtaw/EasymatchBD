@@ -98,6 +98,9 @@ export function NativeCallMediaBridge({ nativeShell = false }: Props) {
           if (!lp.isMicrophoneEnabled) {
             await enableMicrophoneWithRetry(lp);
           }
+          if (!lp.isCameraEnabled) {
+            await enableCameraWithRetry(lp);
+          }
         } catch {
           /* banner may remain */
         } finally {

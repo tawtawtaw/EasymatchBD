@@ -9,6 +9,8 @@ import { ErrorState, LoadingState } from "../../components/ScreenState";
 import { tVideoCalls } from "../../i18n/video-calls";
 import type { VideoCallRoomScreenProps } from "../../navigation/types";
 import { endVideoCall } from "../../services/video-calls";
+import { setActiveVideoCallId } from "../../services/active-call-session";
+import { invalidateConnectionsCache } from "../../lib/member-status-refresh";
 import { trySilentSessionRestore } from "../../services/auth";
 import { endAndroidTelecomCall } from "../../services/android-incoming-call-telecom";
 import { sessionStorage } from "../../services/session-storage";
@@ -45,6 +47,8 @@ export default function VideoCallRoomScreen({
   const locale = useLocaleStore((s) => s.locale);
   const copy = tVideoCalls(locale);
   const dismissIncomingCall = useMemberAlertsStore((s) => s.dismissIncomingCall);
+  const markCallHandled = useMemberAlertsStore((s) => s.markCallHandled);
+  const refreshAlerts = useMemberAlertsStore((s) => s.refresh);
   const pausePolling = useMemberAlertsStore((s) => s.pausePolling);
   const resumePolling = useMemberAlertsStore((s) => s.resumePolling);
   const insets = useSafeAreaInsets();
@@ -53,6 +57,7 @@ export default function VideoCallRoomScreen({
   const [ending, setEnding] = useState(false);
   const [callStatus, setCallStatus] = useState("loading");
   const [needsMediaTap, setNeedsMediaTap] = useState(false);
+  const [mediaPrimed, setMediaPrimed] = useState(false);
   const [micEnabled, setMicEnabled] = useState(false);
   const [cameraEnabled, setCameraEnabled] = useState(false);
   const webViewRef = useRef<VideoCallWebViewHandle>(null);
@@ -103,6 +108,29 @@ export default function VideoCallRoomScreen({
   }, [pausePolling, resumePolling]);
 
   useEffect(() => {
+    setActiveVideoCallId(callId);
+    dismissIncomingCall();
+    return () => {
+      setActiveVideoCallId(null);
+    };
+  }, [callId, dismissIncomingCall]);
+
+  const finalizeCallExit = useCallback(() => {
+    markCallHandled(callId);
+    dismissIncomingCall();
+    invalidateConnectionsCache();
+    void refreshAlerts();
+    void endAndroidTelecomCall(callId);
+    exitCallScreen();
+  }, [
+    callId,
+    dismissIncomingCall,
+    exitCallScreen,
+    markCallHandled,
+    refreshAlerts,
+  ]);
+
+  useEffect(() => {
     if (autoJoin) {
       dismissIncomingCall();
     }
@@ -117,10 +145,9 @@ export default function VideoCallRoomScreen({
       /* call may already be ended */
     } finally {
       setEnding(false);
-      void endAndroidTelecomCall(callId);
-      exitCallScreen();
+      finalizeCallExit();
     }
-  }, [callId, ending, exitCallScreen]);
+  }, [callId, ending, finalizeCallExit]);
 
   const handleCallStateChange = useCallback(
     (status: string) => {
@@ -133,12 +160,20 @@ export default function VideoCallRoomScreen({
         setNeedsMediaTap(false);
       }
       if (status === "ended") {
-        void endAndroidTelecomCall(callId);
-        exitCallScreen();
+        finalizeCallExit();
       }
     },
-    [callId, exitCallScreen],
+    [finalizeCallExit],
   );
+
+  const subtitle =
+    needsMediaTap && !mediaPrimed
+      ? copy.tapToEnableCallMedia
+      : statusLabel(callStatus, copy);
+
+  const primeCallMedia = useCallback(() => {
+    webViewRef.current?.triggerNativeMediaStart();
+  }, []);
 
   if (loading) {
     return <LoadingState label={autoJoin ? copy.joiningCall : copy.loadingCall} />;
@@ -152,8 +187,6 @@ export default function VideoCallRoomScreen({
       />
     );
   }
-
-  const subtitle = statusLabel(callStatus, copy);
 
   return (
     <View style={styles.container}>
@@ -179,16 +212,6 @@ export default function VideoCallRoomScreen({
         </Pressable>
       </View>
       <View style={styles.webviewHost}>
-        {needsMediaTap ? (
-          <Pressable
-            style={styles.mediaTapBanner}
-            onPress={() => {
-              webViewRef.current?.triggerNativeMediaStart();
-            }}
-          >
-            <Text style={styles.mediaTapBannerText}>{copy.tapToEnableCallMedia}</Text>
-          </Pressable>
-        ) : null}
         <VideoCallWebView
           ref={webViewRef}
           locale={locale}
@@ -203,6 +226,7 @@ export default function VideoCallRoomScreen({
             setMicEnabled(mic);
             setCameraEnabled(cam);
             if (mic || cam) {
+              setMediaPrimed(true);
               setNeedsMediaTap(false);
             }
           }}
@@ -215,8 +239,8 @@ export default function VideoCallRoomScreen({
             micEnabled ? styles.mediaButtonOn : styles.mediaButtonOff,
           ]}
           onPress={() => {
-            if (needsMediaTap) {
-              webViewRef.current?.triggerNativeMediaStart();
+            if (!mediaPrimed) {
+              primeCallMedia();
               return;
             }
             webViewRef.current?.toggleMic();
@@ -232,8 +256,8 @@ export default function VideoCallRoomScreen({
             cameraEnabled ? styles.mediaButtonOn : styles.mediaButtonOff,
           ]}
           onPress={() => {
-            if (needsMediaTap) {
-              webViewRef.current?.triggerNativeMediaStart();
+            if (!mediaPrimed) {
+              primeCallMedia();
               return;
             }
             webViewRef.current?.toggleCamera();

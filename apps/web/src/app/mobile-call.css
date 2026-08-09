@@ -127,10 +127,11 @@ html[data-easymatch-native-call="1"] .easymatch-media-controls--native-shell {
 }
 
 html[data-easymatch-native-call="1"] #easymatch-native-media-start {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
-  overflow: hidden;
+  display: none !important;
+}
+
+html[data-easymatch-native-call="1"] .lk-button-group,
+html[data-easymatch-native-call="1"] .lk-button,
+html[data-easymatch-native-call="1"] .lk-device-menu {
+  display: none !important;
 }

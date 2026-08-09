@@ -137,12 +137,17 @@ export function VideoCallAdaptiveLayout({
     embeddedMobile && (nativeShell || isNativeVideoCallShell());
 
   const orderedTracks = useMemo(() => {
-    if (!useNativeStack) return tracks;
-    return [...tracks].sort((a, b) => {
-      const aLocal = a.participant?.isLocal ? 1 : 0;
-      const bLocal = b.participant?.isLocal ? 1 : 0;
-      return aLocal - bLocal;
-    });
+    const base = useNativeStack
+      ? [...tracks].sort((a, b) => {
+          const aLocal = a.participant?.isLocal ? 1 : 0;
+          const bLocal = b.participant?.isLocal ? 1 : 0;
+          return aLocal - bLocal;
+        })
+      : tracks;
+    if (useNativeStack) {
+      return base.slice(0, 2);
+    }
+    return base;
   }, [tracks, useNativeStack]);
 
   return (

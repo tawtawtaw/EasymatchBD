@@ -146,7 +146,9 @@ export function VideoCallMediaControls({
 
   return (
     <div
-      className="easymatch-media-controls flex shrink-0 flex-wrap items-center justify-center gap-2 border-t border-zinc-700 bg-zinc-900 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3"
+      className={`easymatch-media-controls flex shrink-0 flex-wrap items-center justify-center gap-2 border-t border-zinc-700 bg-zinc-900 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3${
+        nativeShell ? " easymatch-media-controls--native-shell" : ""
+      }`}
       role="toolbar"
       aria-label={t("toolbar")}
     >
