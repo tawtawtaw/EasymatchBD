@@ -10,6 +10,7 @@ import { DisconnectReason, Track } from "livekit-client";
 import { DeferredCallCamera } from "@/components/DeferredCallCamera";
 import { VideoCallAdaptiveLayout } from "@/components/VideoCallAdaptiveLayout";
 import { LiveKitAudioBootstrap } from "@/components/LiveKitAudioBootstrap";
+import { NativeCallDiagnostics } from "@/components/NativeCallDiagnostics";
 import { NativeCallMediaBridge } from "@/components/NativeCallMediaBridge";
 import { NativeCallRemotePlayback } from "@/components/NativeCallRemotePlayback";
 import { VideoCallMediaControls } from "@/components/VideoCallMediaControls";
@@ -79,6 +80,7 @@ function ConferenceLayout({
       <LiveKitAudioBootstrap nativeShell={nativeShell} />
       {nativeShell ? <NativeCallMediaBridge nativeShell /> : null}
       {nativeShell ? <NativeCallRemotePlayback nativeShell /> : null}
+      <NativeCallDiagnostics />
       <RoomAudioRenderer />
     </>
   );

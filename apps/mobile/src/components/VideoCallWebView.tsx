@@ -89,6 +89,7 @@ export const VideoCallWebView = forwardRef<unknown, Props>(
     () =>
       buildWebViewBootstrapScript({
         accessToken,
+        forwardConsole: __DEV__,
       }),
     [accessToken],
   );
@@ -98,9 +99,20 @@ export const VideoCallWebView = forwardRef<unknown, Props>(
       const data = JSON.parse(event.nativeEvent.data) as {
         type?: string;
         status?: string;
+        snapshot?: unknown;
+        level?: string;
+        text?: string;
       };
       if (data.type === "video_call" && data.status) {
         onCallStateChange?.(data.status);
+        return;
+      }
+      if (__DEV__ && data.type === "video_call_debug") {
+        console.log("[call:debug]", JSON.stringify(data.snapshot, null, 2));
+        return;
+      }
+      if (__DEV__ && data.type === "webview_log") {
+        console.log(`[call:web:${data.level ?? "log"}]`, data.text);
       }
     } catch {
       /* ignore non-json messages */
@@ -133,7 +145,7 @@ export const VideoCallWebView = forwardRef<unknown, Props>(
       ) : null}
       <WebView
         ref={webViewRef}
-        androidLayerType="none"
+        androidLayerType="hardware"
         source={{ uri }}
         style={styles.webview}
         injectedJavaScriptBeforeContentLoaded={injectedJavaScriptBeforeContentLoaded}
@@ -179,6 +191,7 @@ export const VideoCallWebView = forwardRef<unknown, Props>(
         mediaCapturePermissionGrantType="grant"
         allowsProtectedMedia
         nestedScrollEnabled={false}
+        webviewDebuggingEnabled={__DEV__}
       />
     </View>
   );

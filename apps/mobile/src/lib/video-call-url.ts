@@ -26,6 +26,9 @@ export function videoCallPageUrl(
   if (options?.memberName?.trim()) {
     params.set("memberName", options.memberName.trim());
   }
+  if (__DEV__) {
+    params.set("debug", "1");
+  }
   return `${base}/${locale}/mobile/video-call?${params.toString()}`;
 }
 

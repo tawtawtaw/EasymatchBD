@@ -20,6 +20,13 @@ import { useMemberAlerts } from "@/components/MemberAlertsProvider";
 
 export const CALL_VIDEO_SLOT_ID = "easymatch-call-video-slot";
 
+/**
+ * The mobile shell route renders its own LiveKitVideoCallRoom instead of a slot.
+ * Mounting the dock there joins the same room a second time under the same
+ * identity, which disconnects the first connection.
+ */
+const PAGE_OWNS_CALL_UI = /\/?mobile\/video-call(?:\/|$)/;
+
 function useSlotLayout(slotEl: HTMLElement | null, active: boolean) {
   const [layout, setLayout] = useState<{
     top: number;
@@ -179,7 +186,7 @@ export function GlobalLiveKitCallHost() {
     }
   }, [clearCallSession, ending, refresh, session]);
 
-  if (!showMedia || !session || !livekit) {
+  if (!showMedia || !session || !livekit || PAGE_OWNS_CALL_UI.test(pathname)) {
     return null;
   }
 
