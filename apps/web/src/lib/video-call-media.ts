@@ -1,5 +1,6 @@
 import type { LocalParticipant, Room } from "livekit-client";
 import { Track, VideoPresets } from "livekit-client";
+import { isNativeVideoCallShell } from "@/lib/mobile-video-call";
 
 export const VIDEO_CALL_CAPTURE = {
   resolution: VideoPresets.h360.resolution,
@@ -39,6 +40,10 @@ export function isMediaTimeoutError(error: unknown): boolean {
 }
 
 function withMediaTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
+  // A browser may be showing its own permission prompt, which the user can
+  // take any amount of time to answer, so only bound this inside the WebView.
+  if (!isNativeVideoCallShell()) return promise;
+
   return new Promise<T>((resolve, reject) => {
     const timer = window.setTimeout(() => {
       const error = new Error(`${label} timeout`);
