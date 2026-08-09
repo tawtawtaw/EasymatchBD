@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   PermissionsAndroid,
@@ -19,12 +19,6 @@ import {
 import type { AppLocale } from "../lib/locale";
 import { colors } from "../theme/colors";
 
-export type VideoCallWebViewHandle = {
-  triggerNativeMediaStart: () => void;
-  toggleMic: () => void;
-  toggleCamera: () => void;
-};
-
 type Props = {
   locale: AppLocale;
   connectionId: string;
@@ -34,7 +28,6 @@ type Props = {
   autoJoin?: boolean;
   loadErrorLabel?: string;
   onCallStateChange?: (status: string) => void;
-  onMediaStateChange?: (state: { micEnabled: boolean; cameraEnabled: boolean }) => void;
 };
 
 async function ensureCallMediaPermissions(): Promise<void> {
@@ -57,7 +50,7 @@ async function ensureCallMediaPermissions(): Promise<void> {
   }
 }
 
-export const VideoCallWebView = forwardRef<VideoCallWebViewHandle, Props>(
+export const VideoCallWebView = forwardRef<unknown, Props>(
   function VideoCallWebView(
     {
       locale,
@@ -68,9 +61,8 @@ export const VideoCallWebView = forwardRef<VideoCallWebViewHandle, Props>(
       autoJoin = false,
       loadErrorLabel = "Could not load the call screen. Check the web app is running and EXPO_PUBLIC_VIDEO_CALL_WEB_URL points to HTTPS (ngrok) for physical devices.",
       onCallStateChange,
-      onMediaStateChange,
     },
-    ref,
+    _ref,
   ) {
   const webViewRef = useRef<WebView>(null);
   const [loading, setLoading] = useState(true);
@@ -82,23 +74,6 @@ export const VideoCallWebView = forwardRef<VideoCallWebViewHandle, Props>(
     nativeShell: true,
   });
 
-  const postNativeCommand = useCallback((cmd: string) => {
-    const payload = JSON.stringify({ type: "native_call_cmd", cmd });
-    webViewRef.current?.postMessage(payload);
-  }, []);
-
-  useImperativeHandle(ref, () => ({
-    triggerNativeMediaStart() {
-      postNativeCommand("enableCallMedia");
-    },
-    toggleMic() {
-      postNativeCommand("toggleMic");
-    },
-    toggleCamera() {
-      postNativeCommand("toggleCamera");
-    },
-  }));
-
   useEffect(() => {
     void ensureCallMediaPermissions()
       .then(() => setPermissionsReady(true))
@@ -109,12 +84,6 @@ export const VideoCallWebView = forwardRef<VideoCallWebViewHandle, Props>(
         setLoading(false);
       });
   }, []);
-
-  const injectedJavaScriptOnLoad = useMemo(
-    () =>
-      `(function(){try{document.body.style.touchAction='manipulation';document.documentElement.style.touchAction='manipulation';}catch(e){}})();true;`,
-    [],
-  );
 
   const injectedJavaScriptBeforeContentLoaded = useMemo(
     () =>
@@ -129,17 +98,9 @@ export const VideoCallWebView = forwardRef<VideoCallWebViewHandle, Props>(
       const data = JSON.parse(event.nativeEvent.data) as {
         type?: string;
         status?: string;
-        micEnabled?: boolean;
-        cameraEnabled?: boolean;
       };
       if (data.type === "video_call" && data.status) {
         onCallStateChange?.(data.status);
-      }
-      if (data.type === "video_call_media") {
-        onMediaStateChange?.({
-          micEnabled: Boolean(data.micEnabled),
-          cameraEnabled: Boolean(data.cameraEnabled),
-        });
       }
     } catch {
       /* ignore non-json messages */
@@ -172,11 +133,10 @@ export const VideoCallWebView = forwardRef<VideoCallWebViewHandle, Props>(
       ) : null}
       <WebView
         ref={webViewRef}
-        androidLayerType="hardware"
+        androidLayerType="none"
         source={{ uri }}
         style={styles.webview}
         injectedJavaScriptBeforeContentLoaded={injectedJavaScriptBeforeContentLoaded}
-        injectedJavaScript={injectedJavaScriptOnLoad}
         javaScriptEnabled
         domStorageEnabled
         mediaPlaybackRequiresUserAction={false}

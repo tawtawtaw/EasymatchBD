@@ -46,18 +46,19 @@ Notifications.setNotificationHandler({
       callId != null &&
       (isActiveVideoCall(callId) ||
         useMemberAlertsStore.getState().isCallSuppressed(callId));
+    // Always hide call tray noise for suppressed/active calls, even in background.
     const suppressCallTrayUi =
       type === "call" &&
-      (appInForeground || Platform.OS === "ios" || suppressStaleCallPush);
+      (suppressStaleCallPush || appInForeground || Platform.OS === "ios");
     return {
       shouldShowAlert: suppressCallTrayUi ? false : true,
       shouldPlaySound:
-        type === "call" && (appInForeground || suppressStaleCallPush)
+        type === "call" && (suppressStaleCallPush || appInForeground)
           ? false
           : true,
       shouldSetBadge: true,
       shouldShowBanner: suppressCallTrayUi ? false : true,
-      shouldShowList: suppressCallTrayUi ? false : true,
+      shouldShowList: suppressStaleCallPush ? false : !suppressCallTrayUi,
       priority,
     };
   },

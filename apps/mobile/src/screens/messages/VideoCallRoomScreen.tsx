@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import {
-  VideoCallWebView,
-  type VideoCallWebViewHandle,
-} from "../../components/VideoCallWebView";
+import { VideoCallWebView } from "../../components/VideoCallWebView";
 import { ErrorState, LoadingState } from "../../components/ScreenState";
 import { tVideoCalls } from "../../i18n/video-calls";
 import type { VideoCallRoomScreenProps } from "../../navigation/types";
@@ -56,11 +53,6 @@ export default function VideoCallRoomScreen({
   const [loading, setLoading] = useState(true);
   const [ending, setEnding] = useState(false);
   const [callStatus, setCallStatus] = useState("loading");
-  const [needsMediaTap, setNeedsMediaTap] = useState(false);
-  const [mediaPrimed, setMediaPrimed] = useState(false);
-  const [micEnabled, setMicEnabled] = useState(false);
-  const [cameraEnabled, setCameraEnabled] = useState(false);
-  const webViewRef = useRef<VideoCallWebViewHandle>(null);
   const exitedRef = useRef(false);
 
   const exitCallScreen = useCallback(() => {
@@ -110,10 +102,12 @@ export default function VideoCallRoomScreen({
   useEffect(() => {
     setActiveVideoCallId(callId);
     dismissIncomingCall();
+    markCallHandled(callId);
     return () => {
+      markCallHandled(callId);
       setActiveVideoCallId(null);
     };
-  }, [callId, dismissIncomingCall]);
+  }, [callId, dismissIncomingCall, markCallHandled]);
 
   const finalizeCallExit = useCallback(() => {
     markCallHandled(callId);
@@ -129,12 +123,6 @@ export default function VideoCallRoomScreen({
     markCallHandled,
     refreshAlerts,
   ]);
-
-  useEffect(() => {
-    if (autoJoin) {
-      dismissIncomingCall();
-    }
-  }, [autoJoin, dismissIncomingCall]);
 
   const handleEndCall = useCallback(async () => {
     if (ending) return;
@@ -152,28 +140,12 @@ export default function VideoCallRoomScreen({
   const handleCallStateChange = useCallback(
     (status: string) => {
       setCallStatus(status);
-      if (status === "needs_media_tap") {
-        setNeedsMediaTap(true);
-        return;
-      }
-      if (status === "active") {
-        setNeedsMediaTap(false);
-      }
       if (status === "ended") {
         finalizeCallExit();
       }
     },
     [finalizeCallExit],
   );
-
-  const subtitle =
-    needsMediaTap && !mediaPrimed
-      ? copy.tapToEnableCallMedia
-      : statusLabel(callStatus, copy);
-
-  const primeCallMedia = useCallback(() => {
-    webViewRef.current?.triggerNativeMediaStart();
-  }, []);
 
   if (loading) {
     return <LoadingState label={autoJoin ? copy.joiningCall : copy.loadingCall} />;
@@ -196,7 +168,7 @@ export default function VideoCallRoomScreen({
             {memberName}
           </Text>
           <Text style={styles.statusText} numberOfLines={1}>
-            {subtitle}
+            {statusLabel(callStatus, copy)}
           </Text>
         </View>
         <Pressable
@@ -213,7 +185,6 @@ export default function VideoCallRoomScreen({
       </View>
       <View style={styles.webviewHost}>
         <VideoCallWebView
-          ref={webViewRef}
           locale={locale}
           connectionId={connectionId}
           callId={callId}
@@ -222,51 +193,7 @@ export default function VideoCallRoomScreen({
           autoJoin={autoJoin}
           loadErrorLabel={copy.loadCallError}
           onCallStateChange={handleCallStateChange}
-          onMediaStateChange={({ micEnabled: mic, cameraEnabled: cam }) => {
-            setMicEnabled(mic);
-            setCameraEnabled(cam);
-            if (mic || cam) {
-              setMediaPrimed(true);
-              setNeedsMediaTap(false);
-            }
-          }}
         />
-      </View>
-      <View style={[styles.toolbar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
-        <Pressable
-          style={[
-            styles.mediaButton,
-            micEnabled ? styles.mediaButtonOn : styles.mediaButtonOff,
-          ]}
-          onPress={() => {
-            if (!mediaPrimed) {
-              primeCallMedia();
-              return;
-            }
-            webViewRef.current?.toggleMic();
-          }}
-        >
-          <Text style={styles.mediaButtonText}>
-            {micEnabled ? copy.micOn : copy.micOff}
-          </Text>
-        </Pressable>
-        <Pressable
-          style={[
-            styles.mediaButton,
-            cameraEnabled ? styles.mediaButtonOn : styles.mediaButtonOff,
-          ]}
-          onPress={() => {
-            if (!mediaPrimed) {
-              primeCallMedia();
-              return;
-            }
-            webViewRef.current?.toggleCamera();
-          }}
-        >
-          <Text style={styles.mediaButtonText}>
-            {cameraEnabled ? copy.cameraOn : copy.cameraOff}
-          </Text>
-        </Pressable>
       </View>
     </View>
   );
@@ -292,46 +219,6 @@ const styles = StyleSheet.create({
   webviewHost: {
     flex: 1,
     minHeight: 0,
-  },
-  toolbar: {
-    flexDirection: "row",
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingTop: 8,
-    backgroundColor: colors.zinc900,
-    borderTopWidth: 1,
-    borderTopColor: colors.zinc700,
-  },
-  mediaButton: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: 48,
-    borderRadius: 999,
-  },
-  mediaButtonOn: {
-    backgroundColor: colors.zinc700,
-  },
-  mediaButtonOff: {
-    backgroundColor: colors.red600,
-  },
-  mediaButtonText: {
-    color: colors.white,
-    fontSize: 14,
-    fontWeight: "800",
-  },
-  mediaTapBanner: {
-    backgroundColor: "#f59e0b",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(0,0,0,0.12)",
-  },
-  mediaTapBannerText: {
-    color: "#18181b",
-    fontSize: 14,
-    fontWeight: "800",
-    textAlign: "center",
   },
   partnerName: {
     color: colors.white,

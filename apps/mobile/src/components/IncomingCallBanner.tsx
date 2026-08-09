@@ -19,14 +19,17 @@ export function IncomingCallBanner() {
   const copy = tVideoCalls(locale);
   const alert = useMemberAlertsStore((s) => s.incomingCallAlert);
   const dismissIncomingCall = useMemberAlertsStore((s) => s.dismissIncomingCall);
+  const isCallSuppressed = useMemberAlertsStore((s) => s.isCallSuppressed);
   const routeName = useActiveRouteName();
   const insets = useSafeAreaInsets();
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
   const lastRungCallId = useRef<string | null>(null);
+  const suppressed =
+    alert?.call.id != null ? isCallSuppressed(alert.call.id) : false;
 
   useEffect(() => {
-    if (alert?.kind !== "incoming") {
+    if (alert?.kind !== "incoming" || suppressed) {
       lastRungCallId.current = null;
       void stopIncomingCallRing();
       return;
@@ -44,9 +47,9 @@ export function IncomingCallBanner() {
     return () => {
       void stopIncomingCallRing();
     };
-  }, [alert, routeName]);
+  }, [alert, routeName, suppressed]);
 
-  if (!alert || alert.kind !== "incoming") {
+  if (!alert || alert.kind !== "incoming" || suppressed) {
     return null;
   }
 

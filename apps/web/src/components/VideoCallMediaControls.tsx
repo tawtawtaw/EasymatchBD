@@ -3,12 +3,13 @@
 import { useLocalParticipant, useRoomContext } from "@livekit/components-react";
 import { Track } from "livekit-client";
 import { useTranslations } from "next-intl";
-import { useCallback, useEffect, useState, type TouchEvent } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   enableCameraWithRetry,
   enableMicrophoneWithRetry,
   kickMediaUserGesture,
 } from "@/lib/video-call-media";
+import { notifyMobileVideoCallMediaState } from "@/lib/mobile-video-call";
 
 type VideoCallMediaControlsProps = {
   compact?: boolean;
@@ -51,13 +52,30 @@ export function VideoCallMediaControls({
     }
   }, [lastMicrophoneError, onDeviceError]);
 
-  const runMicToggle = useCallback(
-    async (targetEnabled: boolean) => {
-      if (pending) return;
-      setPending("mic");
+  const syncNativeMedia = useCallback(() => {
+    if (!nativeShell) return;
+    notifyMobileVideoCallMediaState(
+      localParticipant.isMicrophoneEnabled,
+      localParticipant.isCameraEnabled,
+    );
+  }, [localParticipant, nativeShell]);
+
+  const pressMic = useCallback(() => {
+    // Must stay in the user-gesture stack for Android WebView getUserMedia.
+    kickMediaUserGesture(room, { audio: true, video: true });
+    void room.startAudio().catch(() => undefined);
+    void room.startVideo().catch(() => undefined);
+
+    const turningOn = !localParticipant.isMicrophoneEnabled;
+    if (pending) return;
+    setPending("mic");
+    void (async () => {
       try {
-        if (targetEnabled) {
+        if (turningOn) {
           await enableMicrophoneWithRetry(localParticipant);
+          if (nativeShell && !localParticipant.isCameraEnabled) {
+            await enableCameraWithRetry(localParticipant);
+          }
         } else {
           await localParticipant.setMicrophoneEnabled(false);
         }
@@ -67,25 +85,31 @@ export function VideoCallMediaControls({
         onDeviceError?.(Track.Source.Microphone, err);
       } finally {
         setPending(null);
+        syncNativeMedia();
       }
-    },
-    [localParticipant, onDeviceError, pending, t],
-  );
+    })();
+  }, [
+    localParticipant,
+    nativeShell,
+    onDeviceError,
+    pending,
+    room,
+    syncNativeMedia,
+    t,
+  ]);
 
-  const runCameraToggle = useCallback(
-    async (targetEnabled: boolean) => {
-      if (pending) return;
-      setPending("camera");
+  const pressCamera = useCallback(() => {
+    kickMediaUserGesture(room, { audio: true, video: true });
+    void room.startAudio().catch(() => undefined);
+    void room.startVideo().catch(() => undefined);
+
+    const turningOn = !localParticipant.isCameraEnabled;
+    if (pending) return;
+    setPending("camera");
+    void (async () => {
       try {
-        if (targetEnabled) {
-          const publication = localParticipant.getTrackPublication(
-            Track.Source.Camera,
-          );
-          if (publication?.isMuted) {
-            await publication.unmute();
-          } else {
-            await enableCameraWithRetry(localParticipant);
-          }
+        if (turningOn) {
+          await enableCameraWithRetry(localParticipant);
         } else {
           await localParticipant.setCameraEnabled(false);
         }
@@ -95,54 +119,21 @@ export function VideoCallMediaControls({
         onDeviceError?.(Track.Source.Camera, err);
       } finally {
         setPending(null);
+        syncNativeMedia();
       }
-    },
-    [localParticipant, onDeviceError, pending, t],
-  );
+    })();
+  }, [
+    localParticipant,
+    onDeviceError,
+    pending,
+    room,
+    syncNativeMedia,
+    t,
+  ]);
 
   const buttonClass = compact
     ? "min-h-11 rounded-full px-3 py-2.5 text-xs font-semibold sm:text-sm"
     : "min-h-10 rounded-full px-4 py-2 text-sm font-semibold";
-
-  const pressMic = useCallback(() => {
-    kickMediaUserGesture(room, { audio: true, video: false });
-    void runMicToggle(!isMicrophoneEnabled);
-  }, [isMicrophoneEnabled, room, runMicToggle]);
-
-  const pressCamera = useCallback(() => {
-    const turningOn = !isCameraEnabled;
-    kickMediaUserGesture(room, { audio: true, video: turningOn });
-    void runCameraToggle(turningOn);
-  }, [isCameraEnabled, room, runCameraToggle]);
-
-  const micHandlers = nativeShell
-    ? {
-        onTouchStart: (event: TouchEvent<HTMLButtonElement>) => {
-          event.preventDefault();
-          pressMic();
-        },
-      }
-    : {
-        onPointerDown: () => {
-          kickMediaUserGesture(room, { audio: true, video: false });
-        },
-        onClick: () => pressMic(),
-      };
-
-  const cameraHandlers = nativeShell
-    ? {
-        onTouchStart: (event: TouchEvent<HTMLButtonElement>) => {
-          event.preventDefault();
-          pressCamera();
-        },
-      }
-    : {
-        onPointerDown: () => {
-          const turningOn = !isCameraEnabled;
-          kickMediaUserGesture(room, { audio: true, video: turningOn });
-        },
-        onClick: () => pressCamera(),
-      };
 
   return (
     <div
@@ -161,7 +152,10 @@ export function VideoCallMediaControls({
         } disabled:opacity-60`}
         aria-pressed={isMicrophoneEnabled}
         disabled={pending === "mic"}
-        {...micHandlers}
+        onPointerDown={() => {
+          kickMediaUserGesture(room, { audio: true, video: true });
+        }}
+        onClick={pressMic}
       >
         {isMicrophoneEnabled ? t("micOn") : t("micOff")}
       </button>
@@ -174,7 +168,10 @@ export function VideoCallMediaControls({
         } disabled:opacity-60`}
         aria-pressed={isCameraEnabled}
         disabled={pending === "camera"}
-        {...cameraHandlers}
+        onPointerDown={() => {
+          kickMediaUserGesture(room, { audio: true, video: true });
+        }}
+        onClick={pressCamera}
       >
         {isCameraEnabled ? t("cameraOn") : t("cameraOff")}
       </button>

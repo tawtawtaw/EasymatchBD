@@ -60,7 +60,7 @@ function ConferenceLayout({
     </div>
   );
 
-  const controls = nativeShell ? null : (
+  const controls = (
     <VideoCallMediaControls
       compact={embeddedMobile}
       nativeShell={nativeShell}
@@ -116,8 +116,9 @@ export function LiveKitVideoCallRoom({
 }: LiveKitVideoCallRoomProps) {
   const roomOptions = nativeShell
     ? {
-        adaptiveStream: true,
-        dynacast: true,
+        // Adaptive stream remounts/resizes tiles in WebView and looks like shaking.
+        adaptiveStream: false,
+        dynacast: false,
         disconnectOnPageLeave: false,
         videoCaptureDefaults: VIDEO_CALL_CAPTURE,
         audioCaptureDefaults: {

@@ -122,20 +122,30 @@ html[data-easymatch-native-call="1"] .easymatch-gallery-stack {
   gap: 6px;
 }
 
-html[data-easymatch-native-call="1"] .easymatch-media-controls,
 html[data-easymatch-native-call="1"] .easymatch-media-controls--native-shell {
-  display: none !important;
-  visibility: hidden !important;
-  height: 0 !important;
-  overflow: hidden !important;
-  pointer-events: none !important;
+  flex-shrink: 0;
+  z-index: 40;
+  padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+}
+
+html[data-easymatch-native-call="1"] .easymatch-media-controls--native-shell button {
+  min-height: 48px;
+  flex: 1 1 0;
+  max-width: 180px;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 html[data-easymatch-native-call="1"] .lk-control-bar,
 html[data-easymatch-native-call="1"] .lk-button-group,
-html[data-easymatch-native-call="1"] .lk-button,
 html[data-easymatch-native-call="1"] .lk-device-menu {
   display: none !important;
+}
+
+html[data-easymatch-native-call="1"] .easymatch-video-tile {
+  transition: none !important;
+  animation: none !important;
 }
 
 html[data-easymatch-native-call="1"] .lk-participant-tile video,

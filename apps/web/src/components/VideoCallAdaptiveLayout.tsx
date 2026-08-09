@@ -228,6 +228,7 @@ export function VideoCallAdaptiveLayout({
                         : "min-h-[120px] sm:min-h-[140px]"
               }
               highlighted={
+                !useNativeStack &&
                 dominantTrack != null &&
                 trackKey(trackRef) === trackKey(dominantTrack) &&
                 participants.some((p) => p.isSpeaking)
