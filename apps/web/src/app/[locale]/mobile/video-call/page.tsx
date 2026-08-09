@@ -8,6 +8,7 @@ import { useMounted } from "@/hooks/use-mounted";
 import "@/app/mobile-call.css";
 import { markMobileAppSession } from "@/lib/mobile-app-session";
 import { VideoCallRoom } from "@/components/VideoCallRoom";
+import { NativeCallCommandListener } from "@/components/NativeCallCommandListener";
 
 export default function MobileVideoCallPage() {
   const searchParams = useSearchParams();
@@ -59,6 +60,7 @@ export default function MobileVideoCallPage() {
 
   return (
     <div className="fixed inset-0 flex min-h-0 flex-col bg-zinc-950">
+      <NativeCallCommandListener />
       <VideoCallRoom
         connectionId={connectionId}
         callId={callId}

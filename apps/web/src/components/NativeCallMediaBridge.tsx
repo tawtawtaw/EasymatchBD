@@ -135,6 +135,13 @@ export function NativeCallMediaBridge({ nativeShell = false }: Props) {
 
     drainNativeCommandQueue();
     syncMediaState();
+    (
+      window as Window & {
+        ReactNativeWebView?: { postMessage: (message: string) => void };
+      }
+    ).ReactNativeWebView?.postMessage(
+      JSON.stringify({ type: "video_call", status: "bridge_ready" }),
+    );
 
     const onConnected = () => syncMediaState();
     const onLocalTrack = () => syncMediaState();

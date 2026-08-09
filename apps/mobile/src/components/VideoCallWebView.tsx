@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   PermissionsAndroid,
@@ -18,41 +18,6 @@ import {
 } from "../lib/webview-external-url";
 import type { AppLocale } from "../lib/locale";
 import { colors } from "../theme/colors";
-
-const NATIVE_MEDIA_TAP_JS = `
-(function () {
-  if (window.__easymatchRunNativeCommand && window.__easymatchRunNativeCommand("enableCallMedia")) {
-    return;
-  }
-  window.__easymatchNativeCommandQueue = window.__easymatchNativeCommandQueue || [];
-  window.__easymatchNativeCommandQueue.push("enableCallMedia");
-  var btn = document.getElementById("easymatch-native-media-start");
-  if (btn) btn.click();
-})();
-true;
-`;
-
-const NATIVE_TOGGLE_MIC_JS = `
-(function () {
-  if (window.__easymatchRunNativeCommand && window.__easymatchRunNativeCommand("toggleMic")) {
-    return;
-  }
-  window.__easymatchNativeCommandQueue = window.__easymatchNativeCommandQueue || [];
-  window.__easymatchNativeCommandQueue.push("toggleMic");
-})();
-true;
-`;
-
-const NATIVE_TOGGLE_CAMERA_JS = `
-(function () {
-  if (window.__easymatchRunNativeCommand && window.__easymatchRunNativeCommand("toggleCamera")) {
-    return;
-  }
-  window.__easymatchNativeCommandQueue = window.__easymatchNativeCommandQueue || [];
-  window.__easymatchNativeCommandQueue.push("toggleCamera");
-})();
-true;
-`;
 
 export type VideoCallWebViewHandle = {
   triggerNativeMediaStart: () => void;
@@ -117,15 +82,20 @@ export const VideoCallWebView = forwardRef<VideoCallWebViewHandle, Props>(
     nativeShell: true,
   });
 
+  const postNativeCommand = useCallback((cmd: string) => {
+    const payload = JSON.stringify({ type: "native_call_cmd", cmd });
+    webViewRef.current?.postMessage(payload);
+  }, []);
+
   useImperativeHandle(ref, () => ({
     triggerNativeMediaStart() {
-      webViewRef.current?.injectJavaScript(NATIVE_MEDIA_TAP_JS);
+      postNativeCommand("enableCallMedia");
     },
     toggleMic() {
-      webViewRef.current?.injectJavaScript(NATIVE_TOGGLE_MIC_JS);
+      postNativeCommand("toggleMic");
     },
     toggleCamera() {
-      webViewRef.current?.injectJavaScript(NATIVE_TOGGLE_CAMERA_JS);
+      postNativeCommand("toggleCamera");
     },
   }));
 

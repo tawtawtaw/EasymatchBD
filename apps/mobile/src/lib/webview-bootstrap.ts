@@ -35,6 +35,23 @@ export function buildWebViewBootstrapScript({
         }
         document.documentElement.dataset.easymatchNativeCall = "1";
         window.__easymatchNativeCommandQueue = window.__easymatchNativeCommandQueue || [];
+        function __easymatchHandleNativeCmdMessage(raw) {
+          if (typeof raw !== "string" || !raw) return;
+          try {
+            var data = JSON.parse(raw);
+            if (data.type !== "native_call_cmd" || !data.cmd) return;
+            if (window.__easymatchRunNativeCommand && window.__easymatchRunNativeCommand(data.cmd)) {
+              return;
+            }
+            window.__easymatchNativeCommandQueue.push(data.cmd);
+          } catch (e) {}
+        }
+        window.addEventListener("message", function (event) {
+          __easymatchHandleNativeCmdMessage(event.data);
+        });
+        document.addEventListener("message", function (event) {
+          __easymatchHandleNativeCmdMessage(event.data);
+        });
       } catch (e) {}
     })();
     true;

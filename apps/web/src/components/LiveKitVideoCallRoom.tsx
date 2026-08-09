@@ -11,6 +11,7 @@ import { DeferredCallCamera } from "@/components/DeferredCallCamera";
 import { VideoCallAdaptiveLayout } from "@/components/VideoCallAdaptiveLayout";
 import { LiveKitAudioBootstrap } from "@/components/LiveKitAudioBootstrap";
 import { NativeCallMediaBridge } from "@/components/NativeCallMediaBridge";
+import { NativeCallRemotePlayback } from "@/components/NativeCallRemotePlayback";
 import { VideoCallMediaControls } from "@/components/VideoCallMediaControls";
 import { VIDEO_CALL_CAPTURE } from "@/lib/video-call-media";
 
@@ -77,6 +78,7 @@ function ConferenceLayout({
       ) : null}
       <LiveKitAudioBootstrap nativeShell={nativeShell} />
       {nativeShell ? <NativeCallMediaBridge nativeShell /> : null}
+      {nativeShell ? <NativeCallRemotePlayback nativeShell /> : null}
       <RoomAudioRenderer />
     </>
   );
@@ -114,8 +116,8 @@ export function LiveKitVideoCallRoom({
 }: LiveKitVideoCallRoomProps) {
   const roomOptions = nativeShell
     ? {
-        adaptiveStream: false,
-        dynacast: false,
+        adaptiveStream: true,
+        dynacast: true,
         disconnectOnPageLeave: false,
         videoCaptureDefaults: VIDEO_CALL_CAPTURE,
         audioCaptureDefaults: {
