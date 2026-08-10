@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { clearAuthImageHeadersCache } from "../lib/auth-image-headers";
+import { deleteSecure, readSecure, writeSecure } from "../lib/secure-storage";
 import {
   AUTH_TOKEN_KEY,
   DEVICE_PHONE_KEY,
@@ -14,39 +15,42 @@ export const sessionStorage = {
     if (memoryAccessToken !== undefined) {
       return memoryAccessToken;
     }
-    memoryAccessToken = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
+    memoryAccessToken = await readSecure(AUTH_TOKEN_KEY);
     return memoryAccessToken;
   },
 
   async setAccessToken(token: string): Promise<void> {
     memoryAccessToken = token;
-    await AsyncStorage.setItem(AUTH_TOKEN_KEY, token);
+    await writeSecure(AUTH_TOKEN_KEY, token);
   },
 
   async clearAccessToken(): Promise<void> {
     memoryAccessToken = null;
     clearAuthImageHeadersCache();
-    await AsyncStorage.removeItem(AUTH_TOKEN_KEY);
+    await deleteSecure(AUTH_TOKEN_KEY);
   },
 
   async getDeviceSession(): Promise<{ deviceToken: string; phone: string } | null> {
     const [deviceToken, phone] = await Promise.all([
-      AsyncStorage.getItem(DEVICE_TOKEN_KEY),
-      AsyncStorage.getItem(DEVICE_PHONE_KEY),
+      readSecure(DEVICE_TOKEN_KEY),
+      readSecure(DEVICE_PHONE_KEY),
     ]);
     if (!deviceToken || !phone) return null;
     return { deviceToken, phone };
   },
 
   async setDeviceSession(deviceToken: string, phone: string): Promise<void> {
-    await AsyncStorage.multiSet([
-      [DEVICE_TOKEN_KEY, deviceToken],
-      [DEVICE_PHONE_KEY, phone],
+    await Promise.all([
+      writeSecure(DEVICE_TOKEN_KEY, deviceToken),
+      writeSecure(DEVICE_PHONE_KEY, phone),
     ]);
   },
 
   async clearDeviceSession(): Promise<void> {
-    await AsyncStorage.multiRemove([DEVICE_TOKEN_KEY, DEVICE_PHONE_KEY]);
+    await Promise.all([
+      deleteSecure(DEVICE_TOKEN_KEY),
+      deleteSecure(DEVICE_PHONE_KEY),
+    ]);
   },
 
   async getPushToken(): Promise<string | null> {
@@ -60,10 +64,10 @@ export const sessionStorage = {
   async clearAll(): Promise<void> {
     memoryAccessToken = null;
     clearAuthImageHeadersCache();
-    await AsyncStorage.multiRemove([
-      AUTH_TOKEN_KEY,
-      DEVICE_TOKEN_KEY,
-      DEVICE_PHONE_KEY,
+    await Promise.all([
+      deleteSecure(AUTH_TOKEN_KEY),
+      deleteSecure(DEVICE_TOKEN_KEY),
+      deleteSecure(DEVICE_PHONE_KEY),
     ]);
   },
 };

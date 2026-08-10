@@ -81,6 +81,13 @@
           "icon": "./assets/icon.png",
           "color": "#881337"
         }
+      ],
+      "expo-secure-store",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "EasymatchBD uses Face ID to unlock the app on this device."
+        }
       ]
     ],
     "extra": {

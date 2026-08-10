@@ -1,9 +1,11 @@
 import { useNavigation } from "@react-navigation/native";
 import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import { Alert, Pressable, StyleSheet, Text } from "react-native";
+import { tAppLock } from "../i18n/app-lock";
 import { tNavigation } from "../i18n/messages";
 import { confirmSignOut } from "../lib/confirm-sign-out";
 import type { MainTabParamList } from "../navigation/types";
+import { useAppLockStore } from "../store/appLockStore";
 import { useLocaleStore } from "../store/localeStore";
 import { colors } from "../theme/colors";
 
@@ -19,6 +21,9 @@ export function AccountMenuButton({
   const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList>>();
   const locale = useLocaleStore((s) => s.locale);
   const copy = tNavigation(locale).app;
+  const lockCopy = tAppLock(locale);
+  const lockEnabled = useAppLockStore((s) => s.enabled);
+  const lockNow = useAppLockStore((s) => s.lockNow);
 
   function openMenu() {
     const actions: Array<{
@@ -41,9 +46,13 @@ export function AccountMenuButton({
       });
     }
 
+    if (lockEnabled) {
+      actions.push({ text: lockCopy.lockAppAction, onPress: () => lockNow() });
+    }
+
     actions.push(
       {
-        text: copy.signOut,
+        text: lockCopy.signOutTitle,
         style: "destructive",
         onPress: () => confirmSignOut(locale),
       },

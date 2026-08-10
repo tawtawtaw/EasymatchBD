@@ -1742,7 +1742,8 @@ const navigation = {
       settings: "Settings",
       signOut: "Sign out",
       signOutConfirmTitle: "Sign out?",
-      signOutConfirmBody: "You will need to sign in again with your phone number.",
+      signOutConfirmBody:
+        "This device will be removed. Signing back in needs a new OTP sent to your phone.",
       cancel: "Cancel",
     },
     relationship: {
@@ -1794,7 +1795,8 @@ const navigation = {
       settings: "সেটিংস",
       signOut: "সাইন আউট",
       signOutConfirmTitle: "সাইন আউট করবেন?",
-      signOutConfirmBody: "আবার ফোন নম্বর দিয়ে সাইন ইন করতে হবে।",
+      signOutConfirmBody:
+        "এই ডিভাইস মুছে যাবে। আবার সাইন ইন করতে ফোনে নতুন OTP লাগবে।",
       cancel: "বাতিল",
     },
     relationship: {

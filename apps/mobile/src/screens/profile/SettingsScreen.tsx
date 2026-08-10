@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { AppLockSettingsCard } from "../../components/AppLockSettingsCard";
 import { PaidMembershipGate } from "../../components/PaidMembershipGate";
 import { ProfileAccountStatusPanel } from "../../components/ProfileAccountStatusPanel";
 import { ProfilePausedBanner } from "../../components/ProfilePausedBanner";
-import { tMembership, tNavigation, tProfileHome, tProfileScreen, tSettingsScreen } from "../../i18n/messages";
+import { tAppLock } from "../../i18n/app-lock";
+import { tMembership, tProfileHome, tProfileScreen, tSettingsScreen } from "../../i18n/messages";
 import { useIsPaidMember } from "../../hooks/use-is-paid-member";
 import { useMemberVerificationState } from "../../hooks/use-member-verification-state";
 import { confirmSignOut } from "../../lib/confirm-sign-out";
@@ -13,6 +15,7 @@ import {
   syncPushTokenRegistration,
   type PushSetupStatus,
 } from "../../services/push-notifications";
+import { useAppLockStore } from "../../store/appLockStore";
 import { useAuthStore } from "../../store/authStore";
 import { useLocaleStore } from "../../store/localeStore";
 import type { AppLocale } from "../../lib/locale";
@@ -37,6 +40,9 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   const locale = useLocaleStore((s) => s.locale);
   const setLocale = useLocaleStore((s) => s.setLocale);
   const copy = tSettingsScreen(locale);
+  const lockCopy = tAppLock(locale);
+  const lockEnabled = useAppLockStore((s) => s.enabled);
+  const lockNow = useAppLockStore((s) => s.lockNow);
   const profileCopy = tProfileHome(locale);
   const languageCopy = tProfileScreen(locale);
   const membershipCopy = tMembership(locale);
@@ -179,11 +185,23 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
         </Pressable>
       </View>
 
+      <AppLockSettingsCard locale={locale} />
+
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>{copy.sessionTitle}</Text>
-        <Text style={styles.hint}>{copy.sessionHint}</Text>
+        {lockEnabled ? (
+          <>
+            <Text style={styles.hint}>{lockCopy.lockAppHint}</Text>
+            <Pressable style={styles.secondaryButton} onPress={() => lockNow()}>
+              <Text style={styles.secondaryButtonText}>{lockCopy.lockAppAction}</Text>
+            </Pressable>
+          </>
+        ) : null}
+        <Text style={[styles.hint, lockEnabled && styles.hintSpaced]}>
+          {lockCopy.signOutHint}
+        </Text>
         <Pressable style={styles.signOutButton} onPress={() => confirmSignOut(locale)}>
-          <Text style={styles.signOutText}>{tNavigation(locale).app.signOut}</Text>
+          <Text style={styles.signOutText}>{lockCopy.signOutTitle}</Text>
         </Pressable>
       </View>
     </ScrollView>
@@ -228,6 +246,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     color: colors.zinc600,
+  },
+  hintSpaced: {
+    marginTop: 18,
   },
   meta: {
     marginTop: 8,
