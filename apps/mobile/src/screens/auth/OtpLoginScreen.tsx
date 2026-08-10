@@ -15,7 +15,8 @@ import { LanguageToggle } from "../../components/LanguageToggle";
 import { tAuthLogin } from "../../i18n/messages";
 import { getApiErrorMessage } from "../../lib/api-error";
 import { isValidBangladeshPhone } from "../../lib/phone";
-import { sendOtp } from "../../services/auth";
+import { sendOtp, tryTrustedDeviceSignIn } from "../../services/auth";
+import { useAuthStore } from "../../store/authStore";
 import { useLocaleStore } from "../../store/localeStore";
 import { colors } from "../../theme/colors";
 import type { OtpLoginScreenProps } from "../../navigation/types";
@@ -30,6 +31,7 @@ function validatePhone(phone: string, copy: ReturnType<typeof tAuthLogin>): stri
 export default function OtpLoginScreen({ navigation }: OtpLoginScreenProps) {
   const locale = useLocaleStore((s) => s.locale);
   const copy = tAuthLogin(locale);
+  const setFromAuthResponse = useAuthStore((s) => s.setFromAuthResponse);
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +46,12 @@ export default function OtpLoginScreen({ navigation }: OtpLoginScreenProps) {
     setLoading(true);
     setError(null);
     try {
+      const trustedUser = await tryTrustedDeviceSignIn(phone.trim());
+      if (trustedUser) {
+        await setFromAuthResponse(trustedUser);
+        return;
+      }
+
       const result = await sendOtp(phone.trim());
       navigation.navigate("OtpVerify", {
         phone: result.phone,

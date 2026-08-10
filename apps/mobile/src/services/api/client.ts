@@ -1,5 +1,5 @@
 import { config } from "../../config/env";
-import { readApiError } from "../../lib/api-error";
+import { ApiError, readApiError } from "../../lib/api-error";
 import { sessionStorage } from "../session-storage";
 
 const BOOTSTRAP_TIMEOUT_MS = 8_000;
@@ -53,7 +53,7 @@ export async function apiRequest<T>(
       if (response.status === 401 && options.auth !== false) {
         await sessionStorage.clearAccessToken();
       }
-      throw new Error(await readApiError(response));
+      throw new ApiError(await readApiError(response), response.status);
     }
 
     if (response.status === 204) {
@@ -109,7 +109,7 @@ export async function apiUpload<T>(
       if (response.status === 401 && options.auth !== false) {
         await sessionStorage.clearAccessToken();
       }
-      throw new Error(await readApiError(response));
+      throw new ApiError(await readApiError(response), response.status);
     }
 
     return (await response.json()) as T;

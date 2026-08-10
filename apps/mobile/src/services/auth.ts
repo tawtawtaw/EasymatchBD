@@ -1,3 +1,5 @@
+import { normalizeBangladeshPhone } from "@easymatch/shared";
+import { isAuthRejection } from "../lib/api-error";
 import { isValidBangladeshPhone } from "../lib/phone";
 import { apiRequest, BOOTSTRAP_API_TIMEOUT_MS } from "./api/client";
 import { dedupeRequest, invalidateDedupeCache } from "./api/dedupe";
@@ -95,6 +97,28 @@ export async function restoreDeviceSession(phone: string, deviceToken: string) {
   return result;
 }
 
+/** Reuses a still-valid trusted device for this number so sign-in costs no SMS. */
+export async function tryTrustedDeviceSignIn(rawPhone: string): Promise<AuthUser | null> {
+  const device = await sessionStorage.getDeviceSession();
+  if (!device) return null;
+
+  if (
+    normalizeBangladeshPhone(device.phone) !== normalizeBangladeshPhone(rawPhone)
+  ) {
+    return null;
+  }
+
+  try {
+    const restored = await restoreDeviceSession(device.phone, device.deviceToken);
+    return restored.user;
+  } catch (error) {
+    if (isAuthRejection(error)) {
+      await sessionStorage.clearDeviceSession();
+    }
+    return null;
+  }
+}
+
 export async function revokeDeviceSession(deviceToken: string) {
   return apiRequest<{ revoked: boolean }>("/auth/device/revoke", {
     method: "POST",
@@ -164,8 +188,10 @@ export async function bootstrapAuth(): Promise<
     try {
       const [session, user] = await Promise.all([getSession(), getMe(true)]);
       return { status: "authenticated", user, session };
-    } catch {
-      await sessionStorage.clearAccessToken();
+    } catch (error) {
+      if (isAuthRejection(error)) {
+        await sessionStorage.clearAccessToken();
+      }
     }
   }
 
@@ -175,8 +201,12 @@ export async function bootstrapAuth(): Promise<
       const restored = await restoreDeviceSession(device.phone, device.deviceToken);
       const session = await getSession();
       return { status: "authenticated", user: restored.user, session };
-    } catch {
-      await sessionStorage.clearDeviceSession();
+    } catch (error) {
+      // Discarding a live trusted device costs the member an SMS on next launch,
+      // so only drop it when the server actually rejected it.
+      if (isAuthRejection(error)) {
+        await sessionStorage.clearDeviceSession();
+      }
     }
   }
 

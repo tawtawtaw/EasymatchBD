@@ -51,18 +51,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ user: null, session: null });
       }
     } catch {
-      const token = await sessionStorage.getAccessToken();
-      if (!token) {
-        await AuthService.signOut();
-      }
+      // A slow network or an API hiccup must not revoke the trusted device;
+      // bootstrapAuth already drops credentials the server actually rejected.
       set({ user: null, session: null });
     } finally {
       set({ isBootstrapping: false });
     }
   },
 
+  // "Skip" only abandons a stalled launch check, so the trusted device is kept
+  // and the next launch can restore the session without another OTP.
   skipBootstrap: async () => {
-    await AuthService.signOut();
     await useLocaleStore.getState().resetToDefaultLocale();
     set({ user: null, session: null, isBootstrapping: false });
   },

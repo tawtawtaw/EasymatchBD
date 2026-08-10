@@ -1,3 +1,18 @@
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
+/** True only when the server rejected the credential, never for timeouts or 5xx. */
+export function isAuthRejection(error: unknown): boolean {
+  return error instanceof ApiError && (error.status === 401 || error.status === 403);
+}
+
 export function getApiErrorMessage(error: unknown, fallback = "Something went wrong"): string {
   if (error instanceof Error && error.message) {
     return error.message;
