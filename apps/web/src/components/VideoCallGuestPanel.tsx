@@ -5,6 +5,10 @@ import { useTranslations } from "next-intl";
 import { AUTH_TOKEN_KEY } from "@/lib/api";
 import { MAX_VIDEO_CALL_GUESTS_PER_SIDE, VIDEO_CALL_GUEST_RELATIONS } from "@easymatch/shared";
 import {
+  isNativeVideoCallShell,
+  shareViaNativeShell,
+} from "@/lib/mobile-video-call";
+import {
   approveVideoCallGuest,
   declineVideoCallGuest,
   inviteVideoCallGuest,
@@ -145,6 +149,10 @@ export function VideoCallGuestPanel({
 
   async function copyInviteLink(guest: VideoCallGuestItem) {
     if (!guest.inviteUrl) return;
+    // The WebView has no dependable clipboard, so hand off to the share sheet.
+    if (isNativeVideoCallShell() && shareViaNativeShell(guest.inviteUrl)) {
+      return;
+    }
     try {
       await navigator.clipboard.writeText(guest.inviteUrl);
       setCopiedId(guest.id);
@@ -291,7 +299,11 @@ export function VideoCallGuestPanel({
                       onClick={() => void copyInviteLink(guest)}
                       className="rounded border border-zinc-500 px-2 py-1 text-xs hover:bg-zinc-700"
                     >
-                      {copiedId === guest.id ? t("copied") : t("copyLink")}
+                      {copiedId === guest.id
+                        ? t("copied")
+                        : isNativeVideoCallShell()
+                          ? t("shareLink")
+                          : t("copyLink")}
                     </button>
                   ) : null}
                 </div>

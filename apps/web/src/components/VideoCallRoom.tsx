@@ -72,6 +72,7 @@ export function VideoCallRoom({
   const [ending, setEnding] = useState(false);
   const [startingScheduled, setStartingScheduled] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
+  const [guestSheetOpen, setGuestSheetOpen] = useState(false);
   const [livekitUrl, setLivekitUrl] = useState<string | null>(null);
   const [livekitToken, setLivekitToken] = useState<string | null>(null);
   const [livekitConfigured, setLivekitConfigured] = useState<boolean | null>(
@@ -1016,13 +1017,41 @@ export function VideoCallRoom({
               className="relative flex min-h-[min(70dvh,32rem)] flex-1 flex-col bg-black"
             />
           )}
-          <VideoCallGuestPanel
-            callId={callId}
-            callActive
-            livekitConfigured={livekitConfigured}
-            compactMobile={embeddedMobile}
-            enabled={!nativeShell}
-          />
+          {nativeShell ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setGuestSheetOpen(true)}
+                className="easymatch-native-guest-toggle"
+              >
+                {t("guests.openPanel")}
+              </button>
+              {guestSheetOpen ? (
+                <div className="easymatch-native-guest-sheet">
+                  <button
+                    type="button"
+                    onClick={() => setGuestSheetOpen(false)}
+                    className="easymatch-native-guest-sheet__close"
+                  >
+                    {t("guests.closePanel")}
+                  </button>
+                  <VideoCallGuestPanel
+                    callId={callId}
+                    callActive
+                    livekitConfigured={livekitConfigured}
+                    compactMobile
+                  />
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <VideoCallGuestPanel
+              callId={callId}
+              callActive
+              livekitConfigured={livekitConfigured}
+              compactMobile={embeddedMobile}
+            />
+          )}
         </div>
       ) : (
         <>

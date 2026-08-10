@@ -97,8 +97,7 @@ export function VideoCallAdaptiveLayout({
     participantCount >= 3 ? "speaker" : "gallery",
   );
 
-  const effectiveMode =
-    embeddedMobile || participantCount <= 2 ? "gallery" : mode;
+  const effectiveMode = participantCount <= 2 ? "gallery" : mode;
 
   const dominantTrack = useMemo(() => {
     const speaking = participants
@@ -132,22 +131,21 @@ export function VideoCallAdaptiveLayout({
     return tracks.filter((track) => trackKey(track) !== dominantKey);
   }, [dominantTrack, tracks]);
 
-  const showLayoutToggle = participantCount >= 3 && !embeddedMobile;
+  const showLayoutToggle = participantCount >= 3;
+  // The stacked layout is the mobile take on gallery; other modes keep their own.
   const useNativeStack =
-    embeddedMobile && (nativeShell || isNativeVideoCallShell());
+    embeddedMobile &&
+    (nativeShell || isNativeVideoCallShell()) &&
+    effectiveMode === "gallery";
 
+  // Own video last so the people you are talking to sit at the top.
   const orderedTracks = useMemo(() => {
-    const base = useNativeStack
-      ? [...tracks].sort((a, b) => {
-          const aLocal = a.participant?.isLocal ? 1 : 0;
-          const bLocal = b.participant?.isLocal ? 1 : 0;
-          return aLocal - bLocal;
-        })
-      : tracks;
-    if (useNativeStack) {
-      return base.slice(0, 2);
-    }
-    return base;
+    if (!useNativeStack) return tracks;
+    return [...tracks].sort((a, b) => {
+      const aLocal = a.participant?.isLocal ? 1 : 0;
+      const bLocal = b.participant?.isLocal ? 1 : 0;
+      return aLocal - bLocal;
+    });
   }, [tracks, useNativeStack]);
 
   return (
@@ -157,7 +155,7 @@ export function VideoCallAdaptiveLayout({
       }`}
     >
       {showLayoutToggle ? (
-        <div className="mb-2 flex flex-wrap gap-2 px-1">
+        <div className="easymatch-layout-toggle mb-2 flex shrink-0 flex-wrap gap-2 px-1">
           {(["speaker", "gallery", "compact"] as const).map((option) => (
             <button
               key={option}

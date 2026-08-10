@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   PermissionsAndroid,
   Platform,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -102,9 +103,15 @@ export const VideoCallWebView = forwardRef<unknown, Props>(
         snapshot?: unknown;
         level?: string;
         text?: string;
+        url?: string;
+        title?: string;
       };
       if (data.type === "video_call" && data.status) {
         onCallStateChange?.(data.status);
+        return;
+      }
+      if (data.type === "video_call_share" && data.url) {
+        void Share.share({ message: data.url, title: data.title });
         return;
       }
       if (__DEV__ && data.type === "video_call_debug") {

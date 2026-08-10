@@ -42,6 +42,19 @@ export function notifyMobileVideoCallMediaState(
   );
 }
 
+/** Hands a guest link to the native share sheet. Returns false on the web. */
+export function shareViaNativeShell(url: string, title?: string): boolean {
+  const bridge = (
+    window as Window & {
+      ReactNativeWebView?: { postMessage: (message: string) => void };
+    }
+  ).ReactNativeWebView;
+  if (!bridge) return false;
+
+  bridge.postMessage(JSON.stringify({ type: "video_call_share", url, title }));
+  return true;
+}
+
 export function isNativeVideoCallShell(): boolean {
   if (typeof window === "undefined") return false;
   return (
