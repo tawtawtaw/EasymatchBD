@@ -9,7 +9,9 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { tAppLock } from "../i18n/app-lock";
+import { tVideoCalls } from "../i18n/video-calls";
 import { useActiveRouteName } from "../navigation/active-route";
+import { openIncomingVideoCall } from "../services/incoming-call-navigation";
 import {
   authenticateWithBiometrics,
   getLockoutRemainingMs,
@@ -19,6 +21,7 @@ import {
 import { useAppLockStore } from "../store/appLockStore";
 import { useAuthStore } from "../store/authStore";
 import { useLocaleStore } from "../store/localeStore";
+import { useMemberAlertsStore } from "../store/memberAlertsStore";
 import { colors } from "../theme/colors";
 
 /** Answering a call must not require unlocking first, the way phones behave. */
@@ -27,6 +30,7 @@ const LOCK_EXEMPT_ROUTES = new Set(["VideoCallRoom"]);
 export function AppLockGate() {
   const locale = useLocaleStore((s) => s.locale);
   const copy = tAppLock(locale);
+  const callCopy = tVideoCalls(locale);
   const signedIn = useAuthStore((s) => Boolean(s.user));
   const enabled = useAppLockStore((s) => s.enabled);
   const isLocked = useAppLockStore((s) => s.isLocked);
@@ -39,7 +43,17 @@ export function AppLockGate() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [lockoutSeconds, setLockoutSeconds] = useState(0);
+  const [answering, setAnswering] = useState(false);
   const biometricAskedFor = useRef(false);
+
+  // A locked phone still shows and answers calls; unlocking first would mean
+  // missing them, since the in-app banner sits behind this overlay.
+  const callAlert = useMemberAlertsStore((s) => s.incomingCallAlert);
+  const isCallSuppressed = useMemberAlertsStore((s) => s.isCallSuppressed);
+  const incomingCall =
+    callAlert?.kind === "incoming" && !isCallSuppressed(callAlert.call.id)
+      ? callAlert
+      : null;
 
   const visible =
     signedIn && enabled && isLocked && !LOCK_EXEMPT_ROUTES.has(routeName ?? "");
@@ -83,6 +97,22 @@ export function AppLockGate() {
     return () => clearInterval(timer);
   }, [lockoutSeconds]);
 
+  async function handleAnswer() {
+    if (!incomingCall || answering) return;
+
+    setAnswering(true);
+    try {
+      await openIncomingVideoCall({
+        connectionId: incomingCall.call.connectionId,
+        callId: incomingCall.call.id,
+        memberName: incomingCall.partnerName?.trim() || callCopy.unknownMember,
+        autoJoin: true,
+      });
+    } finally {
+      setAnswering(false);
+    }
+  }
+
   async function handleUnlock() {
     if (busy || lockoutSeconds > 0) return;
 
@@ -119,10 +149,29 @@ export function AppLockGate() {
 
   const biometricLabel =
     biometricKind === "face" ? copy.useBiometricFace : copy.useBiometric;
+  const ringingPartner =
+    incomingCall?.partnerName?.trim() || callCopy.unknownMember;
 
   return (
     <View style={styles.overlay}>
       <SafeAreaView style={styles.safe}>
+        {incomingCall ? (
+          <View style={styles.callCard}>
+            <Text style={styles.callTitle}>
+              {callCopy.alertsIncoming.replace("{partner}", ringingPartner)}
+            </Text>
+            <Pressable
+              style={[styles.answerButton, answering && styles.buttonDisabled]}
+              disabled={answering}
+              onPress={() => void handleAnswer()}
+            >
+              <Text style={styles.answerButtonText}>
+                {answering ? callCopy.joiningCall : callCopy.answer}
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
+
         <View style={styles.card}>
           <Text style={styles.title}>{copy.lockTitle}</Text>
           <Text style={styles.subtitle}>{copy.lockSubtitle}</Text>
@@ -200,6 +249,29 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.rose100,
     padding: 20,
+  },
+  callCard: {
+    marginBottom: 16,
+    backgroundColor: colors.rose800,
+    borderRadius: 20,
+    padding: 20,
+  },
+  callTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: colors.white,
+  },
+  answerButton: {
+    marginTop: 14,
+    borderRadius: 999,
+    backgroundColor: colors.white,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  answerButtonText: {
+    color: colors.rose800,
+    fontSize: 16,
+    fontWeight: "700",
   },
   title: {
     fontSize: 22,

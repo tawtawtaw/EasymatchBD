@@ -31,10 +31,12 @@ export function IncomingCallBanner() {
   useEffect(() => {
     if (alert?.kind !== "incoming" || suppressed) {
       lastRungCallId.current = null;
+      Vibration.cancel();
       void stopIncomingCallRing();
       return;
     }
     if (routeName === "VideoCallRoom") {
+      Vibration.cancel();
       void stopIncomingCallRing();
       return;
     }
@@ -42,9 +44,11 @@ export function IncomingCallBanner() {
       return;
     }
     lastRungCallId.current = alert.call.id;
-    Vibration.vibrate([0, 700, 200, 700, 200, 700, 200, 900]);
+    // Repeat alongside the looping ringtone rather than buzzing once.
+    Vibration.vibrate([0, 700, 200, 700, 200, 700, 200, 900], true);
     void startIncomingCallRing(alert.call.id);
     return () => {
+      Vibration.cancel();
       void stopIncomingCallRing();
     };
   }, [alert, routeName, suppressed]);
@@ -92,6 +96,7 @@ export function IncomingCallBanner() {
           })
             .then((opened) => {
               if (opened) {
+                Vibration.cancel();
                 void stopIncomingCallRing();
                 dismissIncomingCall();
                 return;

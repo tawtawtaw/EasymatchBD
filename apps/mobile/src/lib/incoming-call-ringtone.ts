@@ -1,48 +1,82 @@
-import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
+import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from "expo-audio";
 
-const INCOMING_CALL_CHANNEL = "incoming_calls";
-const RING_INTERVAL_MS = 1800;
+const RINGTONE = require("../../assets/sounds/incoming-call.wav");
 
-let ringTimer: ReturnType<typeof setInterval> | null = null;
+let player: AudioPlayer | null = null;
 let activeCallId: string | null = null;
 
-async function playRingPulse() {
-  await Notifications.scheduleNotificationAsync({
-    content: {
-      title: "Incoming video call",
-      body: "Tap to answer",
-      sound: "default",
-      priority: Notifications.AndroidNotificationPriority.MAX,
-      ...(Platform.OS === "android"
-        ? { channelId: INCOMING_CALL_CHANNEL }
-        : {}),
-    },
-    trigger: null,
-  });
+function ensurePlayer(): AudioPlayer {
+  if (!player) {
+    player = createAudioPlayer(RINGTONE);
+    player.loop = true;
+  }
+  return player;
 }
 
 export async function startIncomingCallRing(callId: string) {
-  if (activeCallId === callId && ringTimer) {
+  if (activeCallId === callId && player?.playing) {
     return;
   }
-  await stopIncomingCallRing();
+
   activeCallId = callId;
-  await playRingPulse();
-  ringTimer = setInterval(() => {
-    void playRingPulse();
-  }, RING_INTERVAL_MS);
+
+  try {
+    // Ring even when the handset switch is silenced, and duck other audio the
+    // way a real incoming call would.
+    await setAudioModeAsync({
+      playsInSilentMode: true,
+      shouldPlayInBackground: false,
+      interruptionMode: "doNotMix",
+    });
+  } catch {
+    // A failed audio mode should not stop us from trying to ring.
+  }
+
+  try {
+    const current = ensurePlayer();
+    current.volume = 1;
+    await current.seekTo(0);
+    current.play();
+  } catch {
+    // Leave activeCallId set so stopIncomingCallRing still tidies up.
+  }
 }
 
 export async function stopIncomingCallRing() {
+  const callId = activeCallId;
   activeCallId = null;
-  if (ringTimer) {
-    clearInterval(ringTimer);
-    ringTimer = null;
-  }
+
   try {
-    await Notifications.dismissAllNotificationsAsync();
+    player?.pause();
+    await player?.seekTo(0);
   } catch {
-    /* ignore */
+    // Ignore; the player is torn down on the next start if it is wedged.
+  }
+
+  if (callId) {
+    await dismissCallNotifications(callId);
+  }
+}
+
+/**
+ * Clears only this call's tray entries. The previous implementation dismissed
+ * every notification, wiping unread messages and interests along with it.
+ */
+async function dismissCallNotifications(callId: string) {
+  try {
+    const presented = await Notifications.getPresentedNotificationsAsync();
+    await Promise.all(
+      presented
+        .filter((item) => {
+          const data = item.request.content.data as Record<string, unknown>;
+          return data?.type === "call" && data?.callId === callId;
+        })
+        .map((item) =>
+          Notifications.dismissNotificationAsync(item.request.identifier),
+        ),
+    );
+  } catch {
+    // Tray access can fail while the app is backgrounded; not worth surfacing.
   }
 }
