@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import type { NavigationState, PartialState } from "@react-navigation/native";
-import { navigationRef } from "./navigationRef";
 
 type NavState = NavigationState | PartialState<NavigationState>;
 
@@ -13,19 +12,34 @@ export function getDeepestRouteName(state: NavState | undefined): string | undef
   return route.name;
 }
 
+let currentRouteName: string | undefined;
+const subscribers = new Set<() => void>();
+
+/**
+ * Fed by NavigationContainer itself rather than by a listener on the container
+ * ref: a ref listener registered before the container mounts only survives on
+ * exact timing, which silently broke consumers rendered outside the container.
+ */
+export function publishActiveRoute(state: NavState | undefined) {
+  const next = getDeepestRouteName(state);
+  if (next === currentRouteName) return;
+  currentRouteName = next;
+  for (const notify of subscribers) notify();
+}
+
+function subscribe(onChange: () => void) {
+  subscribers.add(onChange);
+  return () => {
+    subscribers.delete(onChange);
+  };
+}
+
 export function useActiveRouteName() {
-  const [routeName, setRouteName] = useState<string | undefined>();
-
-  useEffect(() => {
-    const sync = () => {
-      if (!navigationRef.isReady()) return;
-      setRouteName(getDeepestRouteName(navigationRef.getRootState()));
-    };
-    sync();
-    return navigationRef.addListener("state", sync);
-  }, []);
-
-  return routeName;
+  return useSyncExternalStore(
+    subscribe,
+    () => currentRouteName,
+    () => currentRouteName,
+  );
 }
 
 /** Screens with a bottom composer or full-screen controls — hide global FAB. */

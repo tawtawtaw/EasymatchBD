@@ -69,7 +69,11 @@ type MemberAlertsState = {
   startPolling: (userId: string) => void;
   stopPolling: () => void;
   refresh: () => Promise<void>;
-  primeIncomingCall: (connectionId: string, callId: string) => void;
+  primeIncomingCall: (
+    connectionId: string,
+    callId: string,
+    partnerName?: string | null,
+  ) => void;
   dismissIncomingCall: () => void;
   markCallHandled: (callId: string) => void;
   isCallSuppressed: (callId: string) => boolean;
@@ -179,16 +183,22 @@ export const useMemberAlertsStore = create<MemberAlertsState>((set, get) => ({
     await refreshSummary(set, true, get);
   },
 
-  primeIncomingCall: (connectionId, callId) => {
+  primeIncomingCall: (connectionId, callId, partnerName) => {
     if (get().isCallSuppressed(callId)) {
       return;
     }
     const now = new Date().toISOString();
+    const existing = get().incomingCallAlert;
+    // Never trade a name we already resolved for the anonymous placeholder.
+    const knownName =
+      partnerName?.trim() ||
+      (existing?.call.id === callId ? existing.partnerName : null) ||
+      null;
     set({
       incomingCalls: Math.max(1, get().incomingCalls),
       incomingCallAlert: {
         kind: "incoming",
-        partnerName: null,
+        partnerName: knownName,
         call: {
           id: callId,
           connectionId,

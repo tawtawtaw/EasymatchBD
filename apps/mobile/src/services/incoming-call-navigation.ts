@@ -32,6 +32,12 @@ export function hasPendingIncomingCallNavigation(): boolean {
 }
 
 export async function restoreSessionForIncomingCall(): Promise<boolean> {
+  // Someone already signed in must never wait on a network round-trip to answer
+  // a call that is ringing right now; a slow or failing /me would drop the call.
+  if (useAuthStore.getState().user) {
+    return true;
+  }
+
   const token = await trySilentSessionRestore();
   if (!token) {
     return false;
@@ -47,7 +53,7 @@ export async function restoreSessionForIncomingCall(): Promise<boolean> {
 function primeIncomingCallAlert(params: IncomingCallNavigationParams) {
   useMemberAlertsStore
     .getState()
-    .primeIncomingCall(params.connectionId, params.callId);
+    .primeIncomingCall(params.connectionId, params.callId, params.memberName);
 }
 
 function pushCallScreen(params: IncomingCallNavigationParams) {

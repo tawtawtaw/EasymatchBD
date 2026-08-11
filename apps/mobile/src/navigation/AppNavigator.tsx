@@ -16,6 +16,7 @@ import { enablePushNotificationsOnLogin } from "../services/push-notifications";
 import { flushPendingIncomingCallNavigation, hasPendingIncomingCallNavigation, subscribeIncomingCallNavigation } from "../services/incoming-call-navigation";
 import { tNavigation } from "../i18n/messages";
 import { colors } from "../theme/colors";
+import { publishActiveRoute } from "./active-route";
 import { AuthNavigator } from "./AuthNavigator";
 import { MainTabs } from "./MainTabs";
 import { navigationRef } from "./navigationRef";
@@ -128,8 +129,10 @@ export function AppNavigator() {
     <NavigationContainer
       ref={navigationRef}
       onReady={() => {
+        publishActiveRoute(navigationRef.getRootState());
         flushPendingIncomingCallNavigation();
       }}
+      onStateChange={(state) => publishActiveRoute(state)}
     >
       <PushNotificationHost />
       <Stack.Navigator screenOptions={{ headerShown: false }}>

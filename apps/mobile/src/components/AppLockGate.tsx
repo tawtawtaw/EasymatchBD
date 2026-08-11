@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -11,6 +11,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { tAppLock } from "../i18n/app-lock";
 import { tVideoCalls } from "../i18n/video-calls";
 import { useActiveRouteName } from "../navigation/active-route";
+import {
+  getActiveVideoCallId,
+  subscribeActiveVideoCall,
+} from "../services/active-call-session";
+import { declineIncomingCall } from "../services/incoming-call-actions";
 import { openIncomingVideoCall } from "../services/incoming-call-navigation";
 import {
   authenticateWithBiometrics,
@@ -44,6 +49,8 @@ export function AppLockGate() {
   const [busy, setBusy] = useState(false);
   const [lockoutSeconds, setLockoutSeconds] = useState(0);
   const [answering, setAnswering] = useState(false);
+  const [declining, setDeclining] = useState(false);
+  const [callError, setCallError] = useState<string | null>(null);
   const biometricAskedFor = useRef(false);
 
   // A locked phone still shows and answers calls; unlocking first would mean
@@ -55,8 +62,20 @@ export function AppLockGate() {
       ? callAlert
       : null;
 
+  // A mounted call screen is the ground truth for "a call is on screen", and it
+  // does not depend on navigation state reaching this component in time.
+  const activeCallId = useSyncExternalStore(
+    subscribeActiveVideoCall,
+    getActiveVideoCallId,
+    getActiveVideoCallId,
+  );
+
   const visible =
-    signedIn && enabled && isLocked && !LOCK_EXEMPT_ROUTES.has(routeName ?? "");
+    signedIn &&
+    enabled &&
+    isLocked &&
+    activeCallId === null &&
+    !LOCK_EXEMPT_ROUTES.has(routeName ?? "");
 
   const runBiometric = useCallback(async () => {
     const ok = await authenticateWithBiometrics(
@@ -101,15 +120,34 @@ export function AppLockGate() {
     if (!incomingCall || answering) return;
 
     setAnswering(true);
+    setCallError(null);
     try {
-      await openIncomingVideoCall({
+      const opened = await openIncomingVideoCall({
         connectionId: incomingCall.call.connectionId,
         callId: incomingCall.call.id,
         memberName: incomingCall.partnerName?.trim() || callCopy.unknownMember,
         autoJoin: true,
       });
+      // Without this the gate silently keeps showing the PIN form, which reads
+      // as "answering the call requires unlocking first".
+      if (!opened) {
+        setCallError(callCopy.signInRequired);
+      }
+    } catch {
+      setCallError(callCopy.actionsError);
     } finally {
       setAnswering(false);
+    }
+  }
+
+  async function handleDecline() {
+    if (!incomingCall || declining) return;
+
+    setDeclining(true);
+    try {
+      await declineIncomingCall(incomingCall.call.id);
+    } finally {
+      setDeclining(false);
     }
   }
 
@@ -160,15 +198,29 @@ export function AppLockGate() {
             <Text style={styles.callTitle}>
               {callCopy.alertsIncoming.replace("{partner}", ringingPartner)}
             </Text>
-            <Pressable
-              style={[styles.answerButton, answering && styles.buttonDisabled]}
-              disabled={answering}
-              onPress={() => void handleAnswer()}
-            >
-              <Text style={styles.answerButtonText}>
-                {answering ? callCopy.joiningCall : callCopy.answer}
-              </Text>
-            </Pressable>
+            {callError ? (
+              <Text style={styles.callError}>{callError}</Text>
+            ) : null}
+            <View style={styles.callActions}>
+              <Pressable
+                style={[styles.declineButton, declining && styles.buttonDisabled]}
+                disabled={answering || declining}
+                onPress={() => void handleDecline()}
+              >
+                <Text style={styles.declineButtonText}>
+                  {declining ? callCopy.decliningCall : callCopy.declineCall}
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.answerButton, answering && styles.buttonDisabled]}
+                disabled={answering || declining}
+                onPress={() => void handleAnswer()}
+              >
+                <Text style={styles.answerButtonText}>
+                  {answering ? callCopy.joiningCall : callCopy.answer}
+                </Text>
+              </Pressable>
+            </View>
           </View>
         ) : null}
 
@@ -261,8 +313,18 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: colors.white,
   },
-  answerButton: {
+  callError: {
+    marginTop: 8,
+    color: colors.rose100,
+    fontSize: 13,
+  },
+  callActions: {
     marginTop: 14,
+    flexDirection: "row",
+    gap: 10,
+  },
+  answerButton: {
+    flex: 1,
     borderRadius: 999,
     backgroundColor: colors.white,
     paddingVertical: 12,
@@ -270,6 +332,19 @@ const styles = StyleSheet.create({
   },
   answerButtonText: {
     color: colors.rose800,
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  declineButton: {
+    flex: 1,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.rose100,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  declineButtonText: {
+    color: colors.rose100,
     fontSize: 16,
     fontWeight: "700",
   },
