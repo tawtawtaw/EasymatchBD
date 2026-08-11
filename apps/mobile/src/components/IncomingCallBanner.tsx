@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { tVideoCalls } from "../i18n/video-calls";
@@ -8,11 +8,14 @@ import {
   stopIncomingCallRing,
 } from "../lib/incoming-call-ringtone";
 import { useActiveRouteName } from "../navigation/active-route";
+import { declineIncomingCall } from "../services/incoming-call-actions";
 import { openIncomingVideoCall } from "../services/incoming-call-navigation";
 import { isAndroidConnectionServiceEnabled } from "../services/android-incoming-call-telecom";
 import { useMemberAlertsStore } from "../store/memberAlertsStore";
 import { useLocaleStore } from "../store/localeStore";
 import { colors } from "../theme/colors";
+
+const RING_VIBRATION_PATTERN = [0, 700, 200, 700, 200, 700, 200, 900];
 
 export function IncomingCallBanner() {
   const locale = useLocaleStore((s) => s.locale);
@@ -23,35 +26,30 @@ export function IncomingCallBanner() {
   const routeName = useActiveRouteName();
   const insets = useSafeAreaInsets();
   const [joining, setJoining] = useState(false);
+  const [declining, setDeclining] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
-  const lastRungCallId = useRef<string | null>(null);
   const suppressed =
     alert?.call.id != null ? isCallSuppressed(alert.call.id) : false;
 
+  // Depends on the call id rather than the alert object: polling replaces that
+  // object every few seconds, and re-running the effect tore the ringtone down.
+  const ringingCallId =
+    alert?.kind === "incoming" && !suppressed && routeName !== "VideoCallRoom"
+      ? alert.call.id
+      : null;
+
   useEffect(() => {
-    if (alert?.kind !== "incoming" || suppressed) {
-      lastRungCallId.current = null;
-      Vibration.cancel();
-      void stopIncomingCallRing();
-      return;
-    }
-    if (routeName === "VideoCallRoom") {
-      Vibration.cancel();
-      void stopIncomingCallRing();
-      return;
-    }
-    if (alert.call.id === lastRungCallId.current) {
-      return;
-    }
-    lastRungCallId.current = alert.call.id;
+    if (!ringingCallId) return;
+
     // Repeat alongside the looping ringtone rather than buzzing once.
-    Vibration.vibrate([0, 700, 200, 700, 200, 700, 200, 900], true);
-    void startIncomingCallRing(alert.call.id);
+    Vibration.vibrate(RING_VIBRATION_PATTERN, true);
+    void startIncomingCallRing(ringingCallId);
+
     return () => {
       Vibration.cancel();
       void stopIncomingCallRing();
     };
-  }, [alert, routeName, suppressed]);
+  }, [ringingCallId]);
 
   if (!alert || alert.kind !== "incoming" || suppressed) {
     return null;
@@ -81,40 +79,57 @@ export function IncomingCallBanner() {
           </Text>
         ) : null}
       </View>
-      <Pressable
-        style={[styles.button, joining && styles.buttonDisabled]}
-        disabled={joining}
-        onPress={() => {
-          if (!alert) return;
-          setJoinError(null);
-          setJoining(true);
-          void openIncomingVideoCall({
-            connectionId: alert.call.connectionId,
-            callId: alert.call.id,
-            memberName: partner,
-            autoJoin: true,
-          })
-            .then((opened) => {
-              if (opened) {
-                Vibration.cancel();
-                void stopIncomingCallRing();
-                dismissIncomingCall();
-                return;
-              }
-              setJoinError(copy.signInRequired);
-            })
-            .catch((err) => {
-              setJoinError(getApiErrorMessage(err, copy.actionsError));
-            })
-            .finally(() => {
-              setJoining(false);
+      <View style={styles.actions}>
+        <Pressable
+          style={[styles.declineButton, declining && styles.buttonDisabled]}
+          disabled={joining || declining}
+          onPress={() => {
+            if (!alert) return;
+            setDeclining(true);
+            void declineIncomingCall(alert.call.id).finally(() => {
+              setDeclining(false);
             });
-        }}
-      >
-        <Text style={styles.buttonText}>
-          {joining ? copy.joiningCall : copy.answer}
-        </Text>
-      </Pressable>
+          }}
+        >
+          <Text style={styles.declineButtonText}>
+            {declining ? copy.decliningCall : copy.declineCall}
+          </Text>
+        </Pressable>
+        <Pressable
+          style={[styles.button, joining && styles.buttonDisabled]}
+          disabled={joining || declining}
+          onPress={() => {
+            if (!alert) return;
+            setJoinError(null);
+            setJoining(true);
+            void openIncomingVideoCall({
+              connectionId: alert.call.connectionId,
+              callId: alert.call.id,
+              memberName: partner,
+              autoJoin: true,
+            })
+              .then((opened) => {
+                if (opened) {
+                  Vibration.cancel();
+                  void stopIncomingCallRing();
+                  dismissIncomingCall();
+                  return;
+                }
+                setJoinError(copy.signInRequired);
+              })
+              .catch((err) => {
+                setJoinError(getApiErrorMessage(err, copy.actionsError));
+              })
+              .finally(() => {
+                setJoining(false);
+              });
+          }}
+        >
+          <Text style={styles.buttonText}>
+            {joining ? copy.joiningCall : copy.answer}
+          </Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -156,11 +171,28 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 2,
   },
+  actions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   button: {
     borderRadius: 999,
     backgroundColor: colors.white,
     paddingHorizontal: 14,
     paddingVertical: 8,
+  },
+  declineButton: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.rose100,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  declineButtonText: {
+    color: colors.rose100,
+    fontSize: 13,
+    fontWeight: "700",
   },
   buttonDisabled: {
     opacity: 0.7,
