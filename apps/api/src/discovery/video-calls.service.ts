@@ -222,7 +222,10 @@ export class VideoCallsService {
   ) {
     await this.requirePaid(userId);
     await this.profilePause.assertCanSendConnectionActions(userId);
-    const { otherUserId } = await this.getConnectionForUser(userId, connectionId);
+    const { connection, otherUserId } = await this.getConnectionForUser(
+      userId,
+      connectionId,
+    );
 
     const existingActive = await this.prisma.videoCall.findFirst({
       where: {
@@ -259,6 +262,13 @@ export class VideoCallsService {
     this.invalidateCallCaches(userId, connectionId, call.id, [otherUserId]);
 
     if (!parsedScheduled) {
+      // Carried in data only, never in the visible text, so a locked handset
+      // still shows nothing identifying while the app can name the caller
+      // immediately instead of waiting for the alerts poll.
+      const callerName = await this.resolveVisibleNameFor(
+        userId,
+        connection.privacyLevel,
+      );
       void this.pushNotifications.sendToUser(otherUserId, {
         title: 'Incoming video call',
         body: 'A connection is calling you — tap to answer',
@@ -268,11 +278,28 @@ export class VideoCallsService {
           type: 'call',
           connectionId,
           callId: call.id,
+          ...(callerName ? { callerName } : {}),
         },
       });
     }
 
     return serializeCall(call, userId);
+  }
+
+  private async resolveVisibleNameFor(userId: string, privacyLevel: number) {
+    const [profile, fullNameRule] = await Promise.all([
+      this.prisma.profile.findUnique({
+        where: { userId },
+        select: { fullName: true },
+      }),
+      this.privacyFields.getFullNameRule(),
+    ]);
+
+    return resolveVisibleFullName(
+      profile?.fullName ?? null,
+      privacyLevel,
+      fullNameRule,
+    );
   }
 
   async listCalls(

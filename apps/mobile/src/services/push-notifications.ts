@@ -159,10 +159,12 @@ function handleIncomingCallPush(data: Record<string, unknown>) {
     ) {
       return;
     }
-    useMemberAlertsStore.getState().primeIncomingCall(connectionId, callId);
+    const payload = parseAndroidCallPushData(data);
+    useMemberAlertsStore
+      .getState()
+      .primeIncomingCall(connectionId, callId, payload?.memberName);
     void useMemberAlertsStore.getState().refresh();
     if (Platform.OS === "android") {
-      const payload = parseAndroidCallPushData(data);
       if (payload) {
         void presentAndroidIncomingCallTelecom(payload);
       }
