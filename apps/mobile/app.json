@@ -79,7 +79,10 @@
         "expo-notifications",
         {
           "icon": "./assets/icon.png",
-          "color": "#881337"
+          "color": "#881337",
+          "sounds": [
+            "./assets/sounds/incoming_call_ring.wav"
+          ]
         }
       ],
       "expo-secure-store",

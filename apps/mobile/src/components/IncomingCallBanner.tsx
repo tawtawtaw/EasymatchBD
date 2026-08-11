@@ -1,5 +1,13 @@
 import { useEffect, useState } from "react";
-import { Platform, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
+import {
+  AppState,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  Vibration,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { tVideoCalls } from "../i18n/video-calls";
 import { getApiErrorMessage } from "../lib/api-error";
@@ -45,7 +53,16 @@ export function IncomingCallBanner() {
     Vibration.vibrate(RING_VIBRATION_PATTERN, true);
     void startIncomingCallRing(ringingCallId);
 
+    // Backgrounded, the notification channel rings and startIncomingCallRing
+    // deliberately does nothing, so take the ring over on the way back in.
+    const appState = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        void startIncomingCallRing(ringingCallId);
+      }
+    });
+
     return () => {
+      appState.remove();
       Vibration.cancel();
       void stopIncomingCallRing();
     };

@@ -1,4 +1,5 @@
 import type { RootStackParamList } from "../navigation/types";
+import { dismissCallNotifications } from "../lib/incoming-call-ringtone";
 import { navigationRef } from "../navigation/navigationRef";
 import { trySilentSessionRestore } from "./auth";
 import { useAuthStore } from "../store/authStore";
@@ -80,6 +81,9 @@ export async function openIncomingVideoCall(
   pendingIncomingCall = params;
   notifyIncomingCallNavigationListeners();
   primeIncomingCallAlert(params);
+  // Answering from the tray never reaches the banner, so silence the channel
+  // ringtone here rather than letting it run out the rest of its 32s.
+  void dismissCallNotifications(params.callId);
 
   const hasSession = await restoreSessionForIncomingCall();
   if (!hasSession) {

@@ -1,4 +1,5 @@
 import * as Notifications from "expo-notifications";
+import { AppState } from "react-native";
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from "expo-audio";
 
 const RINGTONE = require("../../assets/sounds/incoming-call.wav");
@@ -15,11 +16,21 @@ function ensurePlayer(): AudioPlayer {
 }
 
 export async function startIncomingCallRing(callId: string) {
+  // Backgrounded, the Android notification channel does the ringing. Playing
+  // here would be silent anyway, and the handoff below would cut the OS
+  // ringtone short.
+  if (AppState.currentState !== "active") {
+    return;
+  }
+
   if (activeCallId === callId && player?.playing) {
     return;
   }
 
   activeCallId = callId;
+
+  // Take over from the channel ringtone instead of ringing on top of it.
+  await dismissCallNotifications(callId);
 
   try {
     // Ring even when the handset switch is silenced, and duck other audio the
@@ -62,8 +73,11 @@ export async function stopIncomingCallRing() {
 /**
  * Clears only this call's tray entries. The previous implementation dismissed
  * every notification, wiping unread messages and interests along with it.
+ *
+ * Cancelling the notification also stops the channel ringtone, which is how
+ * answering silences a ring that started while the app was backgrounded.
  */
-async function dismissCallNotifications(callId: string) {
+export async function dismissCallNotifications(callId: string) {
   try {
     const presented = await Notifications.getPresentedNotificationsAsync();
     await Promise.all(

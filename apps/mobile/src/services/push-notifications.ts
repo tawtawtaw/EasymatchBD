@@ -67,6 +67,16 @@ Notifications.setNotificationHandler({
 /** Matches app.json / app.config.js — used when Constants is unavailable in dev. */
 const EAS_PROJECT_ID = "0980635d-027a-4d94-80ee-8320c084d15a";
 
+/**
+ * Android freezes a channel's sound the first time it sees the channel, and
+ * recreating a deleted channel restores the old settings, so moving calls onto
+ * the long custom ringtone needs a fresh id. Must stay in sync with
+ * PUSH_CHANNEL_CALLS in the API; pushes naming an unknown channel fall back to
+ * expo-notifications' generic channel, which rings with the default sound.
+ */
+const INCOMING_CALLS_CHANNEL_ID = "incoming_calls_v2";
+const LEGACY_INCOMING_CALLS_CHANNEL_ID = "incoming_calls";
+
 let lastPushTokenError: string | null = null;
 
 export function getLastPushTokenError() {
@@ -286,15 +296,34 @@ function navigateFromPushData(data: Record<string, unknown> | undefined) {
 async function ensureAndroidChannels() {
   if (Platform.OS !== "android") return;
 
-  await Notifications.setNotificationChannelAsync("incoming_calls", {
+  await Notifications.setNotificationChannelAsync(INCOMING_CALLS_CHANNEL_ID, {
     name: "Incoming video calls",
     importance: Notifications.AndroidImportance.MAX,
     vibrationPattern: [0, 500, 250, 500, 250, 500],
     lightColor: "#881337",
-    sound: "default",
+    // Resolved against res/raw, where the expo-notifications config plugin
+    // copies the asset. Android plays a channel sound once rather than looping
+    // it, so the file itself is 32s of ringing.
+    sound: "incoming_call_ring.wav",
+    audioAttributes: {
+      usage: Notifications.AndroidAudioUsage.NOTIFICATION_RINGTONE,
+      contentType: Notifications.AndroidAudioContentType.SONIFICATION,
+      flags: {
+        enforceAudibility: true,
+        requestHardwareAudioVideoSynchronization: false,
+      },
+    },
     bypassDnd: true,
     lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
   });
+
+  try {
+    await Notifications.deleteNotificationChannelAsync(
+      LEGACY_INCOMING_CALLS_CHANNEL_ID,
+    );
+  } catch {
+    // Only cosmetic — a leftover channel in Settings is not worth failing over.
+  }
 
   await Notifications.setNotificationChannelAsync("messages", {
     name: "Chat messages",
