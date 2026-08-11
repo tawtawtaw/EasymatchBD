@@ -7,10 +7,24 @@ import { useCallback, useEffect, useState } from "react";
 import {
   enableCameraWithRetry,
   enableMicrophoneWithRetry,
+  isMediaTimeoutError,
   kickMediaUserGesture,
   setNativeCallTrackMuted,
 } from "@/lib/video-call-media";
 import { notifyMobileVideoCallMediaState } from "@/lib/mobile-video-call";
+
+/**
+ * The timeout is raised by our own WebView guard and its message is debug
+ * wording, never something to put in front of someone mid-call.
+ */
+function toDeviceError(
+  error: unknown,
+  timeoutMessage: string,
+  fallbackMessage: string,
+): Error {
+  if (isMediaTimeoutError(error)) return new Error(timeoutMessage);
+  return error instanceof Error ? error : new Error(fallbackMessage);
+}
 
 type VideoCallMediaControlsProps = {
   compact?: boolean;
@@ -88,9 +102,10 @@ export function VideoCallMediaControls({
           await localParticipant.setMicrophoneEnabled(false);
         }
       } catch (error) {
-        const err =
-          error instanceof Error ? error : new Error(t("micEnableFailed"));
-        onDeviceError?.(Track.Source.Microphone, err);
+        onDeviceError?.(
+          Track.Source.Microphone,
+          toDeviceError(error, t("micTimeout"), t("micEnableFailed")),
+        );
       } finally {
         setMicPending(false);
         syncNativeMedia();
@@ -131,9 +146,10 @@ export function VideoCallMediaControls({
           await localParticipant.setCameraEnabled(false);
         }
       } catch (error) {
-        const err =
-          error instanceof Error ? error : new Error(t("cameraEnableFailed"));
-        onDeviceError?.(Track.Source.Camera, err);
+        onDeviceError?.(
+          Track.Source.Camera,
+          toDeviceError(error, t("cameraTimeout"), t("cameraEnableFailed")),
+        );
       } finally {
         setCameraPending(false);
         syncNativeMedia();

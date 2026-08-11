@@ -28,28 +28,37 @@ function delay(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
+type MediaKind = "microphone" | "camera";
+
 /**
  * getUserMedia can hang forever in the Android WebView instead of rejecting,
  * which would otherwise wedge the caller's pending state. "timeout" is a
  * retryable message, so a stalled attempt is simply retried.
+ *
+ * Camera capture gets the longer budget: bringing the sensor up from cold on
+ * low-end Android regularly outlasts what a microphone would ever need, and
+ * cutting that short reports a failure for a device that was only slow.
  */
-const MEDIA_ENABLE_TIMEOUT_MS = 8000;
+const MEDIA_ENABLE_TIMEOUT_MS: Record<MediaKind, number> = {
+  microphone: 8000,
+  camera: 15000,
+};
 
 export function isMediaTimeoutError(error: unknown): boolean {
   return error instanceof Error && error.name === "MediaTimeoutError";
 }
 
-function withMediaTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
+function withMediaTimeout<T>(promise: Promise<T>, kind: MediaKind): Promise<T> {
   // A browser may be showing its own permission prompt, which the user can
   // take any amount of time to answer, so only bound this inside the WebView.
   if (!isNativeVideoCallShell()) return promise;
 
   return new Promise<T>((resolve, reject) => {
     const timer = window.setTimeout(() => {
-      const error = new Error(`${label} timeout`);
+      const error = new Error(`${kind} timeout`);
       error.name = "MediaTimeoutError";
       reject(error);
-    }, MEDIA_ENABLE_TIMEOUT_MS);
+    }, MEDIA_ENABLE_TIMEOUT_MS[kind]);
 
     promise.then(
       (value) => {
@@ -166,16 +175,29 @@ export async function setNativeCallTrackMuted(
   );
 }
 
+/**
+ * Every stalled attempt leaves a request pending in the WebView, so a timeout
+ * buys exactly one more try: enough to cover a camera that was merely slow to
+ * warm up, without stacking requests behind one that is genuinely wedged.
+ */
+const CAMERA_TIMEOUT_RETRIES = 1;
+
 export async function enableCameraWithRetry(
   localParticipant: LocalParticipant,
   attempts = 3,
 ): Promise<void> {
   let lastError: Error | undefined;
+  let timeoutRetries = 0;
 
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     if (attempt > 0) {
       await delay(500 * attempt);
-      await localParticipant.setCameraEnabled(false).catch(() => undefined);
+      // Disabling can stall on the same wedged device, and must not hold up the
+      // retry it exists to clear the way for.
+      await Promise.race([
+        localParticipant.setCameraEnabled(false).catch(() => undefined),
+        delay(1500),
+      ]);
       await delay(250);
     }
 
@@ -201,9 +223,11 @@ export async function enableCameraWithRetry(
         error instanceof Error ? error : new Error("Camera could not be started.");
     }
 
-    // A stalled request stays pending in the WebView; retrying only adds more.
     if (isMediaTimeoutError(lastError)) {
-      throw lastError;
+      if (timeoutRetries >= CAMERA_TIMEOUT_RETRIES) {
+        throw lastError;
+      }
+      timeoutRetries += 1;
     }
 
     if (lastError && !isRetryableMediaDeviceError(lastError) && attempt === attempts - 1) {

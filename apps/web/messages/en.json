@@ -2659,7 +2659,9 @@
       "cameraOn": "Camera on",
       "cameraOff": "Camera off",
       "cameraEnableFailed": "Could not turn the camera on. Close other apps using the camera, then tap Camera off to try again.",
-      "micEnableFailed": "Could not turn the microphone on."
+      "micEnableFailed": "Could not turn the microphone on.",
+      "cameraTimeout": "The camera is taking too long to start. Close other apps using the camera, then tap Camera on to try again.",
+      "micTimeout": "The microphone is taking too long to start. Tap Mic on to try again."
     },
     "unknownMember": "Member",
     "profileRef": "Profile {code}",
