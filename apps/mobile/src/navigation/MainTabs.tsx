@@ -18,21 +18,13 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 
 const TAB_BAR_CONTENT_HEIGHT = 56;
 
-function TabLabel({
-  label,
-  focused,
-  activeColor = colors.rose800,
-}: {
-  label: string;
-  focused: boolean;
-  activeColor?: string;
-}) {
+function TabLabel({ label, focused }: { label: string; focused: boolean }) {
   return (
     <Text
       style={{
         fontSize: 11,
         fontWeight: focused ? "700" : "500",
-        color: focused ? activeColor : colors.rose200,
+        color: focused ? colors.white : colors.rose200,
       }}
     >
       {label}
@@ -44,16 +36,14 @@ function TabLabelWithBadge({
   label,
   focused,
   badge,
-  activeColor = colors.rose800,
 }: {
   label: string;
   focused: boolean;
   badge: number;
-  activeColor?: string;
 }) {
   return (
     <View style={tabBadgeStyles.wrap}>
-      <TabLabel label={label} focused={focused} activeColor={activeColor} />
+      <TabLabel label={label} focused={focused} />
       {badge > 0 ? (
         <View style={tabBadgeStyles.badge}>
           <Text style={tabBadgeStyles.badgeText}>{badge > 99 ? "99+" : badge}</Text>
@@ -101,7 +91,7 @@ export function MainTabs({
           headerRight: () => <AccountMenuButton />,
           tabBarIcon: ({ focused }) => <TabBarIcon name="home" focused={focused} />,
           tabBarLabel: ({ focused }) => (
-            <TabLabel label={nav.tabs.home} focused={focused} activeColor={colors.tabHome} />
+            <TabLabel label={nav.tabs.home} focused={focused} />
           ),
         }}
       />
@@ -112,7 +102,7 @@ export function MainTabs({
           headerShown: false,
           tabBarIcon: ({ focused }) => <TabBarIcon name="discovery" focused={focused} />,
           tabBarLabel: ({ focused }) => (
-            <TabLabel label={nav.tabs.discover} focused={focused} activeColor={colors.tabDiscovery} />
+            <TabLabel label={nav.tabs.discover} focused={focused} />
           ),
         }}
       />
@@ -128,7 +118,6 @@ export function MainTabs({
               label={nav.tabs.connect}
               focused={focused}
               badge={incomingInterests}
-              activeColor={colors.tabConnections}
             />
           ),
         }}
@@ -144,7 +133,6 @@ export function MainTabs({
               label={nav.tabs.messages}
               focused={focused}
               badge={unreadCount}
-              activeColor={colors.tabMessages}
             />
           ),
         }}
@@ -156,7 +144,7 @@ export function MainTabs({
           headerShown: false,
           tabBarIcon: ({ focused }) => <TabBarIcon name="account" focused={focused} />,
           tabBarLabel: ({ focused }) => (
-            <TabLabel label={nav.tabs.profile} focused={focused} activeColor={colors.tabAccount} />
+            <TabLabel label={nav.tabs.profile} focused={focused} />
           ),
         }}
       />

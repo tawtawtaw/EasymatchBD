@@ -1,3 +1,4 @@
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import {
   fillMessageTemplate,
@@ -11,6 +12,7 @@ import type { DiscoveryListItem } from "../types/discovery";
 import { useLocaleStore } from "../store/localeStore";
 import { GenderProfileAvatar } from "./GenderProfileAvatar";
 import { colors } from "../theme/colors";
+import { cardShadow } from "../theme/shadows";
 
 type Props = {
   item: DiscoveryListItem;
@@ -41,7 +43,10 @@ export function DiscoveryProfileCard({
   const relationshipLabel = formatRelationshipStatus(locale, item.relationshipStatus);
 
   return (
-    <Pressable style={styles.card} onPress={onPress}>
+    <Pressable
+      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      onPress={onPress}
+    >
       <GenderProfileAvatar gender={gender} size={52} />
       <View style={styles.body}>
         <View style={styles.headerRow}>
@@ -49,10 +54,20 @@ export function DiscoveryProfileCard({
             {name}
           </Text>
           {item.media.isVerified ? (
-            <Text style={styles.verified}>{copy.verified}</Text>
+            <Pill
+              icon="check-decagram"
+              label={copy.verified}
+              color={colors.emerald600}
+              background={colors.emerald50}
+            />
           ) : null}
           {item.isBookmarked ? (
-            <Text style={styles.bookmarked}>{bookmarkedLabel ?? copy.saved}</Text>
+            <Pill
+              icon="bookmark"
+              label={bookmarkedLabel ?? copy.saved}
+              color={colors.rose800}
+              background={colors.rose50}
+            />
           ) : null}
         </View>
         <Text style={styles.meta}>
@@ -80,17 +95,41 @@ export function DiscoveryProfileCard({
   );
 }
 
+function Pill({
+  icon,
+  label,
+  color,
+  background,
+}: {
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  label: string;
+  color: string;
+  background: string;
+}) {
+  return (
+    <View style={[styles.pill, { backgroundColor: background }]}>
+      <MaterialCommunityIcons name={icon} size={11} color={color} />
+      <Text style={[styles.pillText, { color }]}>{label}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   card: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
     backgroundColor: colors.white,
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: colors.rose100,
     padding: 14,
     marginBottom: 10,
+    ...cardShadow,
+  },
+  cardPressed: {
+    opacity: 0.9,
+    transform: [{ scale: 0.99 }],
   },
   body: {
     flex: 1,
@@ -108,25 +147,17 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: colors.zinc900,
   },
-  verified: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: colors.emerald600,
-    backgroundColor: "#ecfdf5",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+  pill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
     borderRadius: 999,
-    overflow: "hidden",
   },
-  bookmarked: {
+  pillText: {
     fontSize: 10,
     fontWeight: "700",
-    color: colors.rose800,
-    backgroundColor: colors.rose50,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 999,
-    overflow: "hidden",
   },
   meta: {
     marginTop: 4,

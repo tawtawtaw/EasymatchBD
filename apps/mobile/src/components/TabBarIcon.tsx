@@ -6,6 +6,7 @@ export type MainTabIconName = "home" | "discovery" | "connections" | "messages" 
 
 type TabAccent = {
   active: string;
+  pill: string;
   iconFocused: keyof typeof MaterialCommunityIcons.glyphMap;
   iconDefault: keyof typeof MaterialCommunityIcons.glyphMap;
 };
@@ -13,26 +14,31 @@ type TabAccent = {
 const TAB_ACCENTS: Record<MainTabIconName, TabAccent> = {
   home: {
     active: colors.tabHome,
+    pill: colors.tabHomePill,
     iconFocused: "home-heart",
     iconDefault: "home-outline",
   },
   discovery: {
     active: colors.tabDiscovery,
+    pill: colors.tabDiscoveryPill,
     iconFocused: "compass",
     iconDefault: "compass-outline",
   },
   connections: {
     active: colors.tabConnections,
+    pill: colors.tabConnectionsPill,
     iconFocused: "account-heart",
     iconDefault: "account-heart-outline",
   },
   messages: {
     active: colors.tabMessages,
+    pill: colors.tabMessagesPill,
     iconFocused: "message-text",
     iconDefault: "message-text-outline",
   },
   account: {
     active: colors.tabAccount,
+    pill: colors.tabAccountPill,
     iconFocused: "account-circle",
     iconDefault: "account-circle-outline",
   },
@@ -47,11 +53,17 @@ type Props = {
 export function TabBarIcon({ name, focused, size = 22 }: Props) {
   const accent = TAB_ACCENTS[name];
   const iconName = focused ? accent.iconFocused : accent.iconDefault;
-  const iconColor = focused ? colors.white : colors.rose200;
 
+  // The pill is what carries the tab's colour. Tinting the glyph instead would
+  // put a dark accent on the dark bar, which is how the labels used to read at
+  // barely 1.2:1.
   return (
-    <View style={[styles.wrap, focused && styles.wrapFocused]}>
-      <MaterialCommunityIcons name={iconName} size={size} color={iconColor} />
+    <View style={[styles.wrap, focused && { backgroundColor: accent.pill }]}>
+      <MaterialCommunityIcons
+        name={iconName}
+        size={size}
+        color={focused ? accent.active : colors.rose200}
+      />
     </View>
   );
 }
@@ -63,8 +75,5 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-  },
-  wrapFocused: {
-    backgroundColor: colors.rose800,
   },
 });

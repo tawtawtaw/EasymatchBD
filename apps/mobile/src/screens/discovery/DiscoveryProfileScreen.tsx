@@ -165,7 +165,7 @@ export default function DiscoveryProfileScreen({
   }
 
   if (!profile) {
-    return <EmptyState message={copy.notFound} />;
+    return <EmptyState message={copy.notFound} icon="account-question-outline" />;
   }
 
   const name = resolveMemberDisplayName({ profileCode }, profile.personal, {

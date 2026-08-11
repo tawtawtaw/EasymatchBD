@@ -128,7 +128,7 @@ export default function MembershipCheckoutScreen({
   }
 
   if (verificationLoading) {
-    return <LoadingState message={copy.checkoutTitle} />;
+    return <LoadingState label={copy.checkoutTitle} />;
   }
 
   if (isPaid) {

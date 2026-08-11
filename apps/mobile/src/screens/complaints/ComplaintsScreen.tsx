@@ -245,7 +245,7 @@ export default function ComplaintsScreen({ navigation, route }: ComplaintsScreen
 
           <Text style={styles.sectionTitle}>{copy.myComplaints}</Text>
           {complaints.length === 0 ? (
-            <EmptyState message={copy.emptyList} />
+            <EmptyState message={copy.emptyList} icon="flag-outline" />
           ) : (
             <FlatList
               data={complaints}

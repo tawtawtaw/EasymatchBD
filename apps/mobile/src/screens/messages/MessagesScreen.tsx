@@ -97,7 +97,9 @@ export default function MessagesScreen({ navigation }: MessagesListScreenProps) 
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} />
       }
-      ListEmptyComponent={<EmptyState message={copy.empty} />}
+      ListEmptyComponent={
+        <EmptyState message={copy.empty} icon="message-text-outline" />
+      }
       renderItem={({ item }) => {
         const name = resolveMemberDisplayName(
           {

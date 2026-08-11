@@ -8,6 +8,7 @@ import * as AuthService from "../services/auth";
 import { sessionStorage } from "../services/session-storage";
 import { withTimeout } from "../lib/with-timeout";
 import { useAppLockStore } from "./appLockStore";
+import { useMemberProfileStore } from "./memberProfileStore";
 import { useLocaleStore } from "./localeStore";
 
 type AuthState = {
@@ -84,6 +85,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     await preservePushTokenBeforeSignOut();
     await AuthService.signOut();
     clearConnectionPrivacyCache();
+    useMemberProfileStore.getState().clear();
     // The lock guards this member's session, so it must not outlive it and
     // greet whoever signs in on this device next.
     await useAppLockStore.getState().disableLock();

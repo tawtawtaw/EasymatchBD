@@ -16,7 +16,8 @@ import {
 import { DiscoveryProfileCard } from "../../components/DiscoveryProfileCard";
 import { ProfilePausedBanner } from "../../components/ProfilePausedBanner";
 import { VerificationFeedbackPanel } from "../../components/VerificationFeedbackPanel";
-import { EmptyState, ErrorState, LoadingState } from "../../components/ScreenState";
+import { EmptyState, ErrorState } from "../../components/ScreenState";
+import { ProfileListSkeleton } from "../../components/Skeleton";
 import { tDiscoveryList, tProfileMedia } from "../../i18n/messages";
 import { getApiErrorMessage } from "../../lib/api-error";
 import {
@@ -168,7 +169,7 @@ export default function DiscoveryListScreen({ navigation }: DiscoveryListScreenP
       : copy.matchedSummary.replace("{count}", String(total));
 
   if (loading && !refreshing && items.length === 0) {
-    return <LoadingState label={copy.loading} />;
+    return <ProfileListSkeleton />;
   }
 
   if (error && items.length === 0) {
@@ -245,7 +246,9 @@ export default function DiscoveryListScreen({ navigation }: DiscoveryListScreenP
           if (!loadingMore && hasMore) void loadPage(page + 1, "more", appliedFilters);
         }}
         onEndReachedThreshold={0.4}
-        ListEmptyComponent={<EmptyState message={copy.empty} />}
+        ListEmptyComponent={
+          <EmptyState message={copy.empty} icon="account-search-outline" />
+        }
         ListFooterComponent={
           loadingMore ? (
             <View style={styles.footer}>
@@ -362,6 +365,8 @@ const styles = StyleSheet.create({
   list: {
     padding: 16,
     paddingTop: 8,
+    // Without this the empty state, which fills its parent, collapses to nothing.
+    flexGrow: 1,
   },
   footer: {
     paddingVertical: 16,

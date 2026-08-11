@@ -270,7 +270,7 @@ export default function BiodataExportScreen(_props: BiodataExportScreenProps) {
             !data.family &&
             !data.siblings?.length &&
             !data.partner) ? (
-            <EmptyState message={copy.emptyAtLevel} />
+            <EmptyState message={copy.emptyAtLevel} icon="file-document-outline" />
           ) : null}
         </View>
       ) : null}

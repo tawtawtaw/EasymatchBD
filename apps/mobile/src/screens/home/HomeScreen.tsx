@@ -1,3 +1,4 @@
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useCallback, useRef, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import { useNavigation } from "@react-navigation/native";
@@ -8,7 +9,6 @@ import { MemberProfileAvatar } from "../../components/MemberProfileAvatar";
 import { PaidMembershipGate } from "../../components/PaidMembershipGate";
 import { EmptyState, ErrorState, LoadingState } from "../../components/ScreenState";
 import { tHomeScreen, tSavedProfiles } from "../../i18n/messages";
-import { confirmSignOut } from "../../lib/confirm-sign-out";
 import { useIsPaidMember } from "../../hooks/use-is-paid-member";
 import { getApiErrorMessage } from "../../lib/api-error";
 import { navigateToDiscoveryProfile } from "../../navigation/nestedNavigation";
@@ -23,10 +23,12 @@ import {
   type MemberProfileSummary,
 } from "../../services/member-profile";
 import { useLocaleStore } from "../../store/localeStore";
+import { useMemberProfileStore } from "../../store/memberProfileStore";
 import { useOnboardingStore } from "../../store/onboardingStore";
 import { useMemberAlertsStore } from "../../store/memberAlertsStore";
 import type { MemberHomeBootstrap, SavedProfileItem } from "../../types/discovery";
 import { colors } from "../../theme/colors";
+import { cardShadow } from "../../theme/shadows";
 
 export default function HomeScreen() {
   const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList>>();
@@ -58,9 +60,12 @@ export default function HomeScreen() {
           () => [] as SavedProfileItem[],
         ),
       ]);
+      const summary = memberProfileSummaryFromHomeBootstrap(data.profile);
       setBootstrap(data);
       setSavedProfiles(saved);
-      setMemberProfile(memberProfileSummaryFromHomeBootstrap(data.profile));
+      setMemberProfile(summary);
+      // Keeps the header avatar in sync without a second fetch of its own.
+      useMemberProfileStore.getState().setSummary(summary);
 
       if (!data.termsAccepted) {
         await refreshOnboarding(locale);
@@ -130,7 +135,7 @@ export default function HomeScreen() {
           photoId={primaryPhotoId}
           name={profileFullName}
           gender={memberProfile?.gender}
-          size={72}
+          size={101}
         />
         <View style={styles.heroText}>
           <Text style={styles.greeting}>
@@ -142,21 +147,6 @@ export default function HomeScreen() {
             </Text>
           ) : null}
         </View>
-      </View>
-
-      <View style={styles.accountRow}>
-        <Pressable
-          style={styles.accountSettingsButton}
-          onPress={() => {
-            navigation.navigate("Profile", { screen: "Settings" });
-          }}
-        >
-          <Text style={styles.accountSettingsText}>{copy.accountSettings}</Text>
-          <Text style={styles.accountSettingsHint}>{copy.manageAccountHint}</Text>
-        </Pressable>
-        <Pressable style={styles.signOutButton} onPress={() => confirmSignOut(locale)}>
-          <Text style={styles.signOutText}>{copy.signOut}</Text>
-        </Pressable>
       </View>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -172,6 +162,8 @@ export default function HomeScreen() {
           <StatCard
             label={copy.incoming}
             value={String(stats.incoming)}
+            accent={colors.rose700}
+            icon="account-heart-outline"
             onPress={() =>
               navigation.navigate("Connections", { initialTab: "incoming" satisfies ConnectionsTabKey })
             }
@@ -179,6 +171,8 @@ export default function HomeScreen() {
           <StatCard
             label={copy.sent}
             value={String(stats.outgoing)}
+            accent={colors.tabDiscovery}
+            icon="send-outline"
             onPress={() =>
               navigation.navigate("Connections", { initialTab: "outgoing" satisfies ConnectionsTabKey })
             }
@@ -186,6 +180,8 @@ export default function HomeScreen() {
           <StatCard
             label={copy.connected}
             value={String(stats.connections)}
+            accent={colors.emerald600}
+            icon="account-multiple-outline"
             onPress={() =>
               navigation.navigate("Connections", { initialTab: "connected" satisfies ConnectionsTabKey })
             }
@@ -194,7 +190,7 @@ export default function HomeScreen() {
       ) : null}
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>{copy.suggestedProfiles}</Text>
+        <SectionTitle icon="star-four-points-outline" title={copy.suggestedProfiles} />
         {suggestions.length === 0 ? (
           <Text style={styles.muted}>{copy.emptySuggestions}</Text>
         ) : (
@@ -215,9 +211,10 @@ export default function HomeScreen() {
 
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitleInline}>{copy.savedProfiles}</Text>
+          <SectionTitle icon="bookmark-outline" title={copy.savedProfiles} inline />
           {savedProfiles.length > 0 ? (
             <Pressable
+              style={({ pressed }) => pressed && styles.linkPressed}
               onPress={() =>
                 navigation.navigate("Discovery", { screen: "SavedProfiles" })
               }
@@ -251,17 +248,42 @@ export default function HomeScreen() {
 function StatCard({
   label,
   value,
+  accent,
+  icon,
   onPress,
 }: {
   label: string;
   value: string;
+  accent: string;
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
   onPress: () => void;
 }) {
   return (
-    <Pressable style={styles.statCard} onPress={onPress}>
+    <Pressable
+      style={({ pressed }) => [styles.statCard, pressed && styles.cardPressed]}
+      onPress={onPress}
+    >
+      <MaterialCommunityIcons name={icon} size={18} color={accent} />
       <Text style={styles.statLabel}>{label}</Text>
-      <Text style={styles.statValue}>{value}</Text>
+      <Text style={[styles.statValue, { color: accent }]}>{value}</Text>
     </Pressable>
+  );
+}
+
+function SectionTitle({
+  icon,
+  title,
+  inline,
+}: {
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  title: string;
+  inline?: boolean;
+}) {
+  return (
+    <View style={[styles.sectionTitleRow, inline && styles.sectionTitleRowInline]}>
+      <MaterialCommunityIcons name={icon} size={18} color={colors.rose800} />
+      <Text style={styles.sectionTitle}>{title}</Text>
+    </View>
   );
 }
 
@@ -278,49 +300,16 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   greeting: {
-    fontSize: 22,
+    fontSize: 26,
     fontWeight: "800",
     color: colors.zinc900,
-    lineHeight: 28,
+    lineHeight: 32,
   },
   profileCode: {
-    marginTop: 4,
+    marginTop: 6,
     fontSize: 13,
     fontWeight: "600",
     color: colors.zinc500,
-  },
-  accountRow: {
-    marginTop: 14,
-    gap: 10,
-  },
-  accountSettingsButton: {
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.rose100,
-    backgroundColor: colors.white,
-    padding: 14,
-  },
-  accountSettingsText: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: colors.rose800,
-  },
-  accountSettingsHint: {
-    marginTop: 4,
-    fontSize: 12,
-    lineHeight: 17,
-    color: colors.zinc500,
-  },
-  signOutButton: {
-    alignSelf: "flex-start",
-    paddingVertical: 4,
-    paddingHorizontal: 2,
-  },
-  signOutText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: colors.red600,
-    textDecorationLine: "underline",
   },
   error: { marginTop: 12, color: colors.red600, fontSize: 13 },
   upsellWrap: { marginTop: 16 },
@@ -328,29 +317,41 @@ const styles = StyleSheet.create({
   statCard: {
     flex: 1,
     backgroundColor: colors.white,
-    borderRadius: 14,
-    padding: 12,
+    borderRadius: 18,
+    padding: 14,
     borderWidth: 1,
     borderColor: colors.rose100,
+    ...cardShadow,
+  },
+  cardPressed: {
+    opacity: 0.9,
+    transform: [{ scale: 0.98 }],
   },
   statLabel: {
-    fontSize: 11,
+    marginTop: 8,
+    fontSize: 13,
     fontWeight: "600",
-    color: colors.zinc500,
-    textTransform: "uppercase",
+    color: colors.zinc600,
   },
   statValue: {
-    marginTop: 4,
-    fontSize: 22,
+    marginTop: 2,
+    fontSize: 26,
     fontWeight: "800",
-    color: colors.zinc900,
   },
-  section: { marginTop: 20 },
+  section: { marginTop: 24 },
+  sectionTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    marginBottom: 12,
+  },
+  sectionTitleRowInline: {
+    marginBottom: 0,
+  },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "700",
     color: colors.zinc900,
-    marginBottom: 10,
   },
   sectionHeader: {
     flexDirection: "row",
@@ -359,16 +360,13 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 10,
   },
-  sectionTitleInline: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.zinc900,
-    marginBottom: 0,
-  },
   viewAll: {
     fontSize: 14,
     fontWeight: "600",
     color: colors.rose800,
+  },
+  linkPressed: {
+    opacity: 0.6,
   },
   muted: { fontSize: 14, lineHeight: 20, color: colors.zinc600 },
 });

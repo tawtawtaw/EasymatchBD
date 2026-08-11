@@ -311,7 +311,7 @@ export default function ConnectionsScreen() {
       >
         {tab === "incoming" ? (
           incoming.length === 0 ? (
-            <EmptyState message={copy.emptyIncoming} />
+            <EmptyState message={copy.emptyIncoming} icon="account-heart-outline" />
           ) : (
             incoming.map((item) => {
               const profile = item.sender.profile;
@@ -364,7 +364,7 @@ export default function ConnectionsScreen() {
 
         {tab === "outgoing" ? (
           outgoing.length === 0 ? (
-            <EmptyState message={copy.emptySent} />
+            <EmptyState message={copy.emptySent} icon="send-outline" />
           ) : (
             outgoing.map((item) => {
               const profile = item.receiver.profile;
@@ -406,7 +406,7 @@ export default function ConnectionsScreen() {
 
         {tab === "connected" ? (
           connections.length === 0 ? (
-            <EmptyState message={copy.emptyConnected} />
+            <EmptyState message={copy.emptyConnected} icon="account-multiple-outline" />
           ) : (
             connections.map((item) => {
               const name = resolveMemberDisplayName({

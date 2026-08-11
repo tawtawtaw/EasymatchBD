@@ -194,7 +194,7 @@ export default function VideoCallsScreen({ navigation }: VideoCallsScreenProps) 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{copy.hubConnectionsSection}</Text>
         {eligible.length === 0 ? (
-          <EmptyState message={copy.hubEmpty} />
+          <EmptyState message={copy.hubEmpty} icon="video-outline" />
         ) : (
           eligible.map((item) => {
             const name = resolveMemberDisplayName(item.member, undefined, {

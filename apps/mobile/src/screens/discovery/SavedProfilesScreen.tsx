@@ -9,7 +9,8 @@ import {
   View,
 } from "react-native";
 import { DiscoveryProfileCard } from "../../components/DiscoveryProfileCard";
-import { EmptyState, ErrorState, LoadingState } from "../../components/ScreenState";
+import { EmptyState, ErrorState } from "../../components/ScreenState";
+import { ProfileListSkeleton } from "../../components/Skeleton";
 import { tSavedProfiles } from "../../i18n/messages";
 import { getApiErrorMessage } from "../../lib/api-error";
 import type { SavedProfilesScreenProps } from "../../navigation/types";
@@ -83,7 +84,7 @@ export default function SavedProfilesScreen({ navigation }: SavedProfilesScreenP
   }
 
   if (loading && !refreshing) {
-    return <LoadingState label={copy.loading} />;
+    return <ProfileListSkeleton />;
   }
 
   if (error && items.length === 0) {
@@ -102,7 +103,7 @@ export default function SavedProfilesScreen({ navigation }: SavedProfilesScreenP
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => void load({ refresh: true })} />
         }
-        ListEmptyComponent={<EmptyState message={copy.empty} />}
+        ListEmptyComponent={<EmptyState message={copy.empty} icon="bookmark-outline" />}
         renderItem={({ item }) => (
           <View style={styles.itemWrap}>
             <DiscoveryProfileCard
