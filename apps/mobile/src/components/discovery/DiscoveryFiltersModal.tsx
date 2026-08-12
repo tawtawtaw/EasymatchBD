@@ -6,6 +6,8 @@ import {
   Text,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { PROFILE_CODE_LENGTH } from "@easymatch/shared";
 import {
   FormSectionTitle,
   FormSelectField,
@@ -54,6 +56,7 @@ export function DiscoveryFiltersModal({
 }: Props) {
   const copy = tDiscoveryList(locale);
   const draftCount = countActiveFilters(draft);
+  const insets = useSafeAreaInsets();
 
   const patch = (partial: DiscoveryFilters) => onDraftChange({ ...draft, ...partial });
   const setField = (key: keyof DiscoveryFilters, value: string) =>
@@ -75,7 +78,7 @@ export function DiscoveryFiltersModal({
           <View style={styles.headerSpacer} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
           <View style={styles.quickActions}>
             <Pressable style={styles.secondaryBtn} onPress={onUseMyPreferences}>
               <Text style={styles.secondaryBtnText}>{copy.useMyPreferences}</Text>
@@ -89,7 +92,14 @@ export function DiscoveryFiltersModal({
           <FormTextField
             label={copy.filterProfileCode}
             value={draft.profileCode ?? ""}
-            onChange={(value) => setField("profileCode", value)}
+            // The API silently drops a code that is not exactly eight digits, which
+            // turns a search for one person into an unfiltered browse.
+            onChange={(value) =>
+              setField(
+                "profileCode",
+                value.replace(/\D/g, "").slice(0, PROFILE_CODE_LENGTH),
+              )
+            }
             placeholder={copy.profileCodePlaceholder}
             keyboardType="number-pad"
           />
@@ -233,7 +243,14 @@ export function DiscoveryFiltersModal({
           <Text style={styles.hint}>{copy.compatibilityHint}</Text>
         </ScrollView>
 
-        <View style={styles.footer}>
+        <View
+          style={[
+            styles.footer,
+            // Android draws edge-to-edge, so the gesture bar sits over the button
+            // unless the footer pads itself past it.
+            { paddingBottom: Math.max(insets.bottom, 16) },
+          ]}
+        >
           <Pressable style={styles.applyBtn} onPress={onApply}>
             <Text style={styles.applyText}>
               {copy.applyFilters}
@@ -273,6 +290,10 @@ const styles = StyleSheet.create({
   },
   headerSpacer: {
     minWidth: 48,
+  },
+  // Keeps the form from growing past the viewport and pushing the footer off it.
+  scroll: {
+    flex: 1,
   },
   content: {
     padding: 16,

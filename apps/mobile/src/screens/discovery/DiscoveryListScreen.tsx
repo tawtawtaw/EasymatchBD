@@ -28,7 +28,10 @@ import {
 } from "../../lib/discovery-filters";
 import { shouldShowVerificationFeedback } from "../../lib/verification-feedback";
 import type { DiscoveryListScreenProps } from "../../navigation/types";
-import { listDiscoveryProfiles } from "../../services/discovery";
+import {
+  findDiscoveryProfileByCode,
+  listDiscoveryProfiles,
+} from "../../services/discovery";
 import { getDropdowns } from "../../services/dropdowns";
 import { getMyProfile } from "../../services/profile";
 import { useMemberVerificationStore } from "../../store/memberVerificationStore";
@@ -86,7 +89,13 @@ export default function DiscoveryListScreen({ navigation }: DiscoveryListScreenP
         const result = await listDiscoveryProfiles(nextPage, PAGE_SIZE, filters, {
           forceFresh: mode === "refresh",
         });
-        const nextItems = Array.isArray(result.items) ? result.items : [];
+        let nextItems = Array.isArray(result.items) ? result.items : [];
+
+        if (nextItems.length === 0 && mode !== "more" && filters.profileCode) {
+          const match = await findDiscoveryProfileByCode(filters.profileCode);
+          if (match) nextItems = [match];
+        }
+
         setTotal(
           result.total > 0
             ? result.total

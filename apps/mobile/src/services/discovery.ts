@@ -1,3 +1,4 @@
+import { isValidProfileCode, normalizeProfileCode } from "@easymatch/shared";
 import { API_BASE_URL, apiRequest } from "./api/client";
 import { dedupeRequest, invalidateDedupeCache } from "./api/dedupe";
 import type { DiscoveryFilters } from "../types/discovery-filters";
@@ -83,6 +84,39 @@ export async function getDiscoveryProfile(
       ),
     30_000,
   );
+}
+
+/**
+ * The list endpoint hides anyone the viewer already has a pending interest or a
+ * connection with, so searching their code there returns nothing. A code is a
+ * request for one specific person, so fall back to the lookup that does show
+ * them rather than reporting that they do not exist.
+ */
+export async function findDiscoveryProfileByCode(
+  profileCode: string,
+): Promise<DiscoveryListItem | null> {
+  if (!isValidProfileCode(profileCode)) return null;
+
+  try {
+    const profile = await getDiscoveryProfile(normalizeProfileCode(profileCode));
+    if (profile.relationship.status === "self") return null;
+
+    return {
+      profileId: profile.profileId,
+      profileCode: profile.profileCode,
+      userId: profile.userId,
+      viewerPrivacyLevel: profile.viewerPrivacyLevel,
+      relationshipStatus: profile.relationship.status,
+      personal: profile.personal,
+      media: profile.media,
+      hiddenFieldCount: profile.hiddenFieldCount,
+      compatibility: profile.compatibility,
+      isBookmarked: profile.isBookmarked,
+    };
+  } catch {
+    // A code nobody visible holds is just an empty result, not an error.
+    return null;
+  }
 }
 
 export async function sendDiscoveryInterest(profileId: string) {
