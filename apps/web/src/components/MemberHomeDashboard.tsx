@@ -266,7 +266,7 @@ export function MemberHomeDashboard() {
               {t("suggestionsEmpty")}
             </p>
           ) : (
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {suggestions.map((item) => (
                 <DiscoveryProfileCard key={item.profileCode} token={authToken} item={item} />
               ))}
@@ -291,8 +291,8 @@ export function MemberHomeDashboard() {
               {t("savedProfilesEmpty")}
             </p>
           ) : (
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {savedProfiles.slice(0, 4).map((item) => (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {savedProfiles.slice(0, 3).map((item) => (
                 <DiscoveryProfileCard key={item.profileCode} token={authToken} item={item} />
               ))}
             </div>
