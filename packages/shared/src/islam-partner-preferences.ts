@@ -3,6 +3,7 @@ import {
   HIJAB_PRACTICE_VALUES,
   ISLAM_RELIGION_VALUE,
   MALE_GENDER_VALUE,
+  PRAYER_PRACTICE_VALUES,
   isIslamReligion,
 } from './islam-profile-fields';
 
@@ -80,6 +81,59 @@ export function matchesHijabPreference(
   if (prefRank === 2) return true;
   // intention_to_wear_hijab: regular, occasional, or intending — not never-wear
   return practiceRank === 0 || practiceRank === 1 || practiceRank === 3;
+}
+
+/** Partner prefs saved before prayer_preference existed used prayer_practice slugs. */
+const LEGACY_PRAYER_PREFERENCE_FROM_PRACTICE: Record<
+  string,
+  PrayerPreferenceValue
+> = {
+  five_times_regularly: 'regular_five_times',
+  occasionally: 'modestly_practicing',
+  friday_only: 'modestly_practicing',
+};
+
+export function normalizePrayerPreference(
+  value: string | null | undefined,
+): PrayerPreferenceValue | null {
+  if (!value) return null;
+  if ((PRAYER_PREFERENCE_VALUES as readonly string[]).includes(value)) {
+    return value as PrayerPreferenceValue;
+  }
+  return LEGACY_PRAYER_PREFERENCE_FROM_PRACTICE[value] ?? null;
+}
+
+export function getPrayerPracticeRank(
+  value: string | null | undefined,
+): number | null {
+  if (!value) return null;
+  const idx = PRAYER_PRACTICE_VALUES.indexOf(
+    value as (typeof PRAYER_PRACTICE_VALUES)[number],
+  );
+  return idx >= 0 ? idx : null;
+}
+
+/**
+ * The two dropdowns describe the same thing with different slugs — a practice of
+ * `five_times_regularly` against a preference of `regular_five_times` — so
+ * comparing them directly reports a mismatch even when they agree.
+ * Ranks run strictest first, and `prefer_not_to_say` sits past `never` so it
+ * satisfies nothing.
+ */
+export function matchesPrayerPreference(
+  preference: string | null | undefined,
+  practice: string | null | undefined,
+): boolean {
+  const normalized = normalizePrayerPreference(preference);
+  if (!normalized) return false;
+  if (normalized === 'no_opinion') return true;
+
+  const rank = getPrayerPracticeRank(practice);
+  if (rank == null) return false;
+
+  if (normalized === 'regular_five_times') return rank === 0;
+  // modestly_practicing: any amount of praying counts, never praying does not.
+  return rank <= PRAYER_PRACTICE_VALUES.indexOf('friday_only');
 }
 
 export function showBeardPreferenceField(

@@ -4,6 +4,7 @@ import {
 } from './height';
 import {
   matchesHijabPreference,
+  matchesPrayerPreference,
   showBeardPreferenceField,
   showHijabPreferenceField,
   showPrayerPreferenceField,
@@ -425,23 +426,11 @@ function buildRows(ctx: CriterionContext): ComparisonRow[] {
       const applicable = showPrayerPreferenceField(c.viewerReligion);
       const expected = c.preferences?.prayerPreference ?? null;
       const hasPreference = !!expected;
-      if (expected === 'no_opinion') {
-        return {
-          hasPreference,
-          preferenceText: expected,
-          attributeText: c.attributes.prayerPractice ?? null,
-          matches: true,
-          applicable,
-        };
-      }
       return {
         hasPreference,
         preferenceText: expected,
         attributeText: c.attributes.prayerPractice ?? null,
-        matches:
-          !!c.attributes.prayerPractice &&
-          !!expected &&
-          c.attributes.prayerPractice === expected,
+        matches: matchesPrayerPreference(expected, c.attributes.prayerPractice),
         applicable,
       };
     }),
