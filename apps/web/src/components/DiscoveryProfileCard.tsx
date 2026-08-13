@@ -1,17 +1,30 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { Fragment } from "react";
+import { useLocale, useTranslations } from "next-intl";
+import { ageFromDateOfBirth } from "@easymatch/shared";
 import { Link } from "@/i18n/routing";
 import { DiscoveryListItem } from "@/lib/discovery";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import { ProfileBookmarkButton } from "@/components/ProfileBookmarkButton";
 import { GenderProfilePlaceholder } from "@/components/GenderProfilePlaceholder";
 import { resolveMemberDisplayName } from "@/lib/member-display";
+import { formatBiodataFieldValue } from "@/lib/biodata-display";
+import { useDropdowns } from "@/lib/use-dropdowns";
+import type { DropdownMap } from "@/lib/api";
 
 type DiscoveryProfileCardProps = {
   token: string;
   item: DiscoveryListItem;
 };
+
+/** Matches the palette GenderProfilePlaceholder already uses for the avatar. */
+const GENDER_BORDER: Record<string, string> = {
+  male: "border-sky-200 hover:border-sky-300",
+  female: "border-rose-200 hover:border-rose-300",
+};
+
+const NEUTRAL_BORDER = "border-zinc-200 hover:border-zinc-300";
 
 function displayName(
   personal: Record<string, unknown>,
@@ -31,23 +44,70 @@ function displayName(
   );
 }
 
+function readValue(personal: Record<string, unknown>, key: string) {
+  const value = personal[key];
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
+function profileFacts(
+  personal: Record<string, unknown>,
+  age: number | null | undefined,
+  dropdowns: DropdownMap,
+  locale: string,
+  t: ReturnType<typeof useTranslations<"discovery">>,
+) {
+  // The API derives age so it survives date_of_birth being privacy-gated, but
+  // fall back for anything served by an older build.
+  const dateOfBirth = readValue(personal, "date_of_birth");
+  const resolvedAge =
+    age ?? (dateOfBirth ? ageFromDateOfBirth(dateOfBirth) : null);
+
+  const coded = (label: string, key: string) => {
+    const value = readValue(personal, key);
+    if (!value) return null;
+    return {
+      label,
+      value: formatBiodataFieldValue(key, value, { locale, dropdowns, personal }),
+    };
+  };
+
+  return [
+    coded(t("cardProfession"), "occupation"),
+    coded(t("cardEducation"), "highest_degree"),
+    resolvedAge != null
+      ? { label: t("cardAge"), value: String(resolvedAge) }
+      : null,
+  ].filter((fact): fact is { label: string; value: string } => fact !== null);
+}
+
 export function DiscoveryProfileCard({ item }: DiscoveryProfileCardProps) {
+  const locale = useLocale();
   const t = useTranslations("discovery");
-  const tp = useTranslations("privacy");
+  const dropdowns = useDropdowns(locale);
   const name = displayName(item.personal, item.profileCode, t);
   const gender =
     typeof item.personal.gender === "string" ? item.personal.gender : null;
+  const facts = profileFacts(item.personal, item.age, dropdowns, locale, t);
+  // Privacy hides the name at low levels, in which case the heading is already
+  // the profile code and repeating it below just says the same thing twice.
+  const showProfileCode = name !== t("profileRef", { code: item.profileCode });
 
   return (
-    <article className="flex gap-3 rounded-xl border border-rose-100/80 bg-white p-3 shadow-sm transition hover:border-rose-200 hover:shadow-md">
+    <article
+      className={`flex gap-3 rounded-xl border-2 bg-white p-3 shadow-sm transition hover:shadow-md ${
+        (gender && GENDER_BORDER[gender]) || NEUTRAL_BORDER
+      }`}
+    >
       <GenderProfilePlaceholder gender={gender} className="h-12 w-12 sm:h-14 sm:w-14" />
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <h2 className="truncate text-sm font-semibold text-zinc-900">{name}</h2>
-            <p className="text-[11px] text-zinc-500">
-              {t("profileCodeLabel", { code: item.profileCode })}
-            </p>
+            {showProfileCode ? (
+              <p className="text-[11px] text-zinc-500">
+                {t("profileCodeLabel", { code: item.profileCode })}
+              </p>
+            ) : null}
           </div>
           <VerificationBadge
             isVerified={item.media.isVerified}
@@ -57,20 +117,23 @@ export function DiscoveryProfileCard({ item }: DiscoveryProfileCardProps) {
           />
         </div>
         {item.compatibility.totalCriteria > 0 ? (
-          <p className="text-[11px] font-semibold text-emerald-800">
-            {t("compatibilityScore", { score: item.compatibility.score })}
+          <p className="w-fit rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+            {t("cardMatch", {
+              score: item.compatibility.score,
+              matched: item.compatibility.matchedCount,
+              total: item.compatibility.totalCriteria,
+            })}
           </p>
         ) : null}
-        <p className="text-[11px] text-zinc-500">
-          {t("privacyLevel", {
-            level: item.viewerPrivacyLevel,
-            label: tp(String(item.viewerPrivacyLevel)),
-          })}
-        </p>
-        {item.hiddenFieldCount > 0 ? (
-          <p className="text-[11px] text-amber-800">
-            {t("hiddenFields", { count: item.hiddenFieldCount })}
-          </p>
+        {facts.length > 0 ? (
+          <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 text-[11px] leading-5">
+            {facts.map((fact) => (
+              <Fragment key={fact.label}>
+                <dt className="text-zinc-500">{fact.label}</dt>
+                <dd className="truncate font-medium text-zinc-800">{fact.value}</dd>
+              </Fragment>
+            ))}
+          </dl>
         ) : null}
         <div className="mt-0.5 flex flex-wrap gap-2">
           <ProfileBookmarkButton

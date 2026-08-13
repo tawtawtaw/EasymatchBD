@@ -2930,6 +2930,10 @@
     "backToList": "← Back to discovery",
     "member": "Member",
     "profileRef": "Profile {code}",
+    "cardProfession": "Profession",
+    "cardEducation": "Highest education",
+    "cardAge": "Age",
+    "cardMatch": "Match {score}% ({matched}/{total})",
     "sections": {
       "personal": "Personal",
       "family": "Family",

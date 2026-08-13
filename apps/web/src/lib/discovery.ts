@@ -45,6 +45,8 @@ export type DiscoveryListItem = {
   media: DiscoveryMedia;
   hiddenFieldCount: number;
   compatibility: CompatibilitySummary;
+  /** Derived server-side, so it survives the date of birth being privacy-gated. */
+  age?: number | null;
   isBookmarked?: boolean;
 };
 

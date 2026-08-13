@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  ageFromDateOfBirth,
   calculateCompatibility,
   PrivacyLevel,
 } from '@easymatch/shared';
@@ -171,6 +172,7 @@ export class SavedProfilesService {
         media: view.media,
         hiddenFieldCount: view.hiddenFieldCount,
         compatibility,
+        age: profile.dateOfBirth ? ageFromDateOfBirth(profile.dateOfBirth) : null,
         isBookmarked: true,
       });
     }

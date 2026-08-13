@@ -2906,6 +2906,10 @@
     "backToList": "← অনুসন্ধানে ফিরে যান",
     "member": "সদস্য",
     "profileRef": "প্রোফাইল {code}",
+    "cardProfession": "পেশা",
+    "cardEducation": "সর্বোচ্চ শিক্ষা",
+    "cardAge": "বয়স",
+    "cardMatch": "মিল {score}% ({matched}/{total})",
     "sections": {
       "personal": "ব্যক্তিগত",
       "family": "পারিবারিক",

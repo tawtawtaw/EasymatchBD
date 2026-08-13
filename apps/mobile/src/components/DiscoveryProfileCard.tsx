@@ -1,14 +1,17 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { ageFromDateOfBirth } from "@easymatch/shared";
 import {
   fillMessageTemplate,
-  formatRelationshipStatus,
   tDiscoveryList,
   tNavigation,
 } from "../i18n/messages";
+import { formatBiodataFieldValue } from "../lib/biodata-display";
 import type { AppLocale } from "../lib/locale";
 import { resolveMemberDisplayName } from "../lib/member-display";
+import { useDropdowns } from "../lib/use-dropdowns";
 import type { DiscoveryListItem } from "../types/discovery";
+import type { DropdownMap } from "../types/dropdowns";
 import { useLocaleStore } from "../store/localeStore";
 import { GenderProfileAvatar } from "./GenderProfileAvatar";
 import { colors } from "../theme/colors";
@@ -21,6 +24,48 @@ type Props = {
   locale?: AppLocale;
 };
 
+/** Matches the palette GenderProfileAvatar already uses. */
+const GENDER_BORDER: Record<string, string> = {
+  male: colors.sky200,
+  female: colors.rose200,
+};
+
+function readValue(personal: Record<string, unknown>, key: string) {
+  const value = personal[key];
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
+function profileFacts(
+  personal: Record<string, unknown>,
+  age: number | null | undefined,
+  dropdowns: DropdownMap,
+  locale: AppLocale,
+  copy: ReturnType<typeof tDiscoveryList>,
+) {
+  // The API derives age so it survives date_of_birth being privacy-gated, but
+  // fall back for anything served by an older build.
+  const dateOfBirth = readValue(personal, "date_of_birth");
+  const resolvedAge =
+    age ?? (dateOfBirth ? ageFromDateOfBirth(dateOfBirth) : null);
+
+  const coded = (label: string, key: string) => {
+    const value = readValue(personal, key);
+    if (!value) return null;
+    return {
+      label,
+      value: formatBiodataFieldValue(key, value, { locale, dropdowns, personal }),
+    };
+  };
+
+  return [
+    coded(copy.cardProfession, "occupation"),
+    coded(copy.cardEducation, "highest_degree"),
+    resolvedAge != null
+      ? { label: copy.cardAge, value: String(resolvedAge) }
+      : null,
+  ].filter((fact): fact is { label: string; value: string } => fact !== null);
+}
+
 export function DiscoveryProfileCard({
   item,
   onPress,
@@ -31,6 +76,7 @@ export function DiscoveryProfileCard({
   const locale = localeProp ?? storeLocale;
   const copy = tDiscoveryList(locale);
   const nav = tNavigation(locale);
+  const dropdowns = useDropdowns(locale);
   const name = resolveMemberDisplayName(
     { profileCode: item.profileCode },
     item.personal,
@@ -40,11 +86,29 @@ export function DiscoveryProfileCard({
     },
   );
   const gender = typeof item.personal.gender === "string" ? item.personal.gender : null;
-  const relationshipLabel = formatRelationshipStatus(locale, item.relationshipStatus);
+  const facts = profileFacts(item.personal, item.age, dropdowns, locale, copy);
+  const match =
+    item.compatibility.totalCriteria > 0
+      ? fillMessageTemplate(copy.matchSummary, {
+          score: item.compatibility.score,
+          matched: item.compatibility.matchedCount,
+          total: item.compatibility.totalCriteria,
+        })
+      : null;
+  const profileRef = fillMessageTemplate(copy.profileRef, {
+    code: item.profileCode,
+  });
+  // Privacy hides the name at low levels, in which case the heading is already
+  // the profile code and repeating it below just says the same thing twice.
+  const showProfileCode = name !== profileRef;
 
   return (
     <Pressable
-      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      style={({ pressed }) => [
+        styles.card,
+        { borderColor: (gender && GENDER_BORDER[gender]) || colors.zinc300 },
+        pressed && styles.cardPressed,
+      ]}
       onPress={onPress}
     >
       <GenderProfileAvatar gender={gender} size={52} />
@@ -70,25 +134,28 @@ export function DiscoveryProfileCard({
             />
           ) : null}
         </View>
-        <Text style={styles.meta}>
-          {fillMessageTemplate(copy.profileRef, { code: item.profileCode })}
-        </Text>
-        {item.compatibility.totalCriteria > 0 ? (
-          <Text style={styles.compat}>
-            {fillMessageTemplate(copy.matchSummary, {
-              score: item.compatibility.score,
-              matched: item.compatibility.matchedCount,
-              total: item.compatibility.totalCriteria,
-            })}
-          </Text>
+        {showProfileCode ? <Text style={styles.meta}>{profileRef}</Text> : null}
+        {match ? (
+          <View style={styles.matchRow}>
+            <Pill
+              icon="heart-multiple"
+              label={match}
+              color={colors.amber700}
+              background={colors.amber50}
+            />
+          </View>
         ) : null}
-        <Text style={styles.privacy}>
-          {fillMessageTemplate(copy.privacyLevelShort, {
-            level: item.viewerPrivacyLevel,
-          })}
-        </Text>
-        {relationshipLabel ? (
-          <Text style={styles.status}>{relationshipLabel}</Text>
+        {facts.length > 0 ? (
+          <View style={styles.facts}>
+            {facts.map((fact) => (
+              <View key={fact.label} style={styles.factRow}>
+                <Text style={styles.factLabel}>{fact.label}</Text>
+                <Text style={styles.factValue} numberOfLines={1}>
+                  {fact.value}
+                </Text>
+              </View>
+            ))}
+          </View>
         ) : null}
       </View>
     </Pressable>
@@ -121,8 +188,7 @@ const styles = StyleSheet.create({
     gap: 12,
     backgroundColor: colors.white,
     borderRadius: 18,
-    borderWidth: 1,
-    borderColor: colors.rose100,
+    borderWidth: 2,
     padding: 14,
     marginBottom: 10,
     ...cardShadow,
@@ -164,21 +230,28 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.zinc600,
   },
-  compat: {
-    marginTop: 4,
-    fontSize: 12,
-    fontWeight: "600",
-    color: colors.rose800,
+  matchRow: {
+    flexDirection: "row",
+    marginTop: 6,
   },
-  privacy: {
-    marginTop: 4,
+  facts: {
+    marginTop: 6,
+    gap: 2,
+  },
+  factRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  factLabel: {
+    width: 96,
     fontSize: 11,
     color: colors.zinc500,
   },
-  status: {
-    marginTop: 4,
-    fontSize: 11,
+  factValue: {
+    flex: 1,
+    fontSize: 12,
     fontWeight: "600",
-    color: colors.zinc700,
+    color: colors.zinc800,
   },
 });

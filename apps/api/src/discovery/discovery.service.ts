@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { MediaReviewStatus, ProfilePhotoType, type Prisma } from '@prisma/client';
 import {
+  ageFromDateOfBirth,
   calculateCompatibility,
   clampDiscoveryProfileLimit,
   DISCOVERY_CANDIDATE_POOL_LIMIT,
@@ -119,6 +120,13 @@ type DiscoveryListProfileItem = {
   media: ReturnType<typeof buildVisibleProfileView>['media'];
   hiddenFieldCount: number;
   compatibility: ReturnType<typeof calculateCompatibility>;
+  /**
+   * Derived rather than read from `personal`, because the exact date of birth
+   * stays behind its privacy rule while the age itself is already public: the
+   * discovery filters let anyone narrow by an age range, and the comparison
+   * matrix shows it too.
+   */
+  age: number | null;
   isBookmarked: boolean;
 };
 
@@ -465,6 +473,7 @@ export class DiscoveryService implements OnModuleInit {
         media: view.media,
         hiddenFieldCount: view.hiddenFieldCount,
         compatibility,
+        age: profile.dateOfBirth ? ageFromDateOfBirth(profile.dateOfBirth) : null,
         isBookmarked: options.skipBookmarks ? false : bookmarkSet.has(profile.id),
       };
     });
@@ -598,6 +607,7 @@ export class DiscoveryService implements OnModuleInit {
       viewerPrivacyLevel: viewerLevel,
       relationship,
       compatibility,
+      age: profile.dateOfBirth ? ageFromDateOfBirth(profile.dateOfBirth) : null,
       isBookmarked: !!bookmark,
       ...view,
     };

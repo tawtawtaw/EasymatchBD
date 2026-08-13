@@ -111,6 +111,7 @@ export async function findDiscoveryProfileByCode(
       media: profile.media,
       hiddenFieldCount: profile.hiddenFieldCount,
       compatibility: profile.compatibility,
+      age: profile.age,
       isBookmarked: profile.isBookmarked,
     };
   } catch {
