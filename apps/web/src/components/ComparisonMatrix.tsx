@@ -90,8 +90,8 @@ export function ComparisonMatrix({
     tf(relativeKey as never),
   );
 
-  function formatDistrictCode(code: string) {
-    return formatBiodataFieldValue("current_district", code.trim(), {
+  function formatCode(fieldKey: string, code: string) {
+    return formatBiodataFieldValue(fieldKey, code.trim(), {
       locale,
       dropdowns,
       resolveStaticOption,
@@ -100,14 +100,16 @@ export function ComparisonMatrix({
     });
   }
 
-  function formatReligionCode(code: string) {
-    return formatBiodataFieldValue("religion", code.trim(), {
-      locale,
-      dropdowns,
-      resolveStaticOption,
-      yesLabel: tb("yes"),
-      noLabel: tb("no"),
-    });
+  /**
+   * Multi-select preferences such as marital status and profession arrive as one
+   * comma-joined string of raw codes, and looking that whole string up never
+   * matches an option, so each code has to be resolved on its own.
+   */
+  function formatCodeList(fieldKey: string, value: string) {
+    return value
+      .split(",")
+      .map((code) => formatCode(fieldKey, code))
+      .join(", ");
   }
 
   function formatCell(
@@ -121,17 +123,14 @@ export function ComparisonMatrix({
       if (side === "expectation" && isAllBangladeshDistrictsPreferenceText(value)) {
         return tf("allDistrictsOfBangladesh");
       }
-      if (value.includes(",")) {
-        return value.split(",").map(formatDistrictCode).join(", ");
-      }
-      return formatDistrictCode(value);
+      return formatCodeList("current_district", value);
     }
 
     if (key === "religion") {
       if (side === "expectation" && isAnyReligionPreferenceText(value)) {
         return tf("anyReligion");
       }
-      return formatReligionCode(value);
+      return formatCode("religion", value);
     }
 
     const fieldKey =
@@ -143,13 +142,7 @@ export function ComparisonMatrix({
       return value;
     }
 
-    return formatBiodataFieldValue(fieldKey, value, {
-      locale,
-      dropdowns,
-      resolveStaticOption,
-      yesLabel: tb("yes"),
-      noLabel: tb("no"),
-    });
+    return formatCodeList(fieldKey, value);
   }
 
   if (!direction.available) {

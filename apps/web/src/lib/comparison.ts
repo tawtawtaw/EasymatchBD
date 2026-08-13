@@ -45,7 +45,12 @@ export type ProfileComparison = {
 
 export type { MaritalAlignmentResult };
 
-export type { ComparisonCriterionKey, ComparisonRow, ComparisonStatus };
+export type {
+  ComparisonCriterionKey,
+  ComparisonDirectionResult,
+  ComparisonRow,
+  ComparisonStatus,
+};
 
 export async function getProfileComparison(
   token: string,
