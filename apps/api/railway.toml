@@ -1,6 +1,18 @@
 [build]
 builder = "RAILPACK"
 buildCommand = "node scripts/railway-api-build.mjs"
+# Everything the API ships or is built from. A push touching nothing in here
+# cannot change this service, so rebuilding it would only delay the deploy that
+# actually needs the builder.
+watchPatterns = [
+  "apps/api/**",
+  "packages/shared/**",
+  "scripts/railway-api-build.mjs",
+  "scripts/hostinger-prisma-generate.mjs",
+  "package.json",
+  "package-lock.json",
+  "tsconfig.json",
+]
 
 [deploy]
 startCommand = "npm run start:prod -w @easymatch/api"

@@ -1,6 +1,17 @@
 [build]
 builder = "RAILPACK"
 buildCommand = "node scripts/railway-web-build.mjs"
+# Everything the web app ships or is built from. A push touching nothing in here
+# cannot change this service, so rebuilding it would only delay the deploy that
+# actually needs the builder.
+watchPatterns = [
+  "apps/web/**",
+  "packages/shared/**",
+  "scripts/railway-web-build.mjs",
+  "package.json",
+  "package-lock.json",
+  "tsconfig.json",
+]
 
 [deploy]
 startCommand = "npm run start -w @easymatch/web"
