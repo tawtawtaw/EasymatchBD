@@ -29,7 +29,7 @@ export function ProfileStack() {
         component={ProfileScreen}
         options={{
           title: nav.stacks.myProfile,
-          headerRight: () => <AccountMenuButton showMyProfile={false} />,
+          headerRight: () => <AccountMenuButton />,
         }}
       />
       <Stack.Screen
@@ -37,7 +37,7 @@ export function ProfileStack() {
         component={SettingsScreen}
         options={{
           title: nav.stacks.settings,
-          headerRight: () => <AccountMenuButton showSettings={false} />,
+          headerRight: () => <AccountMenuButton />,
         }}
       />
       <Stack.Screen name="EditPersonal" component={EditPersonalScreen} />
