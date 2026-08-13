@@ -52,6 +52,7 @@ export default function DiscoveryListScreen({ navigation }: DiscoveryListScreenP
   const [items, setItems] = useState<DiscoveryListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -96,15 +97,18 @@ export default function DiscoveryListScreen({ navigation }: DiscoveryListScreenP
           if (match) nextItems = [match];
         }
 
-        setTotal(
-          result.total > 0
-            ? result.total
-            : nextItems.length === PAGE_SIZE
-              ? nextPage * PAGE_SIZE + 1
-              : (nextPage - 1) * PAGE_SIZE + nextItems.length,
-        );
+        setTotal(result.total > 0 ? result.total : nextItems.length);
         setPage(nextPage);
-        setItems((current) => (mode === "more" ? [...current, ...nextItems] : nextItems));
+        // An older API omits the flag, and stopping is the better guess: the
+        // alternative is the endless scroll of repeats this replaced.
+        setHasMore(Boolean(result.hasMore));
+        setItems((current) => {
+          if (mode !== "more") return nextItems;
+          // The ranked pool is rebuilt once its cache expires, so a slow
+          // scroller can be offered someone they already hold.
+          const seen = new Set(current.map((item) => item.profileId));
+          return [...current, ...nextItems.filter((item) => !seen.has(item.profileId))];
+        });
       } catch (err) {
         setError(getApiErrorMessage(err, copy.loadError));
       } finally {
@@ -119,8 +123,6 @@ export default function DiscoveryListScreen({ navigation }: DiscoveryListScreenP
   useEffect(() => {
     void loadPage(1, "initial", appliedFilters);
   }, [appliedFilters, loadPage]);
-
-  const hasMore = items.length < total;
 
   const openFilters = useCallback(() => {
     setDraftFilters({ ...appliedFilters });

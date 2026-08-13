@@ -135,6 +135,23 @@ type DiscoveryListProfilesResponse = {
   total: number;
   page: number;
   limit: number;
+  /**
+   * Whether a further page exists. `total` counts every profile matching the
+   * filters, but only the candidate pool is ranked and reachable, so a client
+   * comparing what it holds against `total` would page forever.
+   */
+  hasMore: boolean;
+};
+
+/**
+ * The whole ranked candidate pool, which pages are cut from. Ranking costs the
+ * same whichever page is asked for, so it is done once and cached, leaving
+ * later pages as slices of one snapshot rather than separate queries that could
+ * shift underneath the reader.
+ */
+type RankedListProfiles = {
+  items: DiscoveryListProfileItem[];
+  total: number;
 };
 
 type MemberHomeBootstrapResponse = {
@@ -183,11 +200,11 @@ export class DiscoveryService implements OnModuleInit {
   >();
   private readonly listProfilesCache = new Map<
     string,
-    { expiresAt: number; value: DiscoveryListProfilesResponse }
+    { expiresAt: number; value: RankedListProfiles }
   >();
   private readonly listProfilesInflight = new Map<
     string,
-    Promise<DiscoveryListProfilesResponse>
+    Promise<RankedListProfiles>
   >();
   private readonly listTotalCache = new Map<
     string,
@@ -218,11 +235,40 @@ export class DiscoveryService implements OnModuleInit {
 
   async listProfiles(
     viewerUserId: string,
-    _page = 1,
+    page = 1,
     limit = DISCOVERY_TOP_MATCH_LIMIT,
     filters: DiscoveryFilterInput = {},
     options: ListProfilesOptions = {},
   ): Promise<DiscoveryListProfilesResponse> {
+    const resultLimit = clampDiscoveryProfileLimit(limit);
+    const pageNumber =
+      Number.isFinite(page) && page >= 1 ? Math.trunc(page) : 1;
+
+    const ranked = await this.loadRankedListProfiles(
+      viewerUserId,
+      limit,
+      filters,
+      options,
+    );
+
+    const start = (pageNumber - 1) * resultLimit;
+    const items = ranked.items.slice(start, start + resultLimit);
+
+    return {
+      items,
+      total: ranked.total,
+      page: pageNumber,
+      limit: resultLimit,
+      hasMore: start + items.length < ranked.items.length,
+    };
+  }
+
+  private async loadRankedListProfiles(
+    viewerUserId: string,
+    limit: number,
+    filters: DiscoveryFilterInput,
+    options: ListProfilesOptions,
+  ): Promise<RankedListProfiles> {
     const cacheKey = this.buildListProfilesCacheKey(
       viewerUserId,
       limit,
@@ -358,7 +404,7 @@ export class DiscoveryService implements OnModuleInit {
     limit: number,
     filters: DiscoveryFilterInput,
     options: ListProfilesOptions,
-  ): Promise<DiscoveryListProfilesResponse> {
+  ): Promise<RankedListProfiles> {
     const rules = await this.loadPrivacyRules();
     const resultLimit = clampDiscoveryProfileLimit(limit);
     const poolCap =
@@ -372,7 +418,7 @@ export class DiscoveryService implements OnModuleInit {
 
     const oppositeGender = getOppositeGender(viewerProfile?.gender);
     if (!oppositeGender) {
-      return { items: [], total: 0, page: 1, limit: resultLimit };
+      return { items: [], total: 0 };
     }
 
     const where = buildDiscoveryProfileWhere(
@@ -410,7 +456,7 @@ export class DiscoveryService implements OnModuleInit {
     ]);
 
     if (profiles.length === 0) {
-      return { items: [], total: 0, page: 1, limit: resultLimit };
+      return { items: [], total: 0 };
     }
 
     const relationshipMap =
@@ -486,12 +532,7 @@ export class DiscoveryService implements OnModuleInit {
       return b.compatibility.matchedCount - a.compatibility.matchedCount;
     });
 
-    return {
-      items: items.slice(0, resultLimit),
-      total,
-      page: 1,
-      limit: resultLimit,
-    };
+    return { items, total };
   }
 
   async getProfile(viewerUserId: string, profileIdOrCode: string) {

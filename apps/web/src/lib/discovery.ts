@@ -257,6 +257,7 @@ export async function listDiscoveryProfiles(
     total: number;
     page: number;
     limit: number;
+    hasMore?: boolean;
   }>(res);
 }
 

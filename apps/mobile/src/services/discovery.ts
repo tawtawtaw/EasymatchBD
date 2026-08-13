@@ -63,6 +63,7 @@ export async function listDiscoveryProfiles(
         total: number;
         page: number;
         limit: number;
+        hasMore?: boolean;
       }>(`/discovery/profiles?${params.toString()}`),
     20_000,
   );
