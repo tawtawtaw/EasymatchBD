@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Crypto from "expo-crypto";
 import * as LocalAuthentication from "expo-local-authentication";
+import { Platform } from "react-native";
 import {
   APP_LOCK_ATTEMPTS_KEY,
   APP_LOCK_BIOMETRIC_KEY,
@@ -153,7 +154,7 @@ export async function verifyPin(pin: string): Promise<PinVerifyResult> {
   return { status: "wrong", remainingAttempts: MAX_ATTEMPTS - failures };
 }
 
-export type BiometricKind = "face" | "fingerprint" | "iris" | "none";
+export type BiometricKind = "face" | "fingerprint" | "iris" | "generic" | "none";
 
 export type BiometricCapability = {
   available: boolean;
@@ -168,6 +169,14 @@ export async function getBiometricCapability(): Promise<BiometricCapability> {
     ]);
     if (!hasHardware || !isEnrolled) return { available: false, kind: "none" };
 
+    // On Android supportedAuthenticationTypesAsync reports hardware the device
+    // *has*, not what the owner enrolled, so a phone with a selfie camera claims
+    // face support even when only a fingerprint is registered. Naming a modality
+    // from it promises the wrong gesture, so stay generic.
+    if (Platform.OS === "android") {
+      return { available: true, kind: "generic" };
+    }
+
     const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
     if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
       return { available: true, kind: "face" };
@@ -178,7 +187,7 @@ export async function getBiometricCapability(): Promise<BiometricCapability> {
     if (types.includes(LocalAuthentication.AuthenticationType.IRIS)) {
       return { available: true, kind: "iris" };
     }
-    return { available: true, kind: "fingerprint" };
+    return { available: true, kind: "generic" };
   } catch {
     return { available: false, kind: "none" };
   }
@@ -192,10 +201,41 @@ export async function setBiometricEnabled(enabled: boolean): Promise<void> {
   await AsyncStorage.setItem(APP_LOCK_BIOMETRIC_KEY, enabled ? "1" : "0");
 }
 
+export type BiometricFailure =
+  | "cancelled"
+  | "no_screen_lock"
+  | "lockout"
+  | "unavailable"
+  | "unknown";
+
+export type BiometricResult =
+  | { success: true }
+  | { success: false; reason: BiometricFailure };
+
+function toBiometricFailure(error: string | undefined): BiometricFailure {
+  switch (error) {
+    case "user_cancel":
+    case "app_cancel":
+    case "system_cancel":
+      return "cancelled";
+    // Raised when the phone itself has no PIN, pattern or password, which
+    // BiometricPrompt requires before it will run at all.
+    case "not_enrolled":
+      return "no_screen_lock";
+    case "lockout":
+    case "lockout_permanent":
+      return "lockout";
+    case "not_available":
+      return "unavailable";
+    default:
+      return "unknown";
+  }
+}
+
 export async function authenticateWithBiometrics(
   promptMessage: string,
   fallbackLabel: string,
-): Promise<boolean> {
+): Promise<BiometricResult> {
   try {
     const result = await LocalAuthentication.authenticateAsync({
       promptMessage,
@@ -204,8 +244,10 @@ export async function authenticateWithBiometrics(
       disableDeviceFallback: true,
       cancelLabel: fallbackLabel,
     });
-    return result.success;
+
+    if (result.success) return { success: true };
+    return { success: false, reason: toBiometricFailure(result.error) };
   } catch {
-    return false;
+    return { success: false, reason: "unknown" };
   }
 }

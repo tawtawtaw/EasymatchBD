@@ -8,8 +8,13 @@ const appLock = {
     unlock: "Unlock",
     useBiometric: "Use fingerprint",
     useBiometricFace: "Use Face ID",
+    useBiometricGeneric: "Use fingerprint or face",
     biometricPrompt: "Unlock EasymatchBD",
     biometricFallback: "Use PIN",
+    biometricNoScreenLock:
+      "Add a screen lock (PIN, pattern or password) in your phone settings to use biometric unlock.",
+    biometricLockedOut: "Too many biometric attempts. Enter your PIN instead.",
+    biometricFailed: "Biometric unlock did not work. Enter your PIN instead.",
     wrongPin: "Wrong PIN. {count} attempts left.",
     lockedOut: "Too many attempts. Try again in {seconds}s.",
     signOutInstead: "Sign out instead",
@@ -24,6 +29,7 @@ const appLock = {
     changePin: "Change PIN",
     biometricToggleOn: "Unlock with fingerprint",
     biometricToggleOnFace: "Unlock with Face ID",
+    biometricToggleOnGeneric: "Unlock with fingerprint or face",
     biometricUnavailable:
       "No fingerprint or face is enrolled on this device, so PIN unlock only.",
 
@@ -54,8 +60,13 @@ const appLock = {
     unlock: "আনলক করুন",
     useBiometric: "আঙুলের ছাপ ব্যবহার করুন",
     useBiometricFace: "Face ID ব্যবহার করুন",
+    useBiometricGeneric: "আঙুলের ছাপ বা ফেস ব্যবহার করুন",
     biometricPrompt: "EasymatchBD আনলক করুন",
     biometricFallback: "পিন ব্যবহার করুন",
+    biometricNoScreenLock:
+      "বায়োমেট্রিক আনলক ব্যবহার করতে ফোনের সেটিংসে স্ক্রিন লক (পিন, প্যাটার্ন বা পাসওয়ার্ড) চালু করুন।",
+    biometricLockedOut: "অনেকবার চেষ্টা হয়েছে। এখন পিন দিয়ে আনলক করুন।",
+    biometricFailed: "বায়োমেট্রিক আনলক কাজ করেনি। পিন দিয়ে চেষ্টা করুন।",
     wrongPin: "ভুল পিন। আর {count} বার চেষ্টা করা যাবে।",
     lockedOut: "অনেকবার ভুল হয়েছে। {seconds} সেকেন্ড পরে চেষ্টা করুন।",
     signOutInstead: "বরং সাইন আউট করুন",
@@ -70,6 +81,7 @@ const appLock = {
     changePin: "পিন পরিবর্তন করুন",
     biometricToggleOn: "আঙুলের ছাপ দিয়ে আনলক",
     biometricToggleOnFace: "Face ID দিয়ে আনলক",
+    biometricToggleOnGeneric: "আঙুলের ছাপ বা ফেস দিয়ে আনলক",
     biometricUnavailable:
       "এই ডিভাইসে কোনো আঙুলের ছাপ বা ফেস যুক্ত করা নেই, তাই শুধু পিন দিয়ে আনলক হবে।",
 

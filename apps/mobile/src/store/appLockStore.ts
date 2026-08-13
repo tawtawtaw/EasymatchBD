@@ -36,6 +36,8 @@ type AppLockState = {
 
 let appStateSub: { remove: () => void } | null = null;
 let backgroundedAt: number | null = null;
+/** Guards refresh from reading back a preference whose write is still in flight. */
+let biometricWritePending = false;
 
 export const useAppLockStore = create<AppLockState>((set, get) => ({
   enabled: false,
@@ -75,7 +77,9 @@ export const useAppLockStore = create<AppLockState>((set, get) => ({
       isLocked: enabled ? get().isLocked : false,
       biometricAvailable: capability.available,
       biometricKind: capability.kind,
-      biometricEnabled: biometricPreference && capability.available,
+      biometricEnabled: biometricWritePending
+        ? get().biometricEnabled && capability.available
+        : biometricPreference && capability.available,
     });
   },
 
@@ -100,8 +104,17 @@ export const useAppLockStore = create<AppLockState>((set, get) => ({
   },
 
   changeBiometric: async (enabled) => {
-    await setBiometricEnabled(enabled);
+    // Move the switch first. Waiting on the write left it sitting under the
+    // finger unchanged, and a rejected write left it stuck off with no clue why.
     set({ biometricEnabled: enabled });
+    biometricWritePending = true;
+    try {
+      await setBiometricEnabled(enabled);
+    } catch {
+      set({ biometricEnabled: !enabled });
+    } finally {
+      biometricWritePending = false;
+    }
   },
 
   startWatching: () => {

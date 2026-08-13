@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
   Modal,
   Pressable,
   StyleSheet,
@@ -59,6 +60,18 @@ export function AppLockSettingsCard({ locale }: { locale: AppLocale }) {
   const enableLock = useAppLockStore((s) => s.enableLock);
   const disableLock = useAppLockStore((s) => s.disableLock);
   const changeBiometric = useAppLockStore((s) => s.changeBiometric);
+  const refresh = useAppLockStore((s) => s.refresh);
+
+  // Enrolling a fingerprint or adding a screen lock happens in the phone's own
+  // settings, so re-read the capability on the way back rather than leaving this
+  // card claiming biometrics are unavailable until the next cold start.
+  useEffect(() => {
+    void refresh();
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") void refresh();
+    });
+    return () => subscription.remove();
+  }, [refresh]);
 
   const [mode, setMode] = useState<Mode | null>(null);
   const [currentPin, setCurrentPin] = useState("");
@@ -144,7 +157,11 @@ export function AppLockSettingsCard({ locale }: { locale: AppLocale }) {
   }
 
   const biometricLabel =
-    biometricKind === "face" ? copy.biometricToggleOnFace : copy.biometricToggleOn;
+    biometricKind === "face"
+      ? copy.biometricToggleOnFace
+      : biometricKind === "fingerprint"
+        ? copy.biometricToggleOn
+        : copy.biometricToggleOnGeneric;
 
   return (
     <View style={styles.card}>

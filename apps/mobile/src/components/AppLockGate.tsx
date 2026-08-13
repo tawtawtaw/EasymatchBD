@@ -78,16 +78,38 @@ export function AppLockGate() {
     !LOCK_EXEMPT_ROUTES.has(routeName ?? "");
 
   const runBiometric = useCallback(async () => {
-    const ok = await authenticateWithBiometrics(
+    const result = await authenticateWithBiometrics(
       copy.biometricPrompt,
       copy.biometricFallback,
     );
-    if (ok) {
+
+    if (result.success) {
       setPin("");
       setError(null);
       unlock();
+      return;
     }
-  }, [copy.biometricPrompt, copy.biometricFallback, unlock]);
+
+    // Without this a failure looks identical to the feature being switched off,
+    // because the OS sheet never appears for most of these reasons.
+    if (result.reason === "cancelled") return;
+    if (result.reason === "no_screen_lock") {
+      setError(copy.biometricNoScreenLock);
+      return;
+    }
+    if (result.reason === "lockout") {
+      setError(copy.biometricLockedOut);
+      return;
+    }
+    setError(copy.biometricFailed);
+  }, [
+    copy.biometricPrompt,
+    copy.biometricFallback,
+    copy.biometricNoScreenLock,
+    copy.biometricLockedOut,
+    copy.biometricFailed,
+    unlock,
+  ]);
 
   useEffect(() => {
     if (!visible) {
@@ -186,7 +208,11 @@ export function AppLockGate() {
   if (!visible) return null;
 
   const biometricLabel =
-    biometricKind === "face" ? copy.useBiometricFace : copy.useBiometric;
+    biometricKind === "face"
+      ? copy.useBiometricFace
+      : biometricKind === "fingerprint"
+        ? copy.useBiometric
+        : copy.useBiometricGeneric;
   const ringingPartner =
     incomingCall?.partnerName?.trim() || callCopy.unknownMember;
 
