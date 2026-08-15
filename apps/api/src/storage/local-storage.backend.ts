@@ -2,10 +2,11 @@ import {
   createReadStream,
   existsSync,
   mkdirSync,
+  readFileSync,
   unlinkSync,
   writeFileSync,
 } from 'fs';
-import { isAbsolute, join } from 'path';
+import { dirname, isAbsolute, join } from 'path';
 import { buildStorageKey, normalizeStorageKey } from './storage.utils';
 import type { StorageBackend, StorageCategory } from './storage.types';
 
@@ -32,6 +33,19 @@ export class LocalStorageBackend implements StorageBackend {
     }
     writeFileSync(absolutePath, buffer);
     return storageKey;
+  }
+
+  saveAt(storageKey: string, buffer: Buffer, _mimeType: string): void {
+    const absolutePath = this.resolvePath(storageKey);
+    const dir = dirname(absolutePath);
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+    writeFileSync(absolutePath, buffer);
+  }
+
+  readBuffer(storageKey: string): Buffer {
+    return readFileSync(this.resolvePath(storageKey));
   }
 
   delete(storageKey: string): void {

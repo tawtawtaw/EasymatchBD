@@ -113,6 +113,7 @@ export function AddressFields({
             label={labels.cityTown}
             value={value.cityTown}
             onChange={(cityTown) => patch({ cityTown })}
+            required
           />
           <FormTextField
             label={labels.division}
@@ -127,6 +128,7 @@ export function AddressFields({
         value={value.addressLine}
         onChange={(addressLine) => patch({ addressLine })}
         multiline
+        required={!isBd}
       />
     </View>
   );

@@ -9,9 +9,11 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadingState } from "../../components/ScreenState";
+import { AppLogo } from "../../components/AppLogo";
 import { VerificationFeedbackPanel } from "../../components/VerificationFeedbackPanel";
 import { tOnboardingProfileSetup } from "../../i18n/onboarding";
 import { tProfileMedia } from "../../i18n/messages";
+import { canOpenBiodataScreen, type BiodataFlowScreen } from "../../lib/biodata-required";
 import { getCompletionMissingLabel } from "../../lib/completion-missing-labels";
 import type { ProfileSetupScreenProps } from "../../navigation/types";
 import { getVerificationFeedback } from "../../services/media";
@@ -30,10 +32,20 @@ export default function ProfileSetupScreen({ navigation }: ProfileSetupScreenPro
   const phase = useOnboardingStore((s) => s.phase);
   const [verificationFeedback, setVerificationFeedback] =
     useState<VerificationFeedback | null>(null);
+  const [stepLockHint, setStepLockHint] = useState<string | null>(null);
 
   const completionPercent = bootstrap?.completionPercent ?? 0;
   const missing = bootstrap?.completionMissing ?? [];
   const canContinue = phase === "complete";
+
+  const openBiodataStep = (screen: Exclude<BiodataFlowScreen, "ProfileSetup">) => {
+    if (!canOpenBiodataScreen(screen, missing)) {
+      setStepLockHint(copy.completePreviousStep);
+      return;
+    }
+    setStepLockHint(null);
+    navigation.navigate(screen);
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -51,6 +63,7 @@ export default function ProfileSetupScreen({ navigation }: ProfileSetupScreenPro
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content}>
+        <AppLogo width={220} style={styles.logo} />
         <Text style={styles.title}>{copy.title}</Text>
         <Text style={styles.subtitle}>{copy.subtitle}</Text>
 
@@ -89,37 +102,83 @@ export default function ProfileSetupScreen({ navigation }: ProfileSetupScreenPro
 
         <Pressable
           style={styles.actionButton}
-          onPress={() => navigation.navigate("EditPersonal")}
+          onPress={() => openBiodataStep("EditPersonal")}
         >
           <Text style={styles.actionButtonText}>{copy.editPersonal}</Text>
         </Pressable>
         <Pressable
-          style={styles.secondaryButton}
-          onPress={() => navigation.navigate("EditFamily")}
+          style={[
+            styles.secondaryButton,
+            !canOpenBiodataScreen("EditFamily", missing) && styles.lockedButton,
+          ]}
+          onPress={() => openBiodataStep("EditFamily")}
         >
-          <Text style={styles.secondaryButtonText}>{copy.editFamily}</Text>
+          <Text
+            style={[
+              styles.secondaryButtonText,
+              !canOpenBiodataScreen("EditFamily", missing) && styles.lockedButtonText,
+            ]}
+          >
+            {copy.editFamily}
+          </Text>
         </Pressable>
         <Pressable
-          style={styles.secondaryButton}
-          onPress={() => navigation.navigate("EditMarital")}
+          style={[
+            styles.secondaryButton,
+            !canOpenBiodataScreen("EditMarital", missing) && styles.lockedButton,
+          ]}
+          onPress={() => openBiodataStep("EditMarital")}
         >
-          <Text style={styles.secondaryButtonText}>{copy.editMarital}</Text>
+          <Text
+            style={[
+              styles.secondaryButtonText,
+              !canOpenBiodataScreen("EditMarital", missing) && styles.lockedButtonText,
+            ]}
+          >
+            {copy.editMarital}
+          </Text>
         </Pressable>
         <Pressable
-          style={styles.secondaryButton}
-          onPress={() => navigation.navigate("EditPartner")}
+          style={[
+            styles.secondaryButton,
+            !canOpenBiodataScreen("EditPartner", missing) && styles.lockedButton,
+          ]}
+          onPress={() => openBiodataStep("EditPartner")}
         >
-          <Text style={styles.secondaryButtonText}>{copy.editPartner}</Text>
+          <Text
+            style={[
+              styles.secondaryButtonText,
+              !canOpenBiodataScreen("EditPartner", missing) && styles.lockedButtonText,
+            ]}
+          >
+            {copy.editPartner}
+          </Text>
         </Pressable>
         <Pressable
-          style={styles.secondaryButton}
-          onPress={() => navigation.navigate("ProfileMedia")}
+          style={[
+            styles.secondaryButton,
+            !canOpenBiodataScreen("ProfileMedia", missing) && styles.lockedButton,
+          ]}
+          onPress={() => openBiodataStep("ProfileMedia")}
         >
-          <Text style={styles.secondaryButtonText}>{copy.editPhotos}</Text>
+          <Text
+            style={[
+              styles.secondaryButtonText,
+              !canOpenBiodataScreen("ProfileMedia", missing) && styles.lockedButtonText,
+            ]}
+          >
+            {copy.editPhotos}
+          </Text>
         </Pressable>
 
+        {stepLockHint ? (
+          <Text style={styles.continueHint}>{stepLockHint}</Text>
+        ) : null}
+
         {!canContinue ? (
-          <Text style={styles.continueHint}>{copy.continueHint}</Text>
+          <Text style={styles.continueHint}>
+            {missing.length === 0 ? copy.submitPhotosHint : copy.continueHint}
+          </Text>
         ) : (
           <Pressable
             style={styles.primaryButton}
@@ -136,6 +195,7 @@ export default function ProfileSetupScreen({ navigation }: ProfileSetupScreenPro
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.rose50 },
   content: { padding: 20, paddingBottom: 40 },
+  logo: { alignSelf: "center", marginBottom: 12 },
   title: { fontSize: 26, fontWeight: "800", color: colors.zinc900 },
   subtitle: { marginTop: 8, fontSize: 14, lineHeight: 20, color: colors.zinc600 },
   profileCode: { marginTop: 10, fontSize: 13, fontWeight: "600", color: colors.zinc500 },
@@ -182,6 +242,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
   secondaryButtonText: { color: colors.rose800, fontWeight: "700", fontSize: 16 },
+  lockedButton: {
+    borderColor: colors.zinc300,
+    backgroundColor: colors.zinc100,
+  },
+  lockedButtonText: { color: colors.zinc400 },
   continueHint: {
     marginTop: 20,
     fontSize: 13,

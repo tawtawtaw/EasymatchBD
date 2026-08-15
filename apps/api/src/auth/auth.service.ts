@@ -117,6 +117,7 @@ export class AuthService {
         verificationFeedback: unknown;
         completionPercent?: number;
         completionMissing?: string[];
+        profileBiodataReviewStatus?: string | null;
       };
     }
   >();
@@ -603,7 +604,13 @@ export class AuthService {
 
   invalidateSessionCache(userId: string) {
     this.sessionCache.delete(userId);
-    this.editorBootstrapCache.delete(userId);
+    this.clearEditorBootstrapCache(userId);
+    this.clearFullProfileCache(userId);
+  }
+
+  clearFullProfileCache(userId: string) {
+    this.fullProfileCache.delete(userId);
+    this.fullProfileInflight.delete(userId);
   }
 
   async getSession(authUser: AuthUser) {
@@ -1055,6 +1062,10 @@ export class AuthService {
       verificationFeedback,
       completionPercent: profile?.completionPercent ?? 0,
       completionMissing: profile?.completionMissing ?? [],
+      profileBiodataReviewStatus:
+        memberProfile && 'profileBiodataReviewStatus' in memberProfile
+          ? (memberProfile.profileBiodataReviewStatus as string | null)
+          : null,
     };
 
     this.editorBootstrapCache.set(cacheKey, {

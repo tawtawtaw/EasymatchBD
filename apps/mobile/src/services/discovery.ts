@@ -208,8 +208,14 @@ export async function withdrawDiscoveryInterest(interestId: string) {
   return result;
 }
 
-export function discoveryPhotoUrl(profileId: string, photoId: string) {
-  return `${API_BASE_URL}/discovery/profiles/${encodeURIComponent(profileId)}/photos/${encodeURIComponent(photoId)}/file`;
+export function discoveryPhotoUrl(
+  profileId: string,
+  photoId: string,
+  variant?: "thumb" | "display" | "original",
+) {
+  const base = `${API_BASE_URL}/discovery/profiles/${encodeURIComponent(profileId)}/photos/${encodeURIComponent(photoId)}/file`;
+  if (!variant || variant === "original") return base;
+  return `${base}?variant=${variant}`;
 }
 
 export async function listSavedProfiles(options?: { forceFresh?: boolean }) {

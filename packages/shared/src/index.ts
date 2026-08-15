@@ -35,3 +35,4 @@ export * from './video-call-guests';
 export * from './video-call-scheduling';
 export * from './connection-messages';
 export * from './profile-gallery-slots';
+export * from './photo-variants';

@@ -25,7 +25,7 @@ import {
   profileToMaritalForm,
 } from "../../lib/marital-form";
 import type { EditMaritalScreenProps } from "../../navigation/types";
-import { advanceAfterBiodataSave } from "../../lib/biodata-navigation";
+import { advanceAfterBiodataSave, redirectIfBiodataStepLocked } from "../../lib/biodata-navigation";
 import { getProfileEditorBootstrap, updateMarital } from "../../services/profile";
 import { useAuthStore } from "../../store/authStore";
 import { useLocaleStore } from "../../store/localeStore";
@@ -76,7 +76,12 @@ export default function EditMaritalScreen({ navigation }: EditMaritalScreenProps
     }
   }, [copy.loadError, locale]);
 
-  useFocusEffect(useCallback(() => { void load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    if (redirectIfBiodataStepLocked(navigation, "EditMarital", isOnboardingSetup)) {
+      return;
+    }
+    void load();
+  }, [isOnboardingSetup, load, navigation]));
 
   const patch = (partial: Partial<MaritalFormState>) =>
     setForm((current) => ({ ...current, ...partial }));
@@ -96,7 +101,7 @@ export default function EditMaritalScreen({ navigation }: EditMaritalScreenProps
         setError(copy.expectedKabinAmountRange);
         return;
       }
-      await updateMarital(buildUpdateMaritalPayload(form, gender));
+      const updated = await updateMarital(buildUpdateMaritalPayload(form, gender));
       setMessage(copy.saved);
       await advanceAfterBiodataSave({
         navigation,
@@ -104,6 +109,8 @@ export default function EditMaritalScreen({ navigation }: EditMaritalScreenProps
         locale,
         isOnboardingSetup,
         refreshOnboarding,
+        completionMissing: updated.completionMissing,
+        completionPercent: updated.completionPercent,
       });
     } catch (err) {
       setError(getApiErrorMessage(err, copy.saveError));

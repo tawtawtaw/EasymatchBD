@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { AppLogo } from "../../components/AppLogo";
 import {
   ON_BEHALF_RELATIONS,
   PROFILE_CREATION_MODES,
@@ -106,6 +107,7 @@ export default function ProfileCreationIntentScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
+        <AppLogo width={220} style={styles.logo} />
         <Text style={styles.title}>{copy.title}</Text>
         <Text style={styles.subtitle}>{copy.subtitle}</Text>
 
@@ -174,6 +176,7 @@ export default function ProfileCreationIntentScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.rose50 },
   content: { padding: 20, paddingBottom: 40 },
+  logo: { alignSelf: "center", marginBottom: 16 },
   title: { fontSize: 26, fontWeight: "800", color: colors.zinc900, textAlign: "center" },
   subtitle: {
     marginTop: 10,

@@ -1,4 +1,4 @@
-import { apiRequest, apiUpload } from "./api/client";
+import { apiRequest, apiUploadFile } from "./api/client";
 import { dedupeRequest, invalidateDedupeCache } from "./api/dedupe";
 import type {
   NidDocument,
@@ -57,19 +57,17 @@ export async function uploadProfilePhoto(
   type: ProfilePhotoType,
   gallerySlot?: "other" | "family",
 ) {
-  const formData = new FormData();
-  formData.append("file", {
-    uri: file.uri,
-    name: file.name,
-    type: file.type,
-  } as unknown as Blob);
   const params = new URLSearchParams({ type });
   if (gallerySlot) {
     params.set("slot", gallerySlot);
   }
-  const photo = await apiUpload<ProfilePhoto>(
+  const photo = await apiUploadFile<ProfilePhoto>(
     `/profiles/me/photos?${params.toString()}`,
-    formData,
+    {
+      uri: file.uri,
+      name: file.name,
+      type: file.type || "image/jpeg",
+    },
   );
   invalidateProfileMediaCaches();
   return photo;
@@ -98,15 +96,13 @@ export async function uploadNidDocument(
   side: NidDocumentSide,
   subject: NidDocumentSubject = "member",
 ) {
-  const formData = new FormData();
-  formData.append("file", {
-    uri: file.uri,
-    name: file.name,
-    type: file.type,
-  } as unknown as Blob);
-  const doc = await apiUpload<NidDocument>(
+  const doc = await apiUploadFile<NidDocument>(
     `/profiles/me/nid?side=${side}&subject=${subject}`,
-    formData,
+    {
+      uri: file.uri,
+      name: file.name,
+      type: file.type,
+    },
   );
   invalidateProfileMediaCaches();
   return doc;
@@ -134,6 +130,21 @@ export async function submitForVerification() {
   return result;
 }
 
-export function profilePhotoUrl(photoId: string) {
-  return `/profiles/me/photos/${encodeURIComponent(photoId)}/file`;
+export function profilePhotoUrl(
+  photoId: string,
+  variant?: "thumb" | "display" | "original",
+) {
+  const base = `/profiles/me/photos/${encodeURIComponent(photoId)}/file`;
+  if (!variant || variant === "original") return base;
+  return `${base}?variant=${variant}`;
+}
+
+export function nidFileUrl(
+  side: NidDocumentSide,
+  subject: NidDocumentSubject = "member",
+  version?: string | null,
+) {
+  const base = `/profiles/me/nid/${side}/file?subject=${subject}`;
+  if (!version) return base;
+  return `${base}&v=${encodeURIComponent(version)}`;
 }

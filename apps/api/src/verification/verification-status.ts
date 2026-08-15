@@ -45,16 +45,8 @@ function hasApprovedNidPair(
 function photosAreVerified(
   photos: Pick<ProfilePhoto, 'type' | 'status'>[],
 ): boolean {
-  if (photos.length === 0) {
-    return false;
-  }
-
   const primary = photos.find((photo) => photo.type === ProfilePhotoType.primary);
-  if (!primary || primary.status !== MediaReviewStatus.approved) {
-    return false;
-  }
-
-  return photos.every((photo) => photo.status === MediaReviewStatus.approved);
+  return primary?.status === MediaReviewStatus.approved;
 }
 
 export function isOnBehalfProfile(

@@ -21,16 +21,7 @@ import { PrismaService } from '../prisma/prisma.service';
 
 const verificationQueueWhere = {
   user: { isActive: true },
-  OR: [
-    { photos: { some: { status: MediaReviewStatus.pending } } },
-    {
-      AND: [
-        { nidVerifiedAt: null },
-        { nidDocuments: { some: { status: MediaReviewStatus.pending } } },
-      ],
-    },
-    { profileBiodataReviewStatus: MediaReviewStatus.pending },
-  ],
+  profileBiodataReviewStatus: MediaReviewStatus.pending,
 };
 
 export type StaffAlertsSummary = {

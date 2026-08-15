@@ -2,6 +2,7 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   Modal,
   Pressable,
   StyleSheet,
@@ -13,7 +14,8 @@ import {
   registerCameraCaptureHost,
   type CameraCaptureRequest,
 } from "../lib/camera-capture-bridge";
-import type { CaptureOutcome } from "../lib/media-capture";
+import type { CaptureOutcome, PickedMediaFile } from "../lib/media-capture";
+import { persistLocalMediaFile } from "../lib/media-capture";
 import { useLocaleStore } from "../store/localeStore";
 import { colors } from "../theme/colors";
 
@@ -25,6 +27,10 @@ const cameraCopy = {
     grant: "Allow camera",
     cancel: "Cancel",
     capture: "Capture",
+    usePhoto: "Use this photo",
+    retake: "Retake",
+    reviewTitle: "Check this photo",
+    reviewHint: "Make sure it is clear before you save it to your profile.",
     notReady: "Camera is not ready yet. Wait a moment and try again.",
     captureFailed: "Could not take photo. Try again.",
   },
@@ -35,10 +41,36 @@ const cameraCopy = {
     grant: "অনুমতি দিন",
     cancel: "বাতিল",
     capture: "ছবি তুলুন",
+    usePhoto: "এই ছবি ব্যবহার করুন",
+    retake: "আবার তুলুন",
+    reviewTitle: "ছবিটি দেখে নিন",
+    reviewHint: "প্রোফাইলে সেভ করার আগে ছবিটি স্পষ্ট কিনা দেখুন।",
     notReady: "ক্যামেরা এখনো প্রস্তুত নয়। একটু অপেক্ষা করে আবার চেষ্টা করুন।",
     captureFailed: "ছবি তোলা যায়নি। আবার চেষ্টা করুন।",
   },
 } as const;
+
+function pickUploadPictureSize(sizes: string[]): string | undefined {
+  const parsed = sizes
+    .map((value) => {
+      const match = /^(\d+)\s*x\s*(\d+)$/i.exec(value.trim());
+      if (!match) return null;
+      const width = Number(match[1]);
+      const height = Number(match[2]);
+      return {
+        value,
+        maxEdge: Math.max(width, height),
+        pixels: width * height,
+      };
+    })
+    .filter((item): item is { value: string; maxEdge: number; pixels: number } => item != null);
+  if (!parsed.length) return undefined;
+  const preferred = parsed.filter((item) => item.maxEdge >= 720 && item.maxEdge <= 1600);
+  const pool = preferred.length
+    ? preferred
+    : parsed.filter((item) => item.maxEdge <= 1920);
+  return (pool.length ? pool : parsed).sort((a, b) => b.pixels - a.pixels)[0]?.value;
+}
 
 export function CameraCaptureHost() {
   const locale = useLocaleStore((s) => s.locale);
@@ -51,18 +83,24 @@ export function CameraCaptureHost() {
   const [capturing, setCapturing] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
 
+  const [pictureSize, setPictureSize] = useState<string | undefined>();
+  const [captured, setCaptured] = useState<PickedMediaFile | null>(null);
+
   const finish = useCallback((outcome: CaptureOutcome) => {
     requestRef.current?.resolve(outcome);
     requestRef.current = null;
     setRequest(null);
     setCameraReady(false);
     setCapturing(false);
+    setCaptured(null);
   }, []);
 
   const handleHostRequest = useCallback((next: CameraCaptureRequest) => {
     requestRef.current = next;
     setCameraReady(false);
     setCapturing(false);
+    setCaptured(null);
+    setPictureSize(undefined);
     setRequest(next);
   }, []);
 
@@ -78,28 +116,42 @@ export function CameraCaptureHost() {
     }
   }
 
+  async function handleCameraReady() {
+    try {
+      if (!pictureSize) {
+        const sizes = await cameraRef.current?.getAvailablePictureSizesAsync();
+        const picked = pickUploadPictureSize(sizes ?? []);
+        if (picked) setPictureSize(picked);
+      }
+    } catch {
+      // Keep the device default if size discovery fails.
+    }
+    setCameraReady(true);
+  }
+
   async function handleCapture() {
     if (!cameraRef.current || !cameraReady || capturing) return;
     setCapturing(true);
     try {
       const photo = await cameraRef.current.takePictureAsync({
-        quality: requestRef.current?.options?.quality ?? 0.85,
+        quality: requestRef.current?.options?.quality ?? 0.45,
         skipProcessing: false,
+        exif: false,
+        shutterSound: false,
       });
       if (!photo?.uri) {
         finish({ status: "error", message: copy.captureFailed });
         return;
       }
       const name = requestRef.current?.fallbackName ?? `photo-${Date.now()}.jpg`;
-      finish({
-        status: "success",
-        file: {
-          uri: photo.uri,
-          name,
-          type: "image/jpeg",
-          fileSize: undefined,
-        },
+      const persisted = await persistLocalMediaFile({
+        uri: photo.uri,
+        name,
+        type: "image/jpeg",
+        fileSize: undefined,
       });
+      setCaptured(persisted);
+      setCapturing(false);
     } catch {
       finish({ status: "error", message: copy.captureFailed });
     }
@@ -138,31 +190,60 @@ export function CameraCaptureHost() {
               style={StyleSheet.absoluteFill}
               facing={request?.facing ?? "back"}
               mode="picture"
-              onCameraReady={() => setCameraReady(true)}
+              pictureSize={pictureSize}
+              onCameraReady={() => void handleCameraReady()}
             />
-            {!cameraReady ? (
+            {!cameraReady && !captured ? (
               <View style={styles.loadingOverlay}>
                 <ActivityIndicator color={colors.white} size="large" />
                 <Text style={styles.loadingText}>{copy.loading}</Text>
               </View>
             ) : null}
-            <View style={[styles.controls, { paddingBottom: insets.bottom + 16 }]}>
-              <Pressable
-                style={styles.cancelChip}
-                onPress={() => finish({ status: "cancelled" })}
-                disabled={capturing}
-              >
-                <Text style={styles.cancelText}>{copy.cancel}</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.shutter, capturing && styles.shutterDisabled]}
-                onPress={() => void handleCapture()}
-                disabled={!cameraReady || capturing}
-              >
-                <View style={styles.shutterInner} />
-              </Pressable>
-              <View style={styles.sideSpacer} />
-            </View>
+            {captured ? (
+              <View style={styles.reviewOverlay}>
+                <Image source={{ uri: captured.uri }} style={styles.reviewImage} resizeMode="contain" />
+                <View style={[styles.reviewActions, { paddingBottom: insets.bottom + 16 }]}>
+                  <Text style={styles.reviewTitle}>{copy.reviewTitle}</Text>
+                  <Text style={styles.reviewHint}>{copy.reviewHint}</Text>
+                  <Pressable
+                    style={styles.primaryButton}
+                    onPress={() => finish({ status: "success", file: captured })}
+                  >
+                    <Text style={styles.primaryText}>{copy.usePhoto}</Text>
+                  </Pressable>
+                  <Pressable
+                    style={styles.secondaryButton}
+                    onPress={() => {
+                      setCaptured(null);
+                      setCapturing(false);
+                    }}
+                  >
+                    <Text style={styles.secondaryText}>{copy.retake}</Text>
+                  </Pressable>
+                  <Pressable onPress={() => finish({ status: "cancelled" })}>
+                    <Text style={styles.cancelText}>{copy.cancel}</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : (
+              <View style={[styles.controls, { paddingBottom: insets.bottom + 16 }]}>
+                <Pressable
+                  style={styles.cancelChip}
+                  onPress={() => finish({ status: "cancelled" })}
+                  disabled={capturing}
+                >
+                  <Text style={styles.cancelText}>{copy.cancel}</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.shutter, capturing && styles.shutterDisabled]}
+                  onPress={() => void handleCapture()}
+                  disabled={!cameraReady || capturing}
+                >
+                  <View style={styles.shutterInner} />
+                </Pressable>
+                <View style={styles.sideSpacer} />
+              </View>
+            )}
           </>
         ) : null}
       </View>
@@ -267,5 +348,31 @@ const styles = StyleSheet.create({
   },
   sideSpacer: {
     minWidth: 72,
+  },
+  reviewOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.zinc900,
+  },
+  reviewImage: {
+    flex: 1,
+    width: "100%",
+  },
+  reviewActions: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    gap: 10,
+    backgroundColor: colors.zinc900,
+  },
+  reviewTitle: {
+    color: colors.white,
+    fontSize: 18,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  reviewHint: {
+    color: "#e4e4e7",
+    fontSize: 14,
+    textAlign: "center",
+    marginBottom: 4,
   },
 });

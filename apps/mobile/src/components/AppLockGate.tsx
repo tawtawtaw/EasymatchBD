@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { AppLogo } from "./AppLogo";
 import { tAppLock } from "../i18n/app-lock";
 import { tVideoCalls } from "../i18n/video-calls";
 import { useActiveRouteName } from "../navigation/active-route";
@@ -251,6 +252,7 @@ export function AppLockGate() {
         ) : null}
 
         <View style={styles.card}>
+          <AppLogo width={200} style={styles.logo} />
           <Text style={styles.title}>{copy.lockTitle}</Text>
           <Text style={styles.subtitle}>{copy.lockSubtitle}</Text>
 
@@ -327,6 +329,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.rose100,
     padding: 20,
+  },
+  logo: {
+    alignSelf: "center",
+    marginBottom: 16,
   },
   callCard: {
     marginBottom: 16,

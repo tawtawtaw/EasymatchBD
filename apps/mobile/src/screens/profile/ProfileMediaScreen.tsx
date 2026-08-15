@@ -1,6 +1,8 @@
 import { useFocusEffect } from "@react-navigation/native";
-import { useCallback, useEffect, useLayoutEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
+  Alert,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,24 +11,27 @@ import {
 } from "react-native";
 import {
   canAddFamilyGalleryPhoto,
-  canAddOtherGalleryPhoto,
   isOnBehalfProfile,
+  MAX_GALLERY_PHOTOS,
   splitGalleryPhotos,
 } from "@easymatch/shared";
 import { AuthenticatedImage } from "../../components/AuthenticatedImage";
 import { MediaCaptureActions } from "../../components/MediaCaptureActions";
+import { PhotoConfirmModal } from "../../components/PhotoConfirmModal";
 import { VerificationFeedbackPanel } from "../../components/VerificationFeedbackPanel";
 import { ErrorState, LoadingState } from "../../components/ScreenState";
 import { tProfileMedia } from "../../i18n/messages";
 import { getApiErrorMessage } from "../../lib/api-error";
 import {
   captureImageFromCamera,
+  persistLocalMediaFile,
   pickDocumentFile,
   pickImageFromLibrary,
   type CaptureOutcome,
   type PickedMediaFile,
 } from "../../lib/media-capture";
 import { promptOpenAppSettings } from "../../lib/permission-settings";
+import { clearCachedPhoto } from "../../lib/photo-cache";
 import {
   getOnboardingMediaStep,
   getRequiredNidSubject,
@@ -35,6 +40,7 @@ import {
 import { computeVerificationSubmitState, applyMediaCompletionOverrides, isVerificationAwaitingOfficer, requiredNidStatus } from "../../lib/verification-submit-state";
 import { isProfileBiodataComplete } from "../../lib/member-onboarding";
 import { formatCompletionMissingMessage } from "../../lib/completion-missing-labels";
+import { redirectIfBiodataStepLocked } from "../../lib/biodata-navigation";
 import {
   clearVerificationSubmittedAck,
   markVerificationSubmittedAck,
@@ -48,6 +54,7 @@ import {
   deleteProfilePhoto,
   dismissVerificationAlerts,
   getProfileMedia,
+  nidFileUrl,
   profilePhotoUrl,
   setPrimaryPhoto,
   submitForVerification,
@@ -60,6 +67,7 @@ import { useOnboardingStore } from "../../store/onboardingStore";
 import {
   MAX_NID_BYTES,
   MAX_PHOTO_BYTES,
+  type NidDocument,
   type NidDocumentSide,
   type NidDocumentSubject,
   type ProfileMedia,
@@ -95,6 +103,76 @@ function patchMediaAfterVerificationSubmit(
   };
 }
 
+function isImageMime(mime?: string | null) {
+  return Boolean(mime?.startsWith("image/"));
+}
+
+function reviewItemLabel(
+  status: string | undefined,
+  submitted: boolean,
+  copy: ReturnType<typeof tProfileMedia>,
+) {
+  if (!status) return "—";
+  if (status === "rejected") return copy.summaryStatus.rejected;
+  if (status === "approved" || status === "verified") return copy.summaryStatus.approved;
+  if (submitted) return copy.summaryStatus.pending;
+  return copy.savedOnProfile;
+}
+
+function mergePhotoIntoMedia(media: ProfileMedia, photo: ProfilePhoto): ProfileMedia {
+  if (photo.type === "primary") {
+    return {
+      ...media,
+      photos: [
+        ...media.photos.filter((item) => item.type !== "primary" && item.id !== photo.id),
+        photo,
+      ],
+    };
+  }
+  return {
+    ...media,
+    photos: [...media.photos.filter((item) => item.id !== photo.id), photo],
+  };
+}
+
+function mergeNidIntoMedia(media: ProfileMedia, doc: NidDocument): ProfileMedia {
+  return {
+    ...media,
+    nidDocuments: [
+      ...media.nidDocuments.filter(
+        (item) => !(item.side === doc.side && item.subject === doc.subject),
+      ),
+      doc,
+    ],
+  };
+}
+
+function applyIncomingMedia(
+  local: ProfileMedia | null,
+  incoming: ProfileMedia,
+  removedPhotoIds?: Set<string>,
+): ProfileMedia {
+  if (!local) return incoming;
+
+  const photos = new Map(incoming.photos.map((photo) => [photo.id, photo]));
+  for (const photo of local.photos) {
+    if (removedPhotoIds?.has(photo.id)) continue;
+    if (!photos.has(photo.id)) photos.set(photo.id, photo);
+  }
+
+  const nidKey = (doc: NidDocument) => `${doc.subject}:${doc.side}`;
+  const nids = new Map(incoming.nidDocuments.map((doc) => [nidKey(doc), doc]));
+  for (const doc of local.nidDocuments) {
+    if (!nids.has(nidKey(doc))) nids.set(nidKey(doc), doc);
+  }
+
+  return {
+    ...incoming,
+    photos: [...photos.values()],
+    nidDocuments: [...nids.values()],
+  };
+}
+
 export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenProps) {
   const locale = useLocaleStore((s) => s.locale);
   const user = useAuthStore((s) => s.user);
@@ -109,6 +187,29 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [submittedAck, setSubmittedAck] = useState(false);
+  const [previewUris, setPreviewUris] = useState<Record<string, string>>({});
+  const [optimisticPreviews, setOptimisticPreviews] = useState<{
+    primary?: string;
+    family?: string;
+  }>({});
+  const [optimisticOtherUris, setOptimisticOtherUris] = useState<string[]>([]);
+  const loadGeneration = useRef(0);
+  const removedPhotoIds = useRef(new Set<string>());
+  const [pendingConfirm, setPendingConfirm] = useState<
+    | {
+        kind: "photo";
+        file: PickedMediaFile;
+        type: "primary" | "gallery";
+        gallerySlot?: "other" | "family";
+      }
+    | {
+        kind: "nid";
+        file: PickedMediaFile;
+        side: NidDocumentSide;
+        subject: NidDocumentSubject;
+      }
+    | null
+  >(null);
 
   const profileId = user?.profile?.id ?? null;
 
@@ -129,25 +230,35 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
     copy.biodataIncompleteIntro,
   );
 
-  const load = useCallback(async (options?: { forceFresh?: boolean }) => {
-    if (options?.forceFresh !== false) {
+  const load = useCallback(async (options?: { silent?: boolean }) => {
+    const generation = ++loadGeneration.current;
+    if (!options?.silent) {
       setLoading(true);
     }
     setError(null);
     try {
-      setMedia(await getProfileMedia({ forceFresh: true }));
+      const next = await getProfileMedia({ forceFresh: true });
+      if (generation !== loadGeneration.current) return;
+      setMedia((current) => applyIncomingMedia(current, next, removedPhotoIds.current));
     } catch (err) {
+      if (generation !== loadGeneration.current) return;
       setError(getApiErrorMessage(err, copy.loadError));
     } finally {
-      setLoading(false);
+      if (generation === loadGeneration.current) {
+        setLoading(false);
+      }
     }
   }, [copy.loadError]);
 
   const reloadAfterMutation = useCallback(async () => {
     clearMemberVerificationMediaCache();
+    const generation = ++loadGeneration.current;
     try {
-      setMedia(await getProfileMedia({ forceFresh: true }));
+      const next = await getProfileMedia({ forceFresh: true });
+      if (generation !== loadGeneration.current) return;
+      setMedia((current) => applyIncomingMedia(current, next, removedPhotoIds.current));
     } catch (err) {
+      if (generation !== loadGeneration.current) return;
       setError(getApiErrorMessage(err, copy.loadError));
     }
     void syncMemberProfileStateAfterMutation(locale);
@@ -169,16 +280,26 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
 
   useFocusEffect(
     useCallback(() => {
+      if (redirectIfBiodataStepLocked(navigation, "ProfileMedia", isOnboardingSetup)) {
+        return;
+      }
       void readVerificationSubmittedAck(profileId).then(setSubmittedAck);
-      void load();
+      void load({ silent: true });
       void syncMemberProfileStateAfterMutation(locale);
-    }, [load, locale, profileId]),
+    }, [isOnboardingSetup, load, locale, navigation, profileId]),
   );
 
   useEffect(() => {
     if (!media) return;
 
-    const { canResubmit } = computeVerificationSubmitState(media);
+    const { canResubmit, canSubmitVerifiedAmendment } =
+      computeVerificationSubmitState(media, { biodataComplete });
+
+    if (canSubmitVerifiedAmendment) {
+      setSubmittedAck(false);
+      void clearVerificationSubmittedAck(profileId);
+      return;
+    }
 
     if (
       media.nidStatus === "rejected" ||
@@ -204,34 +325,59 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
         setSubmittedAck(false);
       }
     });
-  }, [media, profileId]);
+  }, [biodataComplete, media, profileId]);
 
   async function uploadPhotoFile(
     file: PickedMediaFile,
     type: "primary" | "gallery",
     gallerySlot?: "other" | "family",
   ) {
-    if ((file.fileSize ?? 0) > MAX_PHOTO_BYTES) {
-      setError(copy.photoTooLarge);
-      return;
-    }
     setBusy(true);
     setError(null);
+    const isOther = type === "gallery" && gallerySlot !== "family";
+    let prepared: PickedMediaFile | null = null;
     try {
-      await uploadProfilePhoto(
+      prepared = await persistLocalMediaFile(file);
+      if ((prepared.fileSize ?? 0) > MAX_PHOTO_BYTES) {
+        setError(copy.photoTooLarge);
+        return;
+      }
+      if (type === "primary") {
+        setOptimisticPreviews((current) => ({ ...current, primary: prepared!.uri }));
+      } else if (gallerySlot === "family") {
+        setOptimisticPreviews((current) => ({ ...current, family: prepared!.uri }));
+      } else {
+        setOptimisticOtherUris((current) =>
+          current.includes(prepared!.uri) ? current : [...current, prepared!.uri],
+        );
+      }
+      const uploaded = await uploadProfilePhoto(
         {
-          uri: file.uri,
-          name: file.name,
-          type: file.type,
+          uri: prepared.uri,
+          name: prepared.name,
+          type: prepared.type,
         },
         type,
         gallerySlot,
       );
-      setMessage(copy.uploaded);
+      setPreviewUris((current) => ({ ...current, [uploaded.id]: prepared!.uri }));
+      setMedia((current) => (current ? mergePhotoIntoMedia(current, uploaded) : current));
+      setMessage(
+        type === "gallery" && media?.isVerified
+          ? copy.extraPhotosSavedHint
+          : copy.uploaded,
+      );
       await reloadAfterMutation();
     } catch (err) {
       setError(getApiErrorMessage(err, copy.uploadError));
     } finally {
+      if (type === "primary") {
+        setOptimisticPreviews((current) => ({ ...current, primary: undefined }));
+      } else if (gallerySlot === "family") {
+        setOptimisticPreviews((current) => ({ ...current, family: undefined }));
+      } else if (isOther && prepared) {
+        setOptimisticOtherUris((current) => current.filter((uri) => uri !== prepared!.uri));
+      }
       setBusy(false);
     }
   }
@@ -299,7 +445,12 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
     }
     if (outcome.status === "cancelled") return;
     if (outcome.status !== "success") return;
-    await uploadPhotoFile(outcome.file, type, gallerySlot);
+    setPendingConfirm({
+      kind: "photo",
+      file: outcome.file,
+      type,
+      gallerySlot,
+    });
   }
 
   async function uploadNidFile(
@@ -307,22 +458,31 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
     side: NidDocumentSide,
     subject: NidDocumentSubject,
   ) {
-    if ((file.fileSize ?? 0) > MAX_NID_BYTES) {
-      setError(copy.nidTooLarge);
-      return;
-    }
     setBusy(true);
     setError(null);
     try {
-      await uploadNidDocument(
+      const prepared = await persistLocalMediaFile(file);
+      if ((prepared.fileSize ?? 0) > MAX_NID_BYTES) {
+        setError(copy.nidTooLarge);
+        return;
+      }
+      if (isImageMime(prepared.type)) {
+        setPreviewUris((current) => ({
+          ...current,
+          [`nid-${subject}-${side}`]: prepared.uri,
+        }));
+      }
+      const uploaded = await uploadNidDocument(
         {
-          uri: file.uri,
-          name: file.name,
-          type: file.type,
+          uri: prepared.uri,
+          name: prepared.name,
+          type: prepared.type,
         },
         side,
         subject,
       );
+      setMedia((current) => (current ? mergeNidIntoMedia(current, uploaded) : current));
+      void clearCachedPhoto(nidFileUrl(side, subject));
       setMessage(copy.uploaded);
       await reloadAfterMutation();
     } catch (err) {
@@ -360,13 +520,52 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
     }
     if (outcome.status === "cancelled") return;
     if (outcome.status !== "success") return;
-    await uploadNidFile(outcome.file, side, subject);
+    setPendingConfirm({
+      kind: "nid",
+      file: outcome.file,
+      side,
+      subject,
+    });
   }
 
   async function handleNidFromFile(side: NidDocumentSide, subject: NidDocumentSubject) {
     const file = await pickDocumentFile();
     if (!file) return;
-    await uploadNidFile(file, side, subject);
+    if (isImageMime(file.type)) {
+      setPendingConfirm({ kind: "nid", file, side, subject });
+      return;
+    }
+    Alert.alert(copy.confirmPdfTitle, file.name, [
+      { text: copy.cancel, style: "cancel" },
+      {
+        text: copy.useThisFile,
+        onPress: () => {
+          void uploadNidFile(file, side, subject);
+        },
+      },
+    ]);
+  }
+
+  async function confirmPendingUpload() {
+    const pending = pendingConfirm;
+    setPendingConfirm(null);
+    if (!pending) return;
+    if (pending.kind === "photo") {
+      await uploadPhotoFile(pending.file, pending.type, pending.gallerySlot);
+      return;
+    }
+    await uploadNidFile(pending.file, pending.side, pending.subject);
+  }
+
+  async function retakePendingUpload() {
+    const pending = pendingConfirm;
+    setPendingConfirm(null);
+    if (!pending) return;
+    if (pending.kind === "photo") {
+      await handlePhotoFromGallery(pending.type, pending.gallerySlot);
+      return;
+    }
+    await handleNidFromGallery(pending.side, pending.subject);
   }
 
   async function handleSetPrimary(photo: ProfilePhoto) {
@@ -384,10 +583,18 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
   async function handleDeletePhoto(photoId: string) {
     setBusy(true);
     try {
+      removedPhotoIds.current.add(photoId);
+      setMedia((current) =>
+        current
+          ? { ...current, photos: current.photos.filter((photo) => photo.id !== photoId) }
+          : current,
+      );
       await deleteProfilePhoto(photoId);
       await reloadAfterMutation();
     } catch (err) {
+      removedPhotoIds.current.delete(photoId);
       setError(getApiErrorMessage(err, copy.actionError));
+      await reloadAfterMutation();
     } finally {
       setBusy(false);
     }
@@ -400,16 +607,17 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
       setMessage(null);
       return;
     }
-    if (computeVerificationSubmitState(media).nidRejected) {
+    if (computeVerificationSubmitState(media, { biodataComplete }).nidRejected) {
       setError(copy.submitRejectedNid);
       setMessage(null);
       return;
     }
 
-    const submitStateNow = computeVerificationSubmitState(media);
+    const submitStateNow = computeVerificationSubmitState(media, { biodataComplete });
     const awaitingReviewNow =
-      submitStateNow.isPendingReview ||
-      (submittedAck && !submitStateNow.canResubmit);
+      (submitStateNow.isPendingReview ||
+        (submittedAck && !submitStateNow.canResubmit)) &&
+      !submitStateNow.canSubmitVerifiedAmendment;
 
     if (awaitingReviewNow) {
       setMessage(copy.submitted);
@@ -488,39 +696,75 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
   const requiredNidBack = nidDocuments.find(
     (d) => d.side === "back" && d.subject === requiredSubject,
   );
-  const { otherPhoto, familyPhotos: familyPhotosRaw } = splitGalleryPhotos(gallery);
-  const familyPhotos = familyPhotosRaw.filter(
-    (photo, index, list) => list.findIndex((entry) => entry.id === photo.id) === index,
+  const { otherPhotos, familyPhoto } = splitGalleryPhotos(gallery);
+  const otherPhotoLimit = 3;
+  const canAddOther =
+    otherPhotos.length < otherPhotoLimit && gallery.length < MAX_GALLERY_PHOTOS;
+  const canAddFamily = canAddFamilyGalleryPhoto(gallery.length, familyPhoto);
+  const extraPhotoSlotsLeft = Math.max(
+    0,
+    Math.min(otherPhotoLimit - otherPhotos.length, MAX_GALLERY_PHOTOS - gallery.length),
   );
-  const canAddOther = canAddOtherGalleryPhoto(gallery.length, otherPhoto);
-  const canAddFamily = canAddFamilyGalleryPhoto(gallery.length, familyPhotos);
   const onboardingStep = isOnboardingSetup ? getOnboardingMediaStep(media) : null;
-  const submitState = computeVerificationSubmitState(media);
+  const submitState = computeVerificationSubmitState(media, { biodataComplete });
   const awaitingOfficer = isVerificationAwaitingOfficer(media);
   const awaitingReview =
-    awaitingOfficer ||
-    submitState.isPendingReview ||
-    (submittedAck && !submitState.canResubmit);
+    (awaitingOfficer ||
+      submitState.isPendingReview ||
+      (submittedAck && !submitState.canResubmit)) &&
+    !submitState.canSubmitVerifiedAmendment;
   const canSubmitNow =
     !awaitingOfficer &&
     biodataComplete &&
     (submitState.readyToSubmit ||
-      (submitState.canResubmit && !submittedAck));
+      (submitState.canResubmit && !submittedAck) ||
+      submitState.canSubmitVerifiedAmendment);
   const submitDisabled =
-    busy || media.isVerified || !submitState.packageComplete || !canSubmitNow;
+    busy ||
+    (media.isVerified && !submitState.canSubmitVerifiedAmendment) ||
+    !submitState.packageComplete ||
+    !canSubmitNow;
 
   let submitLabel: string = copy.submitForReview;
   if (busy) submitLabel = copy.submitVerification;
+  else if (submitState.canSubmitVerifiedAmendment) submitLabel = copy.submitExtraPhotos;
   else if (media.isVerified) submitLabel = copy.verifiedButton;
   else if (awaitingReview) submitLabel = copy.pendingReviewButton;
   else if (submitState.canResubmit) submitLabel = copy.resubmitForReview;
 
   const displayNidStatus = requiredNidStatus(media) ?? media.nidStatus;
+  const submittedForReview = media.profileBiodataReviewStatus === "pending";
+  const nidStatusLabel =
+    displayNidStatus === "pending" && !submittedForReview
+      ? copy.savedOnProfile
+      : displayNidStatus.replace(/_/g, " ");
 
   return (
+    <>
+    <PhotoConfirmModal
+      visible={pendingConfirm !== null}
+      uri={pendingConfirm?.file.uri ?? null}
+      title={copy.confirmPhotoTitle}
+      hint={copy.confirmPhotoHint}
+      confirmLabel={copy.useThisPhoto}
+      retakeLabel={copy.chooseAnotherPhoto}
+      cancelLabel={copy.cancel}
+      onConfirm={() => void confirmPendingUpload()}
+      onRetake={() => void retakePendingUpload()}
+      onCancel={() => setPendingConfirm(null)}
+    />
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {message ? <Text style={styles.success}>{message}</Text> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
+
+      {submitState.canSubmitVerifiedAmendment && !awaitingOfficer ? (
+        <ExtraPhotosSubmitCard
+          copy={copy}
+          busy={busy}
+          disabled={submitDisabled}
+          onSubmit={() => void handleSubmitVerification()}
+        />
+      ) : null}
 
       {isOnboardingSetup && onboardingStep ? (
         <OnboardingMediaBanner step={onboardingStep} copy={copy} />
@@ -541,7 +785,7 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
             {copy.profileVerified}: {media.isVerified ? copy.yes : copy.no}
           </Text>
           <Text style={styles.meta}>
-            {copy.nidStatus}: {displayNidStatus.replace(/_/g, " ")}
+            {copy.nidStatus}: {nidStatusLabel}
           </Text>
         </View>
       )}
@@ -552,7 +796,10 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
           onboardingStep === "primary" && styles.cardHighlight,
         ]}
       >
-        <Text style={styles.sectionTitle}>{copy.primaryPhoto}</Text>
+        <Text style={styles.sectionTitle}>
+          {primary ? "✓ " : ""}
+          {copy.primaryPhoto}
+        </Text>
         {onboardingStep === "primary" ? (
           <Text style={styles.stepHint}>{copy.onboardingStepPrimaryHint}</Text>
         ) : null}
@@ -560,11 +807,21 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
           <>
             <AuthenticatedImage
               path={profilePhotoUrl(primary.id)}
+              previewUri={previewUris[primary.id] ?? optimisticPreviews.primary}
               style={styles.primaryPhoto}
               loadingLabel={copy.loadingPhoto}
             />
-            <StatusBadge status={primary.status} />
+            <StatusBadge
+              status={primary.status}
+              label={reviewItemLabel(primary.status, submittedForReview, copy)}
+            />
           </>
+        ) : optimisticPreviews.primary ? (
+          <Image
+            source={{ uri: optimisticPreviews.primary }}
+            style={styles.primaryPhoto}
+            resizeMode="cover"
+          />
         ) : (
           <Text style={styles.muted}>{copy.noPrimaryPhoto}</Text>
         )}
@@ -581,49 +838,25 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>{copy.otherPhoto}</Text>
         <Text style={styles.hint}>{copy.otherPhotoHint}</Text>
-        {otherPhoto ? (
-          <View style={styles.galleryItem}>
-            <AuthenticatedImage
-              path={profilePhotoUrl(otherPhoto.id)}
-              style={styles.galleryPhoto}
-              loadingLabel={copy.loadingPhoto}
-            />
-            <StatusBadge status={otherPhoto.status} compact />
-            {primary?.id !== otherPhoto.id ? (
-              <Pressable onPress={() => void handleSetPrimary(otherPhoto)} disabled={busy}>
-                <Text style={styles.link}>{copy.setPrimary}</Text>
-              </Pressable>
-            ) : null}
-            <Pressable onPress={() => void handleDeletePhoto(otherPhoto.id)} disabled={busy}>
-              <Text style={styles.linkDanger}>{copy.remove}</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <Text style={styles.muted}>{copy.noOtherPhoto}</Text>
-        )}
         {canAddOther ? (
-          <MediaCaptureActions
-            takePhotoLabel={copy.takePhoto}
-            chooseGalleryLabel={copy.chooseFromGallery}
-            onTakePhoto={() => void handlePhotoFromCamera("gallery", "other")}
-            onChooseGallery={() => void handlePhotoFromGallery("gallery", "other")}
-            disabled={busy}
-          />
+          <Text style={styles.hint}>
+            {copy.otherPhotoRemaining.replace("{count}", String(extraPhotoSlotsLeft))}
+          </Text>
         ) : null}
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>{copy.familyPhoto}</Text>
-        <Text style={styles.hint}>{copy.familyPhotoHint}</Text>
         <View style={styles.galleryRow}>
-          {familyPhotos.map((photo) => (
+          {otherPhotos.map((photo) => (
             <View key={photo.id} style={styles.galleryItem}>
               <AuthenticatedImage
                 path={profilePhotoUrl(photo.id)}
+                previewUri={previewUris[photo.id]}
                 style={styles.galleryPhoto}
                 loadingLabel={copy.loadingPhoto}
               />
-              <StatusBadge status={photo.status} compact />
+              <StatusBadge
+                status={photo.status}
+                label={reviewItemLabel(photo.status, submittedForReview, copy)}
+                compact
+              />
               {primary?.id !== photo.id ? (
                 <Pressable onPress={() => void handleSetPrimary(photo)} disabled={busy}>
                   <Text style={styles.link}>{copy.setPrimary}</Text>
@@ -634,8 +867,68 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
               </Pressable>
             </View>
           ))}
+          {optimisticOtherUris
+            .filter((uri) => !otherPhotos.some((photo) => previewUris[photo.id] === uri))
+            .map((uri) => (
+            <View key={uri} style={styles.galleryItem}>
+              <Image
+                source={{ uri }}
+                style={styles.galleryPhoto}
+                resizeMode="cover"
+              />
+            </View>
+          ))}
         </View>
-        {!familyPhotos.length ? <Text style={styles.muted}>{copy.noFamilyPhoto}</Text> : null}
+        {!otherPhotos.length && !optimisticOtherUris.length ? (
+          <Text style={styles.muted}>{copy.noOtherPhoto}</Text>
+        ) : null}
+        {canAddOther ? (
+          <MediaCaptureActions
+            takePhotoLabel={otherPhotos.length ? copy.addAnotherPhoto : copy.takePhoto}
+            chooseGalleryLabel={
+              otherPhotos.length ? copy.addAnotherFromGallery : copy.chooseFromGallery
+            }
+            onTakePhoto={() => void handlePhotoFromCamera("gallery", "other")}
+            onChooseGallery={() => void handlePhotoFromGallery("gallery", "other")}
+            disabled={busy}
+          />
+        ) : null}
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>{copy.familyPhoto}</Text>
+        <Text style={styles.hint}>{copy.familyPhotoHint}</Text>
+        {familyPhoto ? (
+          <View style={styles.galleryItem}>
+            <AuthenticatedImage
+              path={profilePhotoUrl(familyPhoto.id)}
+              previewUri={previewUris[familyPhoto.id] ?? optimisticPreviews.family}
+              style={styles.galleryPhoto}
+              loadingLabel={copy.loadingPhoto}
+            />
+            <StatusBadge
+              status={familyPhoto.status}
+              label={reviewItemLabel(familyPhoto.status, submittedForReview, copy)}
+              compact
+            />
+            {primary?.id !== familyPhoto.id ? (
+              <Pressable onPress={() => void handleSetPrimary(familyPhoto)} disabled={busy}>
+                <Text style={styles.link}>{copy.setPrimary}</Text>
+              </Pressable>
+            ) : null}
+            <Pressable onPress={() => void handleDeletePhoto(familyPhoto.id)} disabled={busy}>
+              <Text style={styles.linkDanger}>{copy.remove}</Text>
+            </Pressable>
+          </View>
+        ) : optimisticPreviews.family ? (
+          <Image
+            source={{ uri: optimisticPreviews.family }}
+            style={styles.galleryPhoto}
+            resizeMode="cover"
+          />
+        ) : (
+          <Text style={styles.muted}>{copy.noFamilyPhoto}</Text>
+        )}
         {canAddFamily ? (
           <MediaCaptureActions
             takePhotoLabel={copy.takePhoto}
@@ -647,6 +940,15 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
         ) : null}
       </View>
 
+      {submitState.canSubmitVerifiedAmendment && !awaitingOfficer ? (
+        <ExtraPhotosSubmitCard
+          copy={copy}
+          busy={busy}
+          disabled={submitDisabled}
+          onSubmit={() => void handleSubmitVerification()}
+        />
+      ) : null}
+
       <View
         style={[
           styles.card,
@@ -655,12 +957,25 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
         ]}
       >
         <Text style={styles.sectionTitle}>
+          {(onBehalf ? creatorNidFront && creatorNidBack : requiredNidFront && requiredNidBack)
+            ? "✓ "
+            : ""}
           {onBehalf ? copy.creatorNidTitle : copy.nidDocuments}
         </Text>
         {onBehalf ? <Text style={styles.hint}>{copy.creatorNidHint}</Text> : null}
         <NidRow
-          label={copy.nidFront}
+          label={`${(onBehalf ? creatorNidFront : requiredNidFront) ? "✓ " : ""}${copy.nidFront}`}
           status={onBehalf ? creatorNidFront?.status : requiredNidFront?.status}
+          statusLabel={reviewItemLabel(
+            onBehalf ? creatorNidFront?.status : requiredNidFront?.status,
+            submittedForReview,
+            copy,
+          )}
+          mimeType={(onBehalf ? creatorNidFront : requiredNidFront)?.mimeType}
+          path={nidFileUrl("front", requiredSubject, (onBehalf ? creatorNidFront : requiredNidFront)?.id)}
+          previewUri={previewUris[`nid-${requiredSubject}-front`]}
+          pdfLabel={copy.pdfUploaded}
+          loadingLabel={copy.loadingPhoto}
           hint={onboardingStep === "nidFront" ? copy.onboardingStepNidFrontHint : undefined}
           takePhotoLabel={
             (onBehalf ? creatorNidFront : requiredNidFront)
@@ -676,8 +991,18 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
           emphasizeCamera={onboardingStep === "nidFront"}
         />
         <NidRow
-          label={copy.nidBack}
+          label={`${(onBehalf ? creatorNidBack : requiredNidBack) ? "✓ " : ""}${copy.nidBack}`}
           status={onBehalf ? creatorNidBack?.status : requiredNidBack?.status}
+          statusLabel={reviewItemLabel(
+            onBehalf ? creatorNidBack?.status : requiredNidBack?.status,
+            submittedForReview,
+            copy,
+          )}
+          mimeType={(onBehalf ? creatorNidBack : requiredNidBack)?.mimeType}
+          path={nidFileUrl("back", requiredSubject, (onBehalf ? creatorNidBack : requiredNidBack)?.id)}
+          previewUri={previewUris[`nid-${requiredSubject}-back`]}
+          pdfLabel={copy.pdfUploaded}
+          loadingLabel={copy.loadingPhoto}
           hint={onboardingStep === "nidBack" ? copy.onboardingStepNidBackHint : undefined}
           takePhotoLabel={
             (onBehalf ? creatorNidBack : requiredNidBack)
@@ -700,8 +1025,14 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
           <Text style={styles.sectionTitle}>{copy.memberNidTitle}</Text>
           <Text style={styles.hint}>{copy.memberNidHint}</Text>
           <NidRow
-            label={copy.nidFront}
+            label={`${memberNidFront ? "✓ " : ""}${copy.nidFront}`}
             status={memberNidFront?.status}
+            statusLabel={reviewItemLabel(memberNidFront?.status, submittedForReview, copy)}
+            mimeType={memberNidFront?.mimeType}
+            path={nidFileUrl("front", "member", memberNidFront?.id)}
+            previewUri={previewUris["nid-member-front"]}
+            pdfLabel={copy.pdfUploaded}
+            loadingLabel={copy.loadingPhoto}
             takePhotoLabel={memberNidFront ? copy.retakePhoto : copy.takeNidPhoto}
             chooseGalleryLabel={copy.chooseFromGallery}
             chooseFileLabel={copy.chooseFile}
@@ -711,8 +1042,14 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
             busy={busy}
           />
           <NidRow
-            label={copy.nidBack}
+            label={`${memberNidBack ? "✓ " : ""}${copy.nidBack}`}
             status={memberNidBack?.status}
+            statusLabel={reviewItemLabel(memberNidBack?.status, submittedForReview, copy)}
+            mimeType={memberNidBack?.mimeType}
+            path={nidFileUrl("back", "member", memberNidBack?.id)}
+            previewUri={previewUris["nid-member-back"]}
+            pdfLabel={copy.pdfUploaded}
+            loadingLabel={copy.loadingPhoto}
             takePhotoLabel={memberNidBack ? copy.retakePhoto : copy.takeNidPhoto}
             chooseGalleryLabel={copy.chooseFromGallery}
             chooseFileLabel={copy.chooseFile}
@@ -736,7 +1073,13 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
             <Text style={styles.stepHint}>{copy.verificationPendingHint}</Text>
           </>
         ) : null}
-        {submitState.readyToSubmit && !awaitingOfficer ? (
+        {submitState.canSubmitVerifiedAmendment && !awaitingOfficer ? (
+          <>
+            <Text style={styles.sectionTitle}>{copy.extraPhotosReadyTitle}</Text>
+            <Text style={styles.stepHint}>{copy.extraPhotosReadyHint}</Text>
+          </>
+        ) : null}
+        {submitState.readyToSubmit && !awaitingOfficer && !submitState.canSubmitVerifiedAmendment ? (
           <>
             <Text style={styles.sectionTitle}>{copy.readyToSubmitTitle}</Text>
             <Text style={styles.stepHint}>{copy.readyToSubmitHint}</Text>
@@ -761,7 +1104,10 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
           style={[
             styles.submitButton,
             (busy || submitDisabled) && styles.disabled,
-            media.isVerified && styles.submitVerified,
+            media.isVerified &&
+              !submitState.canSubmitVerifiedAmendment &&
+              !awaitingReview &&
+              styles.submitVerified,
             awaitingReview && styles.submitPending,
           ]}
           onPress={() => void handleSubmitVerification()}
@@ -783,6 +1129,33 @@ export default function ProfileMediaScreen({ navigation }: ProfileMediaScreenPro
         </Pressable>
       ) : null}
     </ScrollView>
+    </>
+  );
+}
+
+function ExtraPhotosSubmitCard({
+  copy,
+  busy,
+  disabled,
+  onSubmit,
+}: {
+  copy: ReturnType<typeof tProfileMedia>;
+  busy: boolean;
+  disabled: boolean;
+  onSubmit: () => void;
+}) {
+  return (
+    <View style={[styles.card, styles.cardHighlight]}>
+      <Text style={styles.sectionTitle}>{copy.extraPhotosReadyTitle}</Text>
+      <Text style={styles.stepHint}>{copy.extraPhotosReadyHint}</Text>
+      <Pressable
+        style={[styles.submitButton, (busy || disabled) && styles.disabled]}
+        onPress={onSubmit}
+        disabled={disabled}
+      >
+        <Text style={styles.submitText}>{copy.submitExtraPhotos}</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -823,7 +1196,14 @@ function OnboardingMediaBanner({
               isCurrent && styles.onboardingStepCurrent,
             ]}
           >
-            <Text style={styles.onboardingStepIndex}>{isDone ? "✓" : index + 1}</Text>
+            <Text
+              style={[
+                styles.onboardingStepIndex,
+                isDone && styles.onboardingStepIndexDone,
+              ]}
+            >
+              {isDone ? "✓" : index + 1}
+            </Text>
             <Text
               style={[
                 styles.onboardingStepLabel,
@@ -840,10 +1220,18 @@ function OnboardingMediaBanner({
   );
 }
 
-function StatusBadge({ status, compact }: { status: string; compact?: boolean }) {
+function StatusBadge({
+  status,
+  label,
+  compact,
+}: {
+  status: string;
+  label: string;
+  compact?: boolean;
+}) {
   return (
     <Text style={[styles.badge, compact && styles.badgeCompact, badgeStyle(status)]}>
-      {status}
+      {label}
     </Text>
   );
 }
@@ -857,6 +1245,12 @@ function badgeStyle(status: string) {
 function NidRow({
   label,
   status,
+  statusLabel,
+  mimeType,
+  path,
+  previewUri,
+  pdfLabel,
+  loadingLabel,
   hint,
   takePhotoLabel,
   chooseGalleryLabel,
@@ -869,6 +1263,12 @@ function NidRow({
 }: {
   label: string;
   status?: string;
+  statusLabel: string;
+  mimeType?: string;
+  path: string;
+  previewUri?: string;
+  pdfLabel: string;
+  loadingLabel: string;
   hint?: string;
   takePhotoLabel: string;
   chooseGalleryLabel: string;
@@ -879,13 +1279,34 @@ function NidRow({
   busy: boolean;
   emphasizeCamera?: boolean;
 }) {
+  const hasDoc = Boolean(status);
+  const showImage = Boolean(previewUri || (hasDoc && isImageMime(mimeType)));
+  const showPdf = Boolean(hasDoc && mimeType && !isImageMime(mimeType));
+
   return (
     <View style={styles.nidRow}>
       <View style={styles.nidInfo}>
         <Text style={styles.nidLabel}>{label}</Text>
-        <Text style={styles.muted}>{status ?? "—"}</Text>
+        <Text style={styles.muted}>{statusLabel}</Text>
         {hint ? <Text style={styles.stepHint}>{hint}</Text> : null}
       </View>
+      {showImage ? (
+        path && hasDoc && isImageMime(mimeType) ? (
+          <AuthenticatedImage
+            path={path}
+            previewUri={previewUri}
+            style={styles.nidPreview}
+            loadingLabel={loadingLabel}
+          />
+        ) : previewUri ? (
+          <Image source={{ uri: previewUri }} style={styles.nidPreview} resizeMode="cover" />
+        ) : null
+      ) : null}
+      {showPdf ? (
+        <View style={styles.nidPdfBox}>
+          <Text style={styles.nidPdfText}>{pdfLabel}</Text>
+        </View>
+      ) : null}
       <View style={styles.nidActions}>
         <MediaCaptureActions
           takePhotoLabel={takePhotoLabel}
@@ -962,12 +1383,8 @@ const styles = StyleSheet.create({
   onboardingStepCurrent: {
     backgroundColor: colors.rose50,
   },
-  onboardingStepIndex: {
-    width: 22,
-    textAlign: "center",
-    fontWeight: "700",
-    color: colors.rose800,
-    fontSize: 13,
+  onboardingStepIndexDone: {
+    color: colors.emerald600,
   },
   onboardingStepLabel: {
     flex: 1,
@@ -1018,6 +1435,29 @@ const styles = StyleSheet.create({
   nidInfo: { flex: 1 },
   nidActions: { width: "100%" },
   nidLabel: { fontSize: 14, fontWeight: "600", color: colors.zinc800 },
+  nidPreview: {
+    width: "100%",
+    height: 160,
+    borderRadius: 12,
+    marginTop: 4,
+    backgroundColor: colors.rose50,
+  },
+  nidPdfBox: {
+    width: "100%",
+    height: 72,
+    borderRadius: 12,
+    marginTop: 4,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.rose50,
+    borderWidth: 1,
+    borderColor: colors.rose100,
+  },
+  nidPdfText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.zinc700,
+  },
   submitButton: {
     marginTop: 8,
     borderRadius: 999,

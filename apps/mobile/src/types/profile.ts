@@ -59,6 +59,7 @@ export type MemberProfile = {
   introduction: string | null;
   isVerified: boolean;
   nidVerifiedAt: string | null;
+  profileBiodataReviewStatus?: "pending" | "approved" | "rejected" | null;
   completionPercent: number;
   completionMissing: string[];
   photos?: ProfilePhoto[];
@@ -222,6 +223,7 @@ export type ProfileEditorBootstrap = {
   creationMode?: "self" | "on_behalf" | null;
   onBehalfRelation?: string | null;
   profile: MemberProfile | null;
+  profileBiodataReviewStatus?: "pending" | "approved" | "rejected" | null;
   completionPercent: number;
   completionMissing: string[];
 };

@@ -23,7 +23,7 @@ import {
   validatePartnerForm,
 } from "../../lib/partner-form";
 import type { EditPartnerScreenProps } from "../../navigation/types";
-import { advanceAfterBiodataSave } from "../../lib/biodata-navigation";
+import { advanceAfterBiodataSave, redirectIfBiodataStepLocked } from "../../lib/biodata-navigation";
 import { getProfileEditorBootstrap, updatePartner } from "../../services/profile";
 import { useAuthStore } from "../../store/authStore";
 import { useLocaleStore } from "../../store/localeStore";
@@ -111,7 +111,12 @@ export default function EditPartnerScreen({ navigation }: EditPartnerScreenProps
     }
   }, [copy.loadError, locale]);
 
-  useFocusEffect(useCallback(() => { void load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    if (redirectIfBiodataStepLocked(navigation, "EditPartner", isOnboardingSetup)) {
+      return;
+    }
+    void load();
+  }, [isOnboardingSetup, load, navigation]));
 
   const save = useCallback(async () => {
     if (!form || !personalProfile) return;
@@ -132,7 +137,7 @@ export default function EditPartnerScreen({ navigation }: EditPartnerScreenProps
     setError(null);
     setMessage(null);
     try {
-      await updatePartner(
+      const updated = await updatePartner(
         buildUpdatePartnerPayload(form, {
           religion: personalProfile.religion ?? "",
           gender: personalProfile.gender ?? "",
@@ -145,6 +150,8 @@ export default function EditPartnerScreen({ navigation }: EditPartnerScreenProps
         locale,
         isOnboardingSetup,
         refreshOnboarding,
+        completionMissing: updated.completionMissing,
+        completionPercent: updated.completionPercent,
       });
     } catch (err) {
       setError(getApiErrorMessage(err, copy.saveError));

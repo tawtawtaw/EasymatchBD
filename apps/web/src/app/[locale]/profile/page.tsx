@@ -82,8 +82,13 @@ import {
 import {
   dismissVerificationAlerts,
   getVerificationFeedback,
+  type ProfileMedia,
   type VerificationFeedback,
 } from "@/lib/media";
+import {
+  applyMediaCompletionOverrides,
+  isBiodataCompleteFromMissing,
+} from "@/lib/verification-submit-state";
 import { markProfileAmendmentDirty } from "@/lib/profile-amendment";
 
 type Tab = "personal" | "family" | "marital" | "partner" | "photos";
@@ -466,6 +471,7 @@ export default function ProfilePage() {
     }));
   }, [dropdowns.hijab_preference, tf]);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [liveMedia, setLiveMedia] = useState<ProfileMedia | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -729,6 +735,13 @@ export default function ProfilePage() {
     setProfile(p as Profile);
     setVerificationFeedback(feedback);
   }, []);
+
+  const completionMissing = useMemo(() => {
+    const missing = profile?.completionMissing ?? [];
+    return applyMediaCompletionOverrides(liveMedia ?? profile, missing);
+  }, [liveMedia, profile]);
+
+  const biodataComplete = isBiodataCompleteFromMissing(completionMissing);
 
   async function handleDismissVerificationAlerts() {
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
@@ -1199,13 +1212,16 @@ export default function ProfilePage() {
               <div className="space-y-1">
                 <p className="text-sm font-medium text-zinc-700">
                   {t("percentComplete", {
-                    percent: profile.completionPercent ?? 0,
+                    percent:
+                      completionMissing.length === 0
+                        ? 100
+                        : profile.completionPercent ?? 0,
                   })}
                 </p>
-                {(profile.completionMissing?.length ?? 0) > 0 && (
+                {completionMissing.length > 0 && (
                   <p className="text-xs text-zinc-600">
                     {t("completionRemaining", {
-                      count: profile.completionMissing?.length ?? 0,
+                      count: completionMissing.length,
                     })}
                   </p>
                 )}
@@ -1215,16 +1231,22 @@ export default function ProfilePage() {
           <div className="h-2 w-40 overflow-hidden rounded-full bg-zinc-200">
             <div
               className="h-full rounded-full bg-rose-500 transition-all"
-              style={{ width: `${profile?.completionPercent ?? 0}%` }}
+              style={{
+                width: `${
+                  completionMissing.length === 0
+                    ? 100
+                    : profile?.completionPercent ?? 0
+                }%`,
+              }}
             />
           </div>
         </div>
 
-        {profile && (profile.completionMissing?.length ?? 0) > 0 && (
+        {profile && completionMissing.length > 0 && (
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
             <p className="font-semibold">{t("completionMissingTitle")}</p>
             <ul className="mt-2 list-inside list-disc space-y-1">
-              {profile.completionMissing?.map((key) => (
+              {completionMissing.map((key) => (
                 <li key={key}>{t(`completionChecklist.items.${key}`)}</li>
               ))}
             </ul>
@@ -1296,10 +1318,8 @@ export default function ProfilePage() {
               onError={setError}
               onMessage={setMessage}
               onProfileRefresh={refreshProfile}
-              biodataComplete={
-                (profile?.completionPercent ?? 0) >= 100 &&
-                (profile?.completionMissing?.length ?? 0) === 0
-              }
+              onMediaChange={setLiveMedia}
+              biodataComplete={biodataComplete}
             />
           </div>
         ) : (

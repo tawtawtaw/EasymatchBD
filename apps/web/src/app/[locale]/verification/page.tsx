@@ -205,13 +205,13 @@ export default function VerificationPage() {
       const titleKey =
         target.photoType === "primary"
           ? "rejectDialog.photoPrimaryTitle"
-          : target.gallerySortOrder === 0
+          : isOtherGalleryPhoto({ id: "", sortOrder: target.gallerySortOrder ?? 0 })
             ? "rejectDialog.otherPhotoTitle"
             : "rejectDialog.familyPhotoTitle";
       const hintKey =
         target.photoType === "primary"
           ? "rejectDialog.photoPrimaryHint"
-          : target.gallerySortOrder === 0
+          : isOtherGalleryPhoto({ id: "", sortOrder: target.gallerySortOrder ?? 0 })
             ? "rejectDialog.otherPhotoHint"
             : "rejectDialog.familyPhotoHint";
       return {

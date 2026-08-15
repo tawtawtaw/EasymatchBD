@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AuthScreenHeader } from "../../components/AuthScreenHeader";
 import { LanguageToggle } from "../../components/LanguageToggle";
-import { tAuthLogin, tAuthVerify } from "../../i18n/messages";
+import { tAuthVerify } from "../../i18n/messages";
 import { getApiErrorMessage } from "../../lib/api-error";
 import type { OtpVerifyScreenProps } from "../../navigation/types";
 import { verifyOtp } from "../../services/auth";
@@ -24,7 +24,6 @@ export default function OtpVerifyScreen({ navigation, route }: OtpVerifyScreenPr
   const { phone, devOtp } = route.params;
   const locale = useLocaleStore((s) => s.locale);
   const copy = tAuthVerify(locale);
-  const brand = tAuthLogin(locale).brand;
   const setFromAuthResponse = useAuthStore((s) => s.setFromAuthResponse);
   const [code, setCode] = useState("");
   const [rememberDevice, setRememberDevice] = useState(true);
@@ -61,7 +60,7 @@ export default function OtpVerifyScreen({ navigation, route }: OtpVerifyScreenPr
           <Text style={styles.backText}>{copy.back}</Text>
         </Pressable>
 
-        <AuthScreenHeader brand={brand} logoSize={80} />
+        <AuthScreenHeader logoWidth={220} />
 
         <View style={styles.card}>
           <Text style={styles.title}>{copy.title}</Text>

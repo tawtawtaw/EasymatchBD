@@ -29,6 +29,8 @@ import { resolveMemberDisplayName } from "@/lib/member-display";
 import { memberComplaintHref } from "@/lib/member-complaints";
 import { ProfileBookmarkButton } from "@/components/ProfileBookmarkButton";
 import { DiscoveryProfileInterestFooter } from "@/components/DiscoveryProfileInterestFooter";
+import { ProfilePhotoLightbox } from "@/components/ProfilePhotoLightbox";
+import { visibleProfilePhotoIds } from "@easymatch/shared";
 
 export default function DiscoveryProfilePage() {
   const params = useParams<{ profileId: string }>();
@@ -48,6 +50,7 @@ export default function DiscoveryProfilePage() {
   const [acting, setActing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
@@ -126,6 +129,15 @@ export default function DiscoveryProfilePage() {
   const rel = profile.relationship;
   const nextLevel = (rel.connectionPrivacyLevel ?? rel.viewerPrivacyLevel) + 1;
   const isSelf = rel.status === "self";
+  const galleryPhotoIds = visibleProfilePhotoIds(profile.media);
+
+  function openGallery(photoId?: string) {
+    if (!galleryPhotoIds.length) return;
+    const index = photoId
+      ? Math.max(0, galleryPhotoIds.indexOf(photoId))
+      : 0;
+    setGalleryIndex(index);
+  }
 
   async function handleSendInterest() {
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
@@ -200,30 +212,44 @@ export default function DiscoveryProfilePage() {
 
       <header className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-4 sm:flex-row">
-          <div className="mx-auto h-48 w-36 shrink-0 overflow-hidden rounded-lg bg-zinc-100 sm:mx-0">
+          <div className="mx-auto w-36 shrink-0 sm:mx-0">
+            <div className="h-48 w-36 overflow-hidden rounded-lg bg-zinc-100">
             {profile.media.primaryPhotoId ? (
-              <AuthenticatedBlobImage
-                token={authToken}
-                path={discoveryPhotoUrl(
-                  profile.profileCode,
-                  profile.media.primaryPhotoId,
-                )}
-                alt={name}
-                className="h-full w-full object-cover"
-                protect
-                fetchBlob={(token, path) => {
-                  const match = path.match(
-                    /\/discovery\/profiles\/([^/]+)\/photos\/([^/]+)\/file/,
-                  );
-                  if (!match) throw new Error("Invalid photo path");
-                  return fetchDiscoveryBlob(token, match[1], match[2]);
-                }}
-              />
+              <button
+                type="button"
+                onClick={() => openGallery(profile.media.primaryPhotoId ?? undefined)}
+                className="h-full w-full"
+              >
+                <AuthenticatedBlobImage
+                  token={authToken}
+                  path={discoveryPhotoUrl(
+                    profile.profileCode,
+                    profile.media.primaryPhotoId,
+                    "thumb",
+                  )}
+                  alt={name}
+                  className="h-full w-full object-cover"
+                  protect
+                  fetchBlob={(token, path) => {
+                    const match = path.match(
+                      /\/discovery\/profiles\/([^/]+)\/photos\/([^/]+)\/file/,
+                    );
+                    if (!match) throw new Error("Invalid photo path");
+                    return fetchDiscoveryBlob(token, match[1], match[2], "thumb");
+                  }}
+                />
+              </button>
             ) : (
               <div className="flex h-full items-center justify-center text-2xl text-zinc-500">
                 {name.charAt(0)}
               </div>
             )}
+            </div>
+            {galleryPhotoIds.length > 0 ? (
+              <p className="mt-2 text-center text-xs text-rose-800 sm:text-left">
+                {t("galleryOpenHint")}
+              </p>
+            ) : null}
           </div>
           <div className="flex-1">
             <div className="flex flex-wrap items-center gap-2">
@@ -406,27 +432,46 @@ export default function DiscoveryProfilePage() {
       {profile.media.galleryPhotoIds.length > 0 ? (
         <section className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
           <h2 className="mb-1 text-lg font-semibold text-zinc-900">{t("additionalPhotos")}</h2>
+          <p className="mb-1 text-sm text-rose-800">{t("galleryOpenHint")}</p>
           <p className="mb-3 text-xs text-zinc-500">{t("photoConfidentialNotice")}</p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {profile.media.galleryPhotoIds.map((photoId) => (
-              <AuthenticatedBlobImage
+              <button
                 key={photoId}
-                token={authToken}
-                path={discoveryPhotoUrl(profile.profileCode, photoId)}
-                alt=""
-                className="aspect-square w-full rounded-lg object-cover"
-                protect
-                fetchBlob={(token, path) => {
-                  const match = path.match(
-                    /\/discovery\/profiles\/([^/]+)\/photos\/([^/]+)\/file/,
-                  );
-                  if (!match) throw new Error("Invalid photo path");
-                  return fetchDiscoveryBlob(token, match[1], match[2]);
-                }}
-              />
+                type="button"
+                onClick={() => openGallery(photoId)}
+                className="overflow-hidden rounded-lg"
+              >
+                <AuthenticatedBlobImage
+                  token={authToken}
+                  path={discoveryPhotoUrl(profile.profileCode, photoId, "thumb")}
+                  alt=""
+                  className="aspect-square w-full rounded-lg object-cover"
+                  protect
+                  fetchBlob={(token, path) => {
+                    const match = path.match(
+                      /\/discovery\/profiles\/([^/]+)\/photos\/([^/]+)\/file/,
+                    );
+                    if (!match) throw new Error("Invalid photo path");
+                    return fetchDiscoveryBlob(token, match[1], match[2], "thumb");
+                  }}
+                />
+              </button>
             ))}
           </div>
         </section>
+      ) : null}
+
+      {galleryIndex !== null && galleryPhotoIds.length > 0 ? (
+        <ProfilePhotoLightbox
+          token={authToken}
+          profileId={profile.profileCode}
+          photoIds={galleryPhotoIds}
+          index={galleryIndex}
+          alt={name}
+          onClose={() => setGalleryIndex(null)}
+          onIndexChange={setGalleryIndex}
+        />
       ) : null}
 
       <div className="mt-6 space-y-5">

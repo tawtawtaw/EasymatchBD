@@ -1,5 +1,7 @@
+import * as FileSystem from "expo-file-system/legacy";
 import { config } from "../../config/env";
-import { ApiError, readApiError } from "../../lib/api-error";
+import { ApiError, messageFromApiErrorPayload, readApiError } from "../../lib/api-error";
+import { normalizeUploadMime, withFileScheme } from "../../lib/media-capture";
 import { sessionStorage } from "../session-storage";
 
 const BOOTSTRAP_TIMEOUT_MS = 8_000;
@@ -79,7 +81,7 @@ export async function apiUpload<T>(
   formData: FormData,
   options: { auth?: boolean; timeoutMs?: number } = {},
 ): Promise<T> {
-  const timeoutMs = options.timeoutMs ?? config.requestTimeoutMs;
+  const timeoutMs = options.timeoutMs ?? Math.max(config.requestTimeoutMs, 90_000);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -99,7 +101,6 @@ export async function apiUpload<T>(
 
     const response = await fetch(`${config.apiBaseUrl}${path}`, {
       method: "POST",
-      cache: "no-store",
       headers,
       body: formData,
       signal: controller.signal,
@@ -117,8 +118,101 @@ export async function apiUpload<T>(
     if (error instanceof Error && error.name === "AbortError") {
       throw new Error("Could not reach the server. Check the API is running and EXPO_PUBLIC_API_URL in .env");
     }
+    if (
+      error instanceof Error &&
+      /network request failed/i.test(error.message)
+    ) {
+      throw new Error(
+        "Could not upload this photo. Check your connection and try again, or choose a smaller photo from the gallery.",
+      );
+    }
     throw error;
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+export async function apiUploadFile<T>(
+  path: string,
+  file: { uri: string; name: string; type: string },
+  options: { auth?: boolean; fieldName?: string; timeoutMs?: number } = {},
+): Promise<T> {
+  const timeoutMs = options.timeoutMs ?? Math.max(config.requestTimeoutMs, 90_000);
+  const fileUri = withFileScheme(file.uri);
+  const info = await FileSystem.getInfoAsync(fileUri);
+  if (!info.exists || info.isDirectory || info.size <= 0) {
+    throw new Error(
+      "Could not upload this photo. The camera file was no longer available. Please take the photo again.",
+    );
+  }
+
+  const headers: Record<string, string> = {
+    ...(config.apiBaseUrl.includes("ngrok")
+      ? { "ngrok-skip-browser-warning": "1" }
+      : {}),
+  };
+  if (options.auth !== false) {
+    const token = await sessionStorage.getAccessToken();
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+  }
+
+  const task = FileSystem.createUploadTask(`${config.apiBaseUrl}${path}`, fileUri, {
+    httpMethod: "POST",
+    uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+    fieldName: options.fieldName ?? "file",
+    mimeType: normalizeUploadMime(file.type, file.name),
+    headers,
+    sessionType: FileSystem.FileSystemSessionType.FOREGROUND,
+  });
+  const timeout = setTimeout(() => {
+    void task.cancelAsync();
+  }, timeoutMs);
+
+  let result: Awaited<ReturnType<typeof FileSystem.uploadAsync>> | undefined | null;
+  try {
+    result = await task.uploadAsync();
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      /network request failed|cancelled|canceled|abort/i.test(error.message)
+    ) {
+      throw new Error(
+        "Could not upload this photo. Check your connection and try again.",
+      );
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  if (!result) {
+    throw new Error("Could not upload this photo. Check your connection and try again.");
+  }
+
+  if (result.status === 401 && options.auth !== false) {
+    await sessionStorage.clearAccessToken();
+  }
+
+  if (result.status < 200 || result.status >= 300) {
+    let payload: unknown = result.body;
+    try {
+      payload = JSON.parse(result.body) as unknown;
+    } catch {
+      payload = result.body;
+    }
+    throw new ApiError(
+      messageFromApiErrorPayload(payload, result.status),
+      result.status,
+    );
+  }
+
+  try {
+    return JSON.parse(result.body) as T;
+  } catch {
+    throw new Error(
+      "Could not upload this photo. The server returned an unexpected response.",
+    );
   }
 }

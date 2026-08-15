@@ -18,7 +18,7 @@ export class MulterExceptionFilter implements ExceptionFilter {
       const message = path.includes('/nid')
         ? 'NID file must be 5 MB or smaller'
         : path.includes('/photos')
-          ? 'Photo must be 2 MB or smaller'
+          ? 'Photo must be 5 MB or smaller'
           : 'File must be 5 MB or smaller';
 
       response.status(HttpStatus.BAD_REQUEST).json({

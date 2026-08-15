@@ -10,9 +10,10 @@ import { getApiErrorMessage } from "../../lib/api-error";
 import {
   buildUpdateFamilyPayload,
   readFamilyFromProfile,
+  validateFamilyForm,
 } from "../../lib/family-form";
 import type { EditFamilyScreenProps } from "../../navigation/types";
-import { advanceAfterBiodataSave } from "../../lib/biodata-navigation";
+import { advanceAfterBiodataSave, redirectIfBiodataStepLocked } from "../../lib/biodata-navigation";
 import { getProfileEditorBootstrap, updateFamily } from "../../services/profile";
 import { useAuthStore } from "../../store/authStore";
 import { useLocaleStore } from "../../store/localeStore";
@@ -57,15 +58,30 @@ export default function EditFamilyScreen({ navigation }: EditFamilyScreenProps) 
     }
   }, [copy.loadError, locale]);
 
-  useFocusEffect(useCallback(() => { void load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    if (redirectIfBiodataStepLocked(navigation, "EditFamily", isOnboardingSetup)) {
+      return;
+    }
+    void load();
+  }, [isOnboardingSetup, load, navigation]));
 
   const save = useCallback(async () => {
     if (!form) return;
+    const validationError = validateFamilyForm(form, {
+      fieldRequired: copy.fieldRequired,
+      fatherProfession: copy.fatherProfession,
+      motherProfession: copy.motherProfession,
+    });
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
     setSaving(true);
     setError(null);
     setMessage(null);
     try {
-      await updateFamily(buildUpdateFamilyPayload(form));
+      const updated = await updateFamily(buildUpdateFamilyPayload(form));
       setMessage(copy.saved);
       await advanceAfterBiodataSave({
         navigation,
@@ -73,6 +89,8 @@ export default function EditFamilyScreen({ navigation }: EditFamilyScreenProps) 
         locale,
         isOnboardingSetup,
         refreshOnboarding,
+        completionMissing: updated.completionMissing,
+        completionPercent: updated.completionPercent,
       });
     } catch (err) {
       setError(getApiErrorMessage(err, copy.saveError));
@@ -80,6 +98,9 @@ export default function EditFamilyScreen({ navigation }: EditFamilyScreenProps) 
       setSaving(false);
     }
   }, [
+    copy.fatherProfession,
+    copy.fieldRequired,
+    copy.motherProfession,
     copy.saved,
     copy.saveError,
     form,

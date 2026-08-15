@@ -20,6 +20,7 @@ import {
   normalizeProfileCode,
   PrivacyLevel,
   type PartnerPreferenceInput,
+  type PhotoVariant,
 } from '@easymatch/shared';
 import { LegalService } from '../legal/legal.service';
 import { PrivacyFieldsService } from '../privacy/privacy-fields.service';
@@ -31,6 +32,7 @@ import { getCachedPrivacyRules } from '../privacy/privacy-rules-cache';
 import { ProfilesService } from '../profiles/profiles.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
+import { PhotoVariantService } from '../storage/photo-variant.service';
 import { ConnectionsService } from './connections.service';
 import {
   invalidateDiscoveryListCache,
@@ -220,6 +222,7 @@ export class DiscoveryService implements OnModuleInit {
     private readonly privacyFields: PrivacyFieldsService,
     private readonly connections: ConnectionsService,
     private readonly storage: StorageService,
+    private readonly photoVariants: PhotoVariantService,
     private readonly profiles: ProfilesService,
     private readonly legal: LegalService,
   ) {}
@@ -658,6 +661,7 @@ export class DiscoveryService implements OnModuleInit {
     viewerUserId: string,
     profileIdOrCode: string,
     photoId: string,
+    variant: PhotoVariant = 'original',
   ) {
     const viewCacheKey = `${viewerUserId}:${profileIdOrCode}`;
     let cachedView = this.profileViewCache.get(viewCacheKey);
@@ -694,10 +698,11 @@ export class DiscoveryService implements OnModuleInit {
         throw new NotFoundException('Photo not found');
       }
 
-      return {
-        stream: await this.storage.createReadStream(photo.storageKey),
-        mimeType: photo.mimeType,
-      };
+      return this.photoVariants.streamOriginalOrVariant(
+        photo.storageKey,
+        photo.mimeType,
+        variant,
+      );
     }
 
     const profile = await this.findProfileForViewer(
@@ -732,10 +737,11 @@ export class DiscoveryService implements OnModuleInit {
       throw new NotFoundException('Photo not found');
     }
 
-    return {
-      stream: await this.storage.createReadStream(photo.storageKey),
-      mimeType: photo.mimeType,
-    };
+    return this.photoVariants.streamOriginalOrVariant(
+      photo.storageKey,
+      photo.mimeType,
+      variant,
+    );
   }
 
   async resolveBookmarkTarget(viewerUserId: string, profileIdOrCode: string) {

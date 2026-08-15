@@ -115,7 +115,11 @@ const profileSetup = {
     editPartner: "Partner preferences",
     editPhotos: "Photos & verification",
     continueToApp: "Continue to EasymatchBD",
-    continueHint: "Complete all required fields above to continue.",
+    continueHint: "Complete all required fields, then submit photos and NID for verification.",
+    completePreviousStep:
+      "Fill every required field on this step before opening the next one.",
+    submitPhotosHint:
+      "Your biodata is complete. Open Photos & verification, then submit for officer review before browsing matches.",
     loading: "Loading profile…",
   },
   bn: {
@@ -129,7 +133,11 @@ const profileSetup = {
     editPartner: "পছন্দের তথ্য",
     editPhotos: "ছবি ও যাচাই",
     continueToApp: "EasymatchBD-তে যান",
-    continueHint: "চালিয়ে যেতে উপরের সব প্রয়োজনীয় ক্ষেত্র পূরণ করুন।",
+    continueHint: "চালিয়ে যেতে প্রয়োজনীয় তথ্য পূরণ করুন, তারপর ছবি ও এনআইডি যাচাইয়ের জন্য জমা দিন।",
+    completePreviousStep:
+      "পরবর্তী ধাপ খোলার আগে এই ধাপের সব বাধ্যতামূলক তথ্য পূরণ করুন।",
+    submitPhotosHint:
+      "আপনার বায়োডাটা সম্পূর্ণ। ছবি ও যাচাই খুলে অফিসার পর্যালোচনার জন্য জমা দিন, তারপর ম্যাচ দেখুন।",
     loading: "প্রোফাইল লোড হচ্ছে…",
   },
 } as const;

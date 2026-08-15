@@ -422,20 +422,27 @@ export async function respondPrivacyUpgrade(
   return parseResponse<{ privacyLevel: number; accepted: boolean }>(res);
 }
 
-export function discoveryPhotoUrl(profileId: string, photoId: string) {
-  return `/discovery/profiles/${profileId}/photos/${photoId}/file`;
+export function discoveryPhotoUrl(
+  profileId: string,
+  photoId: string,
+  variant?: "thumb" | "display" | "original",
+) {
+  const base = `/discovery/profiles/${profileId}/photos/${photoId}/file`;
+  if (!variant || variant === "original") return base;
+  return `${base}?variant=${variant}`;
 }
 
 export async function fetchDiscoveryBlob(
   token: string,
   profileId: string,
   photoId: string,
+  variant: "thumb" | "display" | "original" = "original",
 ): Promise<Blob> {
   return dedupeRequest(
-    `discovery-photo:${profileId}:${photoId}`,
+    `discovery-photo:${profileId}:${photoId}:${variant}`,
     async () => {
       const res = await apiFetch(
-        `${apiUrl()}${discoveryPhotoUrl(profileId, photoId)}`,
+        `${apiUrl()}${discoveryPhotoUrl(profileId, photoId, variant)}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       if (!res.ok) throw new Error("Failed to load photo");

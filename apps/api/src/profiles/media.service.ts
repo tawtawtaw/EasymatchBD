@@ -10,8 +10,9 @@ import {
   ProfilePhotoType,
   Prisma,
 } from '@prisma/client';
-import { isOnBehalfProfile, type GallerySlot, resolveGalleryUploadSortOrder } from '@easymatch/shared';
+import { isOnBehalfProfile, type GallerySlot, resolveGalleryUploadSortOrder, canAddOtherGalleryPhoto, splitGalleryPhotos, planOtherGallerySortOrders, type PhotoVariant } from '@easymatch/shared';
 import { StorageService } from '../storage/storage.service';
+import { PhotoVariantService } from '../storage/photo-variant.service';
 import {
   ALLOWED_NID_MIME_TYPES,
   ALLOWED_PHOTO_MIME_TYPES,
@@ -20,7 +21,9 @@ import {
   MAX_PHOTO_BYTES,
 } from '../storage/storage.constants';
 import { PrismaService } from '../prisma/prisma.service';
+import { sniffImageMime } from '../storage/storage.utils';
 import { generateUniqueProfileCode } from './profile-code.util';
+import { invalidateDiscoveryListCache } from '../discovery/discovery-list-cache';
 import { VerificationAlertsService } from '../verification/verification-alerts.service';
 import { StaffNotificationService } from '../staff/staff-notification.service';
 import { ProfilesService } from './profiles.service';
@@ -93,6 +96,7 @@ export class MediaService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
+    private readonly photoVariants: PhotoVariantService,
     private readonly verificationAlerts: VerificationAlertsService,
     private readonly staffNotifications: StaffNotificationService,
     private readonly profilesService: ProfilesService,
@@ -246,6 +250,41 @@ export class MediaService {
           );
         }
 
+        const pendingPrimary = photos.some(
+          (photo) =>
+            photo.type === ProfilePhotoType.primary &&
+            photo.status === MediaReviewStatus.pending,
+        );
+        const pendingGallery = photos.some(
+          (photo) =>
+            photo.type === ProfilePhotoType.gallery &&
+            photo.status === MediaReviewStatus.pending,
+        );
+
+        if (pendingGallery && !pendingPrimary) {
+          const updated = await this.prisma.profile.update({
+            where: { id: profile.id },
+            data: {
+              profileBiodataReviewStatus: MediaReviewStatus.pending,
+              profileBiodataReviewedAt: null,
+            },
+            select: {
+              profileBiodataReviewStatus: true,
+            },
+          });
+
+          this.invalidateMediaSummaryCache(userId);
+          void this.staffNotifications.notifyVerificationSubmission({
+            profileId: profile.id,
+            profileCode: profile.profileCode,
+            detail: 'extra photos',
+          });
+          return {
+            submitted: true,
+            profileBiodataReviewStatus: updated.profileBiodataReviewStatus,
+          };
+        }
+
         const updated = await this.prisma.profile.update({
           where: { id: profile.id },
           data: {
@@ -263,7 +302,7 @@ export class MediaService {
         void this.staffNotifications.notifyVerificationSubmission({
           profileId: profile.id,
           profileCode: profile.profileCode,
-          detail: 'profile amendment',
+          detail: pendingPrimary ? 'passport photo' : 'profile amendment',
         });
         return {
           submitted: true,
@@ -334,27 +373,26 @@ export class MediaService {
         await this.deletePhotoRecord(existingPrimary.id, profile.id);
       }
     } else {
-      const existingGallery = await this.prisma.profilePhoto.findMany({
-        where: { profileId: profile.id, type: ProfilePhotoType.gallery },
-        select: { id: true, sortOrder: true },
-      });
-      if (existingGallery.length >= MAX_GALLERY_PHOTOS) {
+      const slot = gallerySlot ?? 'other';
+      const existingGallery = await this.repackGalleryOtherSlots(profile.id);
+
+      if (existingGallery.length >= MAX_GALLERY_PHOTOS && slot !== 'family') {
         throw new BadRequestException(
           `You can upload up to ${MAX_GALLERY_PHOTOS} gallery photos`,
         );
       }
 
-      const sortOrder = gallerySlot
-        ? resolveGalleryUploadSortOrder(gallerySlot, existingGallery)
-        : existingGallery.length;
-
-      if (gallerySlot === 'other') {
-        const existingOther = existingGallery.find(
-          (photo) => photo.sortOrder === 0,
+      const { otherPhotos, familyPhoto } = splitGalleryPhotos(existingGallery);
+      if (slot === 'other' && otherPhotos.length >= MAX_GALLERY_PHOTOS - 1) {
+        throw new BadRequestException(
+          'You can upload up to 3 extra photos of yourself',
         );
-        if (existingOther) {
-          await this.deletePhotoRecord(existingOther.id, profile.id);
-        }
+      }
+
+      const sortOrder = resolveGalleryUploadSortOrder(slot, existingGallery);
+
+      if (slot === 'family' && familyPhoto) {
+        await this.deletePhotoRecord(familyPhoto.id, profile.id);
       }
 
       const storageKey = await this.storage.save(userId, 'photos', file.buffer, file.mimetype);
@@ -412,9 +450,20 @@ export class MediaService {
     });
 
     if (existingPrimary && existingPrimary.id !== photo.id) {
+      const remainingGallery = await this.prisma.profilePhoto.findMany({
+        where: {
+          profileId: profile.id,
+          type: ProfilePhotoType.gallery,
+          id: { not: photo.id },
+        },
+        select: { id: true, sortOrder: true, createdAt: true },
+      });
       await this.prisma.profilePhoto.update({
         where: { id: existingPrimary.id },
-        data: { type: ProfilePhotoType.gallery },
+        data: {
+          type: ProfilePhotoType.gallery,
+          sortOrder: this.nextGallerySortOrder(remainingGallery),
+        },
       });
     }
 
@@ -501,11 +550,6 @@ export class MediaService {
     });
 
     this.invalidateMediaSummaryCache(userId);
-    void this.staffNotifications.notifyVerificationSubmission({
-      profileId: profile.id,
-      profileCode: profile.profileCode,
-      detail: `NID (${subject}, ${side})`,
-    });
     return this.toNidDto(document);
   }
 
@@ -547,7 +591,11 @@ export class MediaService {
     return { deleted: true };
   }
 
-  async getPhotoFile(userId: string, photoId: string) {
+  async getPhotoFile(
+    userId: string,
+    photoId: string,
+    variant: PhotoVariant = 'original',
+  ) {
     const profile = await this.ensureProfile(userId);
     const photo = await this.prisma.profilePhoto.findFirst({
       where: { id: photoId, profileId: profile.id },
@@ -555,10 +603,11 @@ export class MediaService {
     if (!photo || !(await this.storage.exists(photo.storageKey))) {
       throw new NotFoundException('Photo not found');
     }
-    return {
-      stream: await this.storage.createReadStream(photo.storageKey),
-      mimeType: photo.mimeType,
-    };
+    return this.photoVariants.streamOriginalOrVariant(
+      photo.storageKey,
+      photo.mimeType,
+      variant,
+    );
   }
 
   async getNidFile(
@@ -585,6 +634,30 @@ export class MediaService {
     };
   }
 
+  private async listGalleryPhotos(profileId: string) {
+    return this.prisma.profilePhoto.findMany({
+      where: { profileId, type: ProfilePhotoType.gallery },
+      select: { id: true, sortOrder: true, createdAt: true },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+  }
+
+  private async repackGalleryOtherSlots(profileId: string) {
+    const existingGallery = await this.listGalleryPhotos(profileId);
+    const planned = planOtherGallerySortOrders(existingGallery);
+    const current = new Map(
+      existingGallery.map((photo) => [photo.id, photo.sortOrder]),
+    );
+    for (const next of planned) {
+      if (current.get(next.id) === next.sortOrder) continue;
+      await this.prisma.profilePhoto.update({
+        where: { id: next.id },
+        data: { sortOrder: next.sortOrder },
+      });
+    }
+    return this.listGalleryPhotos(profileId);
+  }
+
   private async deletePhotoRecord(photoId: string, profileId: string) {
     const photo = await this.prisma.profilePhoto.findFirst({
       where: { id: photoId, profileId },
@@ -592,19 +665,42 @@ export class MediaService {
     if (!photo) {
       throw new NotFoundException('Photo not found');
     }
+    await this.storage.deleteDerivedPhotos(photo.storageKey);
     await this.storage.delete(photo.storageKey);
     await this.prisma.profilePhoto.delete({ where: { id: photo.id } });
+  }
+
+  private nextGallerySortOrder(
+    existing: Array<{ id: string; sortOrder: number; createdAt?: Date }>,
+  ): number {
+    const { otherPhotos } = splitGalleryPhotos(existing);
+    if (canAddOtherGalleryPhoto(existing.length, otherPhotos)) {
+      return resolveGalleryUploadSortOrder('other', existing);
+    }
+    try {
+      return resolveGalleryUploadSortOrder('family', existing);
+    } catch {
+      const used = new Set(existing.map((photo) => photo.sortOrder));
+      for (let order = 0; order < 10; order += 1) {
+        if (!used.has(order)) {
+          return order;
+        }
+      }
+      return existing.length;
+    }
   }
 
   private assertPhotoFile(file: UploadedFile) {
     if (!file?.buffer?.length) {
       throw new BadRequestException('Photo file is required');
     }
-    if (!ALLOWED_PHOTO_MIME_TYPES.has(file.mimetype)) {
+    const mime = sniffImageMime(file.buffer, file.mimetype);
+    if (!mime || !ALLOWED_PHOTO_MIME_TYPES.has(mime)) {
       throw new BadRequestException('Photo must be JPEG, PNG, or WebP');
     }
+    file.mimetype = mime;
     if (file.size > MAX_PHOTO_BYTES) {
-      throw new BadRequestException('Photo must be 2 MB or smaller');
+      throw new BadRequestException('Photo must be 5 MB or smaller');
     }
   }
 
@@ -612,9 +708,18 @@ export class MediaService {
     if (!file?.buffer?.length) {
       throw new BadRequestException('NID file is required');
     }
-    if (!ALLOWED_NID_MIME_TYPES.has(file.mimetype)) {
+    const reported = (file.mimetype ?? '').toLowerCase();
+    if (reported === 'application/pdf') {
+      if (file.size > MAX_NID_BYTES) {
+        throw new BadRequestException('NID file must be 5 MB or smaller');
+      }
+      return;
+    }
+    const mime = sniffImageMime(file.buffer, file.mimetype);
+    if (!mime || !ALLOWED_NID_MIME_TYPES.has(mime)) {
       throw new BadRequestException('NID must be JPEG, PNG, WebP, or PDF');
     }
+    file.mimetype = mime;
     if (file.size > MAX_NID_BYTES) {
       throw new BadRequestException('NID file must be 5 MB or smaller');
     }
@@ -622,6 +727,8 @@ export class MediaService {
 
   private invalidateMediaSummaryCache(userId: string) {
     this.mediaSummaryCache.delete(userId);
+    this.profilesService.invalidateMemberProfileCaches(userId);
+    invalidateDiscoveryListCache(userId);
   }
 
   /** Drop cached /profiles/me/media after officer review or verification changes. */

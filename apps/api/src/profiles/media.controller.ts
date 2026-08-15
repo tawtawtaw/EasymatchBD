@@ -15,7 +15,9 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { NidDocumentSide, NidDocumentSubject, ProfilePhotoType } from '@prisma/client';
+import { parsePhotoVariant } from '@easymatch/shared';
 import { memoryStorage } from 'multer';
+import { MAX_NID_BYTES, MAX_PHOTO_BYTES } from '../storage/storage.constants';
 import type { AuthUser } from '../auth/decorators/current-user.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -53,7 +55,7 @@ export class MediaController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
-      limits: { fileSize: 2 * 1024 * 1024 },
+      limits: { fileSize: MAX_PHOTO_BYTES },
     }),
   )
   uploadPhoto(
@@ -78,10 +80,15 @@ export class MediaController {
   }
 
   @Get('photos/:id/file')
-  async getPhotoFile(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+  async getPhotoFile(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Query('variant') variant?: string,
+  ) {
     const { stream, mimeType } = await this.mediaService.getPhotoFile(
       user.id,
       id,
+      parsePhotoVariant(variant),
     );
     return new StreamableFile(stream, { type: mimeType });
   }
@@ -90,7 +97,7 @@ export class MediaController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
-      limits: { fileSize: 5 * 1024 * 1024 },
+      limits: { fileSize: MAX_NID_BYTES },
     }),
   )
   uploadNid(

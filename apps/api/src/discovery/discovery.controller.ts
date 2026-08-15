@@ -15,7 +15,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
-import { DISCOVERY_DEFAULT_PROFILE_LIMIT, clampDiscoveryProfileLimit } from '@easymatch/shared';
+import { DISCOVERY_DEFAULT_PROFILE_LIMIT, clampDiscoveryProfileLimit, parsePhotoVariant } from '@easymatch/shared';
 import type { AuthUser } from '../auth/decorators/current-user.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -245,11 +245,13 @@ export class DiscoveryController {
     @CurrentUser() user: AuthUser,
     @Param('profileId') profileId: string,
     @Param('photoId') photoId: string,
+    @Query('variant') variant?: string,
   ) {
     const { stream, mimeType } = await this.discovery.getVisiblePhotoFile(
       user.id,
       profileId,
       photoId,
+      parsePhotoVariant(variant),
     );
     return new StreamableFile(stream, { type: mimeType });
   }

@@ -2,6 +2,7 @@ import {
   cmToFeetInches,
   FEET_MAX,
   FEET_MIN,
+  isBangladeshAddress,
   isIslamReligion,
   isValidDisplayDate,
   displayDateToIso,
@@ -16,6 +17,7 @@ import {
   SMOKING_HABIT_VALUES,
 } from "@easymatch/shared";
 import type { MemberProfile, PersonalFormState } from "../types/profile";
+import { isRequiredValueFilled } from "./biodata-required";
 import { getWeightInputError } from "./weight-validation";
 
 export type PersonalFormValidationMessages = {
@@ -30,7 +32,22 @@ export type PersonalFormValidationMessages = {
   weightInvalid: string;
   weightRange: string;
   heightInvalid: string;
+  fieldRequired: string;
+  gender: string;
+  maritalStatus: string;
+  religion: string;
+  occupation: string;
+  educationMedium: string;
+  highestQualification: string;
+  division: string;
+  district: string;
+  cityTown: string;
+  addressLine: string;
 };
+
+function requiredField(messages: PersonalFormValidationMessages, field: string) {
+  return messages.fieldRequired.replace("{field}", field);
+}
 
 export function emptyPersonalForm(): PersonalFormState {
   return {
@@ -139,11 +156,20 @@ export function validatePersonalForm(
   form: PersonalFormState,
   messages: PersonalFormValidationMessages,
 ): string | null {
+  if (!isRequiredValueFilled(form.gender)) {
+    return requiredField(messages, messages.gender);
+  }
   if (!form.dateOfBirth.trim()) {
     return messages.dateOfBirthRequired;
   }
   if (!isValidDisplayDate(form.dateOfBirth)) {
     return messages.dateOfBirthInvalid;
+  }
+  if (!isRequiredValueFilled(form.maritalStatus)) {
+    return requiredField(messages, messages.maritalStatus);
+  }
+  if (!isRequiredValueFilled(form.religion)) {
+    return requiredField(messages, messages.religion);
   }
   if (isIslamReligion(form.religion) && !form.prayerPractice.trim()) {
     return messages.prayerPracticeRequired;
@@ -166,6 +192,52 @@ export function validatePersonalForm(
   if (showSmokingHabitField(form.gender) && !form.smokingHabit.trim()) {
     return messages.smokingHabitRequired;
   }
+  if (!isRequiredValueFilled(form.educationMedium)) {
+    return requiredField(messages, messages.educationMedium);
+  }
+  if (!isRequiredValueFilled(form.highestDegree)) {
+    return requiredField(messages, messages.highestQualification);
+  }
+  if (!isRequiredValueFilled(form.occupation)) {
+    return requiredField(messages, messages.occupation);
+  }
+
+  const currentIsBd = isBangladeshAddress(form.currentCountry);
+  if (currentIsBd) {
+    if (!isRequiredValueFilled(form.currentDivision)) {
+      return requiredField(messages, messages.division);
+    }
+    if (!isRequiredValueFilled(form.currentDistrict)) {
+      return requiredField(messages, messages.district);
+    }
+  } else {
+    if (!isRequiredValueFilled(form.currentCityTown)) {
+      return requiredField(messages, messages.cityTown);
+    }
+    if (!isRequiredValueFilled(form.currentAddressLine)) {
+      return requiredField(messages, messages.addressLine);
+    }
+  }
+
+  if (!form.permanentSameAsCurrent) {
+    const permanentIsBd = isBangladeshAddress(form.permanentCountry);
+    if (permanentIsBd) {
+      if (!isRequiredValueFilled(form.permanentDivision)) {
+        return requiredField(messages, messages.division);
+      }
+      if (!isRequiredValueFilled(form.permanentDistrict)) {
+        return requiredField(messages, messages.district);
+      }
+    } else {
+      if (!isRequiredValueFilled(form.permanentCityTown)) {
+        return requiredField(messages, messages.cityTown);
+      }
+      if (!isRequiredValueFilled(form.permanentAddressLine)) {
+        return requiredField(messages, messages.addressLine);
+      }
+    }
+  }
+
   const weightError = getWeightInputError(form.weightKg, {
     invalid: messages.weightInvalid,
     range: messages.weightRange,

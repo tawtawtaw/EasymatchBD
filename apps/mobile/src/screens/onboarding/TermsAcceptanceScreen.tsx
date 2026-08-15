@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { AppLogo } from "../../components/AppLogo";
 import { TermsSectionBlock } from "../../components/TermsSectionBlock";
 import { tOnboardingTerms } from "../../i18n/onboarding";
 import { getApiErrorMessage } from "../../lib/api-error";
@@ -116,6 +117,7 @@ export default function TermsAcceptanceScreen({ navigation }: TermsAcceptanceScr
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
+        <AppLogo width={220} style={styles.logo} />
         <Text style={styles.title}>{copy.pageTitle}</Text>
         {terms?.effectiveDate ? (
           <Text style={styles.effectiveDate}>
@@ -195,6 +197,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.rose50,
   },
   content: { padding: 20, paddingBottom: 40 },
+  logo: { alignSelf: "center", marginBottom: 16 },
   title: { fontSize: 24, fontWeight: "800", color: colors.zinc900 },
   effectiveDate: { marginTop: 6, fontSize: 13, color: colors.zinc600 },
   hint: { marginTop: 10, fontSize: 14, lineHeight: 20, color: colors.zinc700 },

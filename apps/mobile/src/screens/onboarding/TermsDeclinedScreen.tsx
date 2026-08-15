@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { AppLogo } from "../../components/AppLogo";
 import { tOnboardingTerms } from "../../i18n/onboarding";
 import type { TermsDeclinedScreenProps } from "../../navigation/types";
 import { useAuthStore } from "../../store/authStore";
@@ -14,6 +15,7 @@ export default function TermsDeclinedScreen({ navigation }: TermsDeclinedScreenP
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.content}>
+        <AppLogo width={220} style={styles.logo} />
         <Text style={styles.title}>{copy.declinedTitle}</Text>
         <Text style={styles.message}>{copy.declinedMessage}</Text>
         <Pressable style={styles.primaryButton} onPress={() => navigation.navigate("TermsAcceptance")}>
@@ -30,6 +32,7 @@ export default function TermsDeclinedScreen({ navigation }: TermsDeclinedScreenP
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.rose50 },
   content: { flex: 1, padding: 24, justifyContent: "center" },
+  logo: { alignSelf: "center", marginBottom: 16 },
   title: { fontSize: 24, fontWeight: "800", color: colors.zinc900, textAlign: "center" },
   message: {
     marginTop: 12,

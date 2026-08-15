@@ -99,7 +99,10 @@ export function nidNeedsResubmit(media: ProfileMedia) {
   );
 }
 
-export function computeVerificationSubmitState(media: ProfileMedia) {
+export function computeVerificationSubmitState(
+  media: ProfileMedia,
+  options?: { biodataComplete?: boolean },
+) {
   const packageComplete = isVerificationPackageComplete(media);
   const biodataRejected = media.profileBiodataReviewStatus === "rejected";
   const biodataPending = media.profileBiodataReviewStatus === "pending";
@@ -108,7 +111,14 @@ export function computeVerificationSubmitState(media: ProfileMedia) {
     packageComplete &&
     !nidRejected &&
     (biodataRejected || nidNeedsResubmit(media));
-  const isPendingReview = biodataPending && !canResubmit;
+  const canSubmitVerifiedAmendment =
+    packageComplete &&
+    media.isVerified &&
+    media.photos.some((photo) => photo.status === "pending") &&
+    !biodataPending &&
+    !nidRejected &&
+    options?.biodataComplete !== false;
+  const isPendingReview = biodataPending && !canResubmit && !canSubmitVerifiedAmendment;
 
   return {
     packageComplete,
@@ -116,6 +126,7 @@ export function computeVerificationSubmitState(media: ProfileMedia) {
     biodataPending,
     nidRejected,
     canResubmit,
+    canSubmitVerifiedAmendment,
     isPendingReview,
     readyToSubmit:
       packageComplete &&
@@ -128,19 +139,19 @@ export function computeVerificationSubmitState(media: ProfileMedia) {
 
 /** Member has submitted and is waiting on a verification officer — no further member action. */
 export function isVerificationAwaitingOfficer(media: ProfileMedia) {
+  const state = computeVerificationSubmitState(media);
+  if (state.canResubmit || state.biodataRejected) return false;
+
+  if (state.biodataPending || state.isPendingReview) return true;
+
   if (media.isVerified || media.verificationFeedback?.isFullyVerified) {
     return false;
   }
-
-  const state = computeVerificationSubmitState(media);
-  if (state.canResubmit || state.biodataRejected) return false;
 
   // Uploaded photos/NID are "pending" in storage before the member submits the package.
   if (!biodataSubmittedForReview(media.profileBiodataReviewStatus)) {
     return false;
   }
-
-  if (state.biodataPending || state.isPendingReview) return true;
 
   const feedback = media.verificationFeedback;
   if (feedback && !feedback.isFullyVerified) {

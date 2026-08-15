@@ -502,12 +502,12 @@ export const PROFILE_PRIVACY_FIELD_META: Record<
   [PROFILE_PRIVACY_FIELDS.PRIMARY_PHOTO]: {
     section: ProfileFieldSection.MEDIA,
     defaultShareable: true,
-    defaultMinLevel: PrivacyLevel.PUBLIC,
+    defaultMinLevel: PrivacyLevel.BASIC_MUTUAL_INTEREST,
   },
   [PROFILE_PRIVACY_FIELDS.GALLERY_PHOTOS]: {
     section: ProfileFieldSection.MEDIA,
     defaultShareable: true,
-    defaultMinLevel: PrivacyLevel.BASIC_MUTUAL_INTEREST,
+    defaultMinLevel: PrivacyLevel.PROFILE_COMPATIBILITY,
   },
   [PROFILE_PRIVACY_FIELDS.VERIFIED_BADGE]: {
     section: ProfileFieldSection.MEDIA,

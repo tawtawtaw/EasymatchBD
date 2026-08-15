@@ -11,6 +11,12 @@ export interface StorageBackend {
     buffer: Buffer,
     mimeType: string,
   ): Promise<string> | string;
+  saveAt(
+    storageKey: string,
+    buffer: Buffer,
+    mimeType: string,
+  ): Promise<void> | void;
+  readBuffer(storageKey: string): Promise<Buffer> | Buffer;
   delete(storageKey: string): Promise<void> | void;
   exists(storageKey: string): Promise<boolean> | boolean;
   createReadStream(storageKey: string): Promise<Readable> | Readable;

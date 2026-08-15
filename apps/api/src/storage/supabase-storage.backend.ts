@@ -37,6 +37,36 @@ export class SupabaseStorageBackend implements StorageBackend {
     return storageKey;
   }
 
+  async saveAt(
+    storageKey: string,
+    buffer: Buffer,
+    mimeType: string,
+  ): Promise<void> {
+    const normalized = normalizeStorageKey(storageKey);
+    const { error } = await this.client.storage
+      .from(this.config.bucket)
+      .upload(normalized, buffer, {
+        contentType: mimeType,
+        upsert: true,
+      });
+    if (error) {
+      throw new Error(`Supabase upload failed: ${error.message}`);
+    }
+  }
+
+  async readBuffer(storageKey: string): Promise<Buffer> {
+    const normalized = normalizeStorageKey(storageKey);
+    const { data, error } = await this.client.storage
+      .from(this.config.bucket)
+      .download(normalized);
+    if (error || !data) {
+      throw new Error(
+        error?.message ?? `Supabase download failed for ${normalized}`,
+      );
+    }
+    return Buffer.from(await data.arrayBuffer());
+  }
+
   async delete(storageKey: string): Promise<void> {
     const normalized = normalizeStorageKey(storageKey);
     const { error } = await this.client.storage

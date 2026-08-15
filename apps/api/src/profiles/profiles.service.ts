@@ -92,6 +92,11 @@ export class ProfilesService {
     return this.calculateCompletion(profile);
   }
 
+  invalidateMemberProfileCaches(userId: string) {
+    this.authService.clearEditorBootstrapCache(userId);
+    this.authService.clearFullProfileCache(userId);
+  }
+
   async getMemberHomeSummary(userId: string) {
     const profile = await this.ensureProfileForCompletion(userId);
     const primaryPhoto = profile.photos.find((photo) => photo.type === 'primary');
@@ -422,6 +427,7 @@ export class ProfilesService {
       include: profileInclude,
     });
 
+    this.invalidateMemberProfileCaches(userId);
     return {
       ...refreshed,
       ...this.calculateCompletion(refreshed),
@@ -536,6 +542,7 @@ export class ProfilesService {
       include: profileInclude,
     });
 
+    this.invalidateMemberProfileCaches(userId);
     return {
       ...updated,
       ...this.calculateCompletion(updated),
@@ -667,6 +674,7 @@ export class ProfilesService {
       include: profileInclude,
     });
 
+    this.invalidateMemberProfileCaches(userId);
     return {
       ...updated,
       ...this.calculateCompletion(updated),
@@ -765,6 +773,7 @@ export class ProfilesService {
       include: profileInclude,
     });
 
+    this.invalidateMemberProfileCaches(userId);
     return {
       ...updated,
       ...this.calculateCompletion(updated),

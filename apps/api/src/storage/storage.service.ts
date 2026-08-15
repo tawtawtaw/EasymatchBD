@@ -8,6 +8,7 @@ import {
 import { resolveStorageConfig } from './storage.config';
 import { SupabaseStorageBackend } from './supabase-storage.backend';
 import type { StorageCategory } from './storage.types';
+import { derivedPhotoStorageKey } from './storage.utils';
 
 @Injectable()
 export class StorageService implements OnModuleInit {
@@ -78,6 +79,24 @@ export class StorageService implements OnModuleInit {
     return storageKey;
   }
 
+  async saveAt(
+    storageKey: string,
+    buffer: Buffer,
+    mimeType: string,
+  ): Promise<void> {
+    await this.primary.saveAt(storageKey, buffer, mimeType);
+  }
+
+  async readBuffer(storageKey: string): Promise<Buffer> {
+    if (await this.primary.exists(storageKey)) {
+      return await this.primary.readBuffer(storageKey);
+    }
+    if (this.localFallback && (await this.localFallback.exists(storageKey))) {
+      return this.localFallback.readBuffer(storageKey);
+    }
+    return await this.primary.readBuffer(storageKey);
+  }
+
   async delete(storageKey: string): Promise<void> {
     await this.primary.delete(storageKey);
   }
@@ -97,5 +116,12 @@ export class StorageService implements OnModuleInit {
       return this.localFallback.createReadStream(storageKey);
     }
     return await this.primary.createReadStream(storageKey);
+  }
+
+  async deleteDerivedPhotos(originalKey: string): Promise<void> {
+    await Promise.allSettled([
+      this.delete(derivedPhotoStorageKey(originalKey, 'thumb')),
+      this.delete(derivedPhotoStorageKey(originalKey, 'display')),
+    ]);
   }
 }

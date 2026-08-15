@@ -5,6 +5,7 @@ import type {
   RelativeFormEntry,
   SiblingFormEntry,
 } from "../types/profile";
+import { isRequiredValueFilled } from "./biodata-required";
 
 export function emptySiblingEntry(): SiblingFormEntry {
   return {
@@ -154,6 +155,19 @@ export function readFamilyFromProfile(profile: MemberProfile): FamilyFormState {
     profile.paternalRelatives,
     profile.maternalRelatives,
   );
+}
+
+export function validateFamilyForm(
+  form: FamilyFormState,
+  messages: { fieldRequired: string; fatherProfession: string; motherProfession: string },
+): string | null {
+  if (!isRequiredValueFilled(form.fatherProfession)) {
+    return messages.fieldRequired.replace("{field}", messages.fatherProfession);
+  }
+  if (!isRequiredValueFilled(form.motherProfession)) {
+    return messages.fieldRequired.replace("{field}", messages.motherProfession);
+  }
+  return null;
 }
 
 export function isSiblingMarried(maritalStatus: string) {

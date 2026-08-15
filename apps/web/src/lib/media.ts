@@ -85,7 +85,7 @@ export type ProfileMedia = {
 };
 
 export const MAX_GALLERY_PHOTOS = 4;
-export const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
+export const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 export const MAX_NID_BYTES = 5 * 1024 * 1024;
 
 const PHOTO_ACCEPT = "image/jpeg,image/png,image/webp";
@@ -204,6 +204,8 @@ export async function submitForVerification(token: string) {
 export function invalidateProfileMediaCaches() {
   invalidateDedupeCache("profile-media:");
   invalidateDedupeCache("verification-feedback:");
+  invalidateDedupeCache("profiles:me:");
+  invalidateDedupeCache("auth:editor-bootstrap:");
 }
 
 export async function getProfileMedia(
@@ -264,7 +266,9 @@ export async function setPrimaryPhoto(token: string, photoId: string) {
     method: "PUT",
     headers: authOnlyHeaders(token),
   });
-  return parseResponse<ProfilePhoto>(res);
+  const photo = await parseResponse<ProfilePhoto>(res);
+  invalidateProfileMediaCaches();
+  return photo;
 }
 
 export async function uploadNidDocument(
@@ -282,7 +286,10 @@ export async function uploadNidDocument(
     headers: authOnlyHeaders(token),
     body: form,
   });
-  return parseResponse<NidDocument>(res);
+  const document = await parseResponse<NidDocument>(res);
+  invalidateProfileMediaCaches();
+  invalidateAuthenticatedBlobCache("/profiles/me/nid");
+  return document;
 }
 
 export async function deleteNidDocument(
@@ -296,7 +303,10 @@ export async function deleteNidDocument(
     method: "DELETE",
     headers: authOnlyHeaders(token),
   });
-  return parseResponse<{ deleted: boolean }>(res);
+  const result = await parseResponse<{ deleted: boolean }>(res);
+  invalidateProfileMediaCaches();
+  invalidateAuthenticatedBlobCache("/profiles/me/nid");
+  return result;
 }
 
 const blobCache = new Map<string, Promise<Blob>>();

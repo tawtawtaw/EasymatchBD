@@ -47,6 +47,20 @@ export function mergeOnboardingBootstrap(
     };
   }
 
+  const previousMissing = previous.completionMissing ?? [];
+  const incomingMissing = incoming.completionMissing ?? [];
+  if (
+    previousMissing.length > 0 &&
+    incomingMissing.length > previousMissing.length &&
+    previousMissing.every((key) => incomingMissing.includes(key))
+  ) {
+    merged = {
+      ...merged,
+      completionMissing: previousMissing,
+      completionPercent: previous.completionPercent ?? merged.completionPercent,
+    };
+  }
+
   return merged;
 }
 
@@ -75,7 +89,21 @@ export function computeOnboardingPhase(
     return "profile_setup";
   }
 
-  return "complete";
+  const profile = bootstrap.profile;
+  if (profile?.isVerified) {
+    return "complete";
+  }
+
+  const reviewStatus =
+    profile?.profileBiodataReviewStatus ??
+    bootstrap.profileBiodataReviewStatus ??
+    null;
+  if (reviewStatus === "pending" || reviewStatus === "approved") {
+    return "complete";
+  }
+
+  // Photos and NID can be saved while the member still needs to submit.
+  return "profile_setup";
 }
 
 export function isProfileBiodataComplete(input: {
@@ -84,7 +112,15 @@ export function isProfileBiodataComplete(input: {
 }): boolean {
   const missing = input.completionMissing ?? [];
   const percent = input.completionPercent ?? 0;
-  return missing.length === 0 || percent >= 100;
+  const biodataGaps = missing.filter(
+    (key) =>
+      key !== "primaryPhoto" &&
+      key !== "nidFront" &&
+      key !== "nidBack" &&
+      key !== "creatorNidFront" &&
+      key !== "creatorNidBack",
+  );
+  return biodataGaps.length === 0 || percent >= 100;
 }
 
 export function mainTabInitialRoute(isVerified: boolean): "Home" | "Discovery" {

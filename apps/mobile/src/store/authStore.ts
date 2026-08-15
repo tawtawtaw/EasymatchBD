@@ -90,6 +90,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // greet whoever signs in on this device next.
     await useAppLockStore.getState().disableLock();
     await useLocaleStore.getState().resetToDefaultLocale();
+    const { clearPhotoCache } = await import("../lib/photo-cache");
+    await clearPhotoCache();
     set({ user: null, session: null });
   },
 }));

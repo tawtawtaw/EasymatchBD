@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
-import { isOnBehalfProfile, canAddFamilyGalleryPhoto, canAddOtherGalleryPhoto, splitGalleryPhotos } from "@easymatch/shared";
+import { isOnBehalfProfile, canAddFamilyGalleryPhoto, canAddOtherGalleryPhoto, MAX_GALLERY_PHOTOS, splitGalleryPhotos } from "@easymatch/shared";
 import { VerificationFeedbackPanel } from "@/components/VerificationFeedbackPanel";
 import {
   deleteNidDocument,
@@ -58,6 +58,7 @@ type ProfileMediaTabProps = {
   onError: (message: string | null) => void;
   onMessage: (message: string | null) => void;
   onProfileRefresh?: () => Promise<void>;
+  onMediaChange?: (media: ProfileMedia | null) => void;
   biodataComplete?: boolean;
 };
 
@@ -219,6 +220,7 @@ export function ProfileMediaTab({
   onError,
   onMessage,
   onProfileRefresh,
+  onMediaChange,
   biodataComplete = true,
 }: ProfileMediaTabProps) {
   const t = useTranslations("profile.media");
@@ -262,7 +264,9 @@ export function ProfileMediaTab({
     if (!token) return;
     const data = await getProfileMedia(token, { forceFresh });
     setMedia(data);
-  }, []);
+    onMediaChange?.(data);
+    return data;
+  }, [onMediaChange]);
 
   useEffect(() => {
     setAmendmentDirty(isProfileAmendmentDirty());
@@ -395,7 +399,7 @@ export function ProfileMediaTab({
               photo.id !== uploaded.id
             ),
         );
-        if (type === "gallery" && gallerySlot === "other") {
+        if (type === "gallery" && gallerySlot === "family") {
           photos = photos.filter(
             (photo) => !(photo.type === "gallery" && photo.sortOrder === 0),
           );
@@ -407,6 +411,7 @@ export function ProfileMediaTab({
         markAmendmentPending();
       }
       await loadMedia(true);
+      await onProfileRefresh?.();
       onMessage(t("photoUploaded"));
     } catch (err) {
       reportUploadError(err);
@@ -460,7 +465,8 @@ export function ProfileMediaTab({
     try {
       clearSubmitted();
       await uploadNidDocument(token, file, side, subject);
-      await loadMedia();
+      await loadMedia(true);
+      await onProfileRefresh?.();
       onMessage(t("nidUploaded"));
     } catch (err) {
       reportUploadError(err);
@@ -498,10 +504,11 @@ export function ProfileMediaTab({
     setUploading(photo.id);
     try {
       await deleteProfilePhoto(token, photo.id);
-      if (media?.isVerified) {
+      if (media?.isVerified && photo.type === "primary") {
         markAmendmentPending();
       }
       await loadMedia(true);
+      await onProfileRefresh?.();
       onMessage(t("photoRemoved"));
     } catch (err) {
       onError(err instanceof Error ? err.message : "Delete failed");
@@ -516,7 +523,8 @@ export function ProfileMediaTab({
     setUploading(photo.id);
     try {
       await setPrimaryPhoto(token, photo.id);
-      await loadMedia();
+      await loadMedia(true);
+      await onProfileRefresh?.();
       onMessage(t("primarySet"));
     } catch (err) {
       onError(err instanceof Error ? err.message : "Update failed");
@@ -535,7 +543,8 @@ export function ProfileMediaTab({
     setUploading(uploadKey);
     try {
       await deleteNidDocument(token, side, subject);
-      await loadMedia();
+      await loadMedia(true);
+      await onProfileRefresh?.();
       onMessage(t("nidRemoved"));
     } catch (err) {
       onError(err instanceof Error ? err.message : "Delete failed");
@@ -643,9 +652,13 @@ export function ProfileMediaTab({
 
   const primaryPhoto = media?.photos.find((p) => p.type === "primary");
   const galleryPhotos = media?.photos.filter((p) => p.type === "gallery") ?? [];
-  const { otherPhoto, familyPhotos } = splitGalleryPhotos(galleryPhotos);
-  const canAddOther = canAddOtherGalleryPhoto(galleryPhotos.length, otherPhoto);
-  const canAddFamily = canAddFamilyGalleryPhoto(galleryPhotos.length, familyPhotos);
+  const { otherPhotos, familyPhoto } = splitGalleryPhotos(galleryPhotos);
+  const canAddOther = canAddOtherGalleryPhoto(galleryPhotos.length, otherPhotos);
+  const canAddFamily = canAddFamilyGalleryPhoto(galleryPhotos.length, familyPhoto);
+  const extraPhotoSlotsLeft = Math.max(
+    0,
+    Math.min(MAX_GALLERY_PHOTOS - 1 - otherPhotos.length, MAX_GALLERY_PHOTOS - galleryPhotos.length),
+  );
   const onBehalf = media ? isOnBehalfProfile(media) : false;
 
   function docsForSubject(subject: NidDocumentSubject) {
@@ -757,7 +770,13 @@ export function ProfileMediaTab({
   }
 
   function reviewStatusLabel(status: string) {
-    return t(`reviewStatus.${status}`);
+    if (
+      status === "pending" &&
+      media?.profileBiodataReviewStatus !== "pending"
+    ) {
+      return t("reviewStatus.saved");
+    }
+    return t(`reviewStatus.${status}` as "pending" | "approved" | "rejected" | "saved");
   }
 
   const submitOptions = { amendmentDirty, biodataComplete };
@@ -797,10 +816,10 @@ export function ProfileMediaTab({
 
   let submitLabel = t("submitForReview");
   if (submitting) submitLabel = tc("saving");
-  else if (isVerified && !canSubmitVerifiedAmendment) submitLabel = t("verifiedButton");
   else if (awaitingReview) submitLabel = t("pendingReviewButton");
-  else if (canSubmitVerifiedAmendment) submitLabel = t("resubmitForReview");
+  else if (canSubmitVerifiedAmendment) submitLabel = t("submitExtraPhotos");
   else if (canResubmit) submitLabel = t("resubmitForReview");
+  else if (isVerified) submitLabel = t("verifiedButton");
 
   const submitButton = (
     <button
@@ -808,11 +827,13 @@ export function ProfileMediaTab({
       disabled={submitDisabled}
       onClick={handleSubmitForReview}
       className={`w-full rounded-lg px-4 py-3 font-semibold shadow-sm disabled:cursor-not-allowed sm:w-auto ${
-        isVerified
-          ? "bg-emerald-700 text-white disabled:opacity-100"
-          : awaitingReview
-            ? "border border-amber-300 bg-amber-50 text-amber-950 disabled:opacity-100"
-            : "bg-rose-700 text-white hover:bg-rose-800 disabled:opacity-60"
+        awaitingReview
+          ? "border border-amber-300 bg-amber-50 text-amber-950 disabled:opacity-100"
+          : canSubmitNow
+            ? "bg-rose-700 text-white hover:bg-rose-800 disabled:opacity-60"
+            : isVerified
+              ? "bg-emerald-700 text-white disabled:opacity-100"
+              : "bg-rose-700 text-white hover:bg-rose-800 disabled:opacity-60"
       }`}
     >
       {submitLabel}
@@ -869,8 +890,12 @@ export function ProfileMediaTab({
 
       {(readyToSubmit || canSubmitVerifiedAmendment) && (
         <section className="rounded-xl border-2 border-rose-300 bg-rose-50 p-4 sm:p-5">
-          <h2 className="text-base font-bold text-rose-950">{t("readyToSubmitTitle")}</h2>
-          <p className="mt-1 text-sm text-rose-900">{t("readyToSubmitHint")}</p>
+          <h2 className="text-base font-bold text-rose-950">
+            {canSubmitVerifiedAmendment ? t("extraPhotosReadyTitle") : t("readyToSubmitTitle")}
+          </h2>
+          <p className="mt-1 text-sm text-rose-900">
+            {canSubmitVerifiedAmendment ? t("extraPhotosReadyHint") : t("readyToSubmitHint")}
+          </p>
           <div className="mt-4">{submitButton}</div>
         </section>
       )}
@@ -931,7 +956,11 @@ export function ProfileMediaTab({
 
         <UploadCard
           title={t("otherPhoto")}
-          hint={t("otherPhotoHint")}
+          hint={
+            extraPhotoSlotsLeft > 0
+              ? `${t("otherPhotoHint")} ${t("otherPhotoRemaining", { count: extraPhotoSlotsLeft })}`
+              : t("otherPhotoHint")
+          }
           accept={PHOTO_ACCEPT}
           disabled={!canAddOther}
           uploading={uploading === "gallery-other"}
@@ -939,58 +968,19 @@ export function ProfileMediaTab({
           onFileRejected={showUploadError}
           onSelect={(file) => handlePhotoSelected("gallery", file, "other")}
         >
-          {otherPhoto && mounted && authToken ? (
-            <div className="space-y-2">
-              <AuthenticatedImage
-                token={authToken}
-                path={photoFileUrl(otherPhoto.id)}
-                alt={t("otherPhoto")}
-                className="aspect-square w-full max-w-xs rounded-lg border border-zinc-200 object-cover"
-              />
-              <div className="flex flex-wrap gap-2 text-xs">
-                <button
-                  type="button"
-                  disabled={uploading === otherPhoto.id}
-                  onClick={() => handleSetPrimary(otherPhoto)}
-                  className="font-medium text-rose-700 hover:underline"
-                >
-                  {t("setPrimary")}
-                </button>
-                <button
-                  type="button"
-                  disabled={uploading === otherPhoto.id}
-                  onClick={() => handleDeletePhoto(otherPhoto)}
-                  className="font-medium text-red-700 hover:underline"
-                >
-                  {tc("remove")}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm text-zinc-500">{t("noOtherPhoto")}</p>
-          )}
-        </UploadCard>
-
-        <UploadCard
-          title={t("familyPhoto")}
-          hint={t("familyPhotoHint")}
-          accept={PHOTO_ACCEPT}
-          disabled={!canAddFamily}
-          uploading={uploading === "gallery-family"}
-          getFileError={getPhotoFileError}
-          onFileRejected={showUploadError}
-          onSelect={(file) => handlePhotoSelected("gallery", file, "family")}
-        >
-          {familyPhotos.length > 0 && mounted && authToken ? (
+          {otherPhotos.length > 0 && mounted && authToken ? (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {familyPhotos.map((photo) => (
+              {otherPhotos.map((photo) => (
                 <div key={photo.id} className="space-y-2">
                   <AuthenticatedImage
                     token={authToken}
                     path={photoFileUrl(photo.id)}
-                    alt={t("familyPhoto")}
+                    alt={t("otherPhoto")}
                     className="aspect-square w-full rounded-lg border border-zinc-200 object-cover"
                   />
+                  <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${statusBadgeClass(photo.status)}`}>
+                    {reviewStatusLabel(photo.status)}
+                  </span>
                   <div className="flex flex-wrap gap-2 text-xs">
                     <button
                       type="button"
@@ -1011,6 +1001,51 @@ export function ProfileMediaTab({
                   </div>
                 </div>
               ))}
+            </div>
+          ) : (
+            <p className="text-sm text-zinc-500">{t("noOtherPhoto")}</p>
+          )}
+        </UploadCard>
+
+        <UploadCard
+          title={t("familyPhoto")}
+          hint={t("familyPhotoHint")}
+          accept={PHOTO_ACCEPT}
+          disabled={!canAddFamily}
+          uploading={uploading === "gallery-family"}
+          getFileError={getPhotoFileError}
+          onFileRejected={showUploadError}
+          onSelect={(file) => handlePhotoSelected("gallery", file, "family")}
+        >
+          {familyPhoto && mounted && authToken ? (
+            <div className="space-y-2">
+              <AuthenticatedImage
+                token={authToken}
+                path={photoFileUrl(familyPhoto.id)}
+                alt={t("familyPhoto")}
+                className="aspect-square w-full max-w-xs rounded-lg border border-zinc-200 object-cover"
+              />
+              <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${statusBadgeClass(familyPhoto.status)}`}>
+                {reviewStatusLabel(familyPhoto.status)}
+              </span>
+              <div className="flex flex-wrap gap-2 text-xs">
+                <button
+                  type="button"
+                  disabled={uploading === familyPhoto.id}
+                  onClick={() => handleSetPrimary(familyPhoto)}
+                  className="font-medium text-rose-700 hover:underline"
+                >
+                  {t("setPrimary")}
+                </button>
+                <button
+                  type="button"
+                  disabled={uploading === familyPhoto.id}
+                  onClick={() => handleDeletePhoto(familyPhoto)}
+                  className="font-medium text-red-700 hover:underline"
+                >
+                  {tc("remove")}
+                </button>
+              </div>
             </div>
           ) : (
             <p className="text-sm text-zinc-500">{t("noFamilyPhoto")}</p>

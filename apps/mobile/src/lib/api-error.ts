@@ -20,23 +20,29 @@ export function getApiErrorMessage(error: unknown, fallback = "Something went wr
   return fallback;
 }
 
+export function messageFromApiErrorPayload(body: unknown, status: number): string {
+  if (body && typeof body === "object") {
+    const payload = body as { message?: string | string[]; error?: string };
+    if (Array.isArray(payload.message)) {
+      return payload.message.join(", ");
+    }
+    if (typeof payload.message === "string" && payload.message.trim()) {
+      return payload.message;
+    }
+    if (typeof payload.error === "string" && payload.error.trim()) {
+      return payload.error;
+    }
+  }
+  if (typeof body === "string" && body.trim()) {
+    return body;
+  }
+  return `Request failed (${status})`;
+}
+
 export async function readApiError(response: Response): Promise<string> {
   try {
-    const body = (await response.json()) as {
-      message?: string | string[];
-      error?: string;
-    };
-    if (Array.isArray(body.message)) {
-      return body.message.join(", ");
-    }
-    if (typeof body.message === "string") {
-      return body.message;
-    }
-    if (typeof body.error === "string") {
-      return body.error;
-    }
+    return messageFromApiErrorPayload(await response.json(), response.status);
   } catch {
-    // ignore parse errors
+    return `Request failed (${response.status})`;
   }
-  return `Request failed (${response.status})`;
 }

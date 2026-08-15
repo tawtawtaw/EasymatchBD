@@ -74,13 +74,6 @@ export class VerificationService {
       where: {
         user: { isActive: true },
         OR: [
-          { photos: { some: { status: MediaReviewStatus.pending } } },
-          {
-            AND: [
-              { nidVerifiedAt: null },
-              { nidDocuments: { some: { status: MediaReviewStatus.pending } } },
-            ],
-          },
           { profileBiodataReviewStatus: MediaReviewStatus.pending },
         ],
       },

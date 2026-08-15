@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { EmptyState, ErrorState, LoadingState } from "../../components/ScreenState";
 import { DiscoveryFieldSection } from "../../components/DiscoveryFieldSection";
+import { PhotoGalleryModal } from "../../components/PhotoGalleryModal";
 import { PaidMembershipGate } from "../../components/PaidMembershipGate";
 import { ProfilePausedBanner } from "../../components/ProfilePausedBanner";
 import { discoverySectionTitle } from "../../i18n/biodata-fields";
@@ -28,7 +29,8 @@ import {
   saveProfileBookmark,
   sendDiscoveryInterest,
 } from "../../services/discovery";
-import { getAuthImageHeaders } from "../../lib/auth-image-headers";
+import { ensureLocalPhoto, photoCacheKey, prefetchPhotos } from "../../lib/photo-cache";
+import { visibleProfilePhotoIds } from "@easymatch/shared";
 import { useAuthStore } from "../../store/authStore";
 import { useLocaleStore } from "../../store/localeStore";
 import type { AppLocale } from "../../lib/locale";
@@ -58,6 +60,7 @@ export default function DiscoveryProfileScreen({
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [bookmarkBusy, setBookmarkBusy] = useState(false);
+  const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
   const hasLoadedRef = useRef(false);
 
   const load = useCallback(async (options?: { silent?: boolean; forceFresh?: boolean }) => {
@@ -77,10 +80,17 @@ export default function DiscoveryProfileScreen({
 
       const photoId = data.media.primaryPhotoId;
       if (photoId) {
-        setPhotoUri(discoveryPhotoUrl(profileId, photoId));
+        setPhotoUri(discoveryPhotoUrl(profileId, photoId, "thumb"));
       } else {
         setPhotoUri(null);
       }
+      const visibleIds = visibleProfilePhotoIds(data.media);
+      prefetchPhotos(
+        visibleIds.map((id) => ({
+          remoteUri: discoveryPhotoUrl(profileId, id, "thumb"),
+          cacheKey: photoCacheKey(profileId, id, "thumb"),
+        })),
+      );
     } catch (err) {
       if (!options?.silent) {
         setError(getApiErrorMessage(err, copy.loadError));
@@ -183,6 +193,19 @@ export default function DiscoveryProfileScreen({
   const canSendInterest = relationshipStatus === "none" && !isProfilePaused;
   const isConnected = relationshipStatus === "connected" && connectionId;
   const tokenReady = photoUri !== null;
+  const galleryPhotos = visibleProfilePhotoIds(profile.media).map((id) => ({
+    id,
+    profileId,
+    remoteUri: discoveryPhotoUrl(profileId, id, "display"),
+  }));
+
+  function openGallery(photoId?: string) {
+    if (!galleryPhotos.length) return;
+    const index = photoId
+      ? Math.max(0, galleryPhotos.findIndex((item) => item.id === photoId))
+      : 0;
+    setGalleryIndex(index);
+  }
 
   function openChat() {
     if (!connectionId) return;
@@ -194,6 +217,7 @@ export default function DiscoveryProfileScreen({
   }
 
   return (
+    <>
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {isProfilePaused ? (
         <View style={styles.pausedBannerWrap}>
@@ -203,12 +227,17 @@ export default function DiscoveryProfileScreen({
 
       <View style={styles.hero}>
         {tokenReady ? (
-          <AuthenticatedPhoto uri={photoUri!} loadingLabel={copy.loadingPhoto} />
+          <Pressable onPress={() => openGallery()} accessibilityRole="imagebutton">
+            <AuthenticatedPhoto uri={photoUri!} loadingLabel={copy.loadingPhoto} />
+          </Pressable>
         ) : (
           <View style={styles.photoPlaceholder}>
             <Text style={styles.photoPlaceholderText}>{copy.noPhoto}</Text>
           </View>
         )}
+        {galleryPhotos.length > 0 ? (
+          <Text style={styles.galleryHint}>{copy.galleryOpenHint}</Text>
+        ) : null}
         <Text style={styles.name}>{name}</Text>
         <Text style={styles.code}>
           {copy.profileId} {profileCode}
@@ -283,15 +312,21 @@ export default function DiscoveryProfileScreen({
           <Text style={styles.sectionTitle}>
             {discoverySectionTitle(locale, "gallery")}
           </Text>
+          <Text style={styles.galleryHint}>{copy.galleryOpenHint}</Text>
           <Text style={styles.muted}>{copy.photoConfidentialNotice}</Text>
           <View style={styles.galleryGrid}>
             {profile.media.galleryPhotoIds.map((photoId) => (
-              <AuthenticatedPhoto
+              <Pressable
                 key={photoId}
-                uri={discoveryPhotoUrl(profileId, photoId)}
-                loadingLabel={copy.loadingPhoto}
-                compact
-              />
+                onPress={() => openGallery(photoId)}
+                accessibilityRole="imagebutton"
+              >
+                <AuthenticatedPhoto
+                  uri={discoveryPhotoUrl(profileId, photoId, "thumb")}
+                  loadingLabel={copy.loadingPhoto}
+                  compact
+                />
+              </Pressable>
             ))}
           </View>
         </View>
@@ -368,6 +403,21 @@ export default function DiscoveryProfileScreen({
         bottom
       />
     </ScrollView>
+    <PhotoGalleryModal
+      visible={galleryIndex !== null && galleryPhotos.length > 0}
+      photos={galleryPhotos}
+      initialIndex={galleryIndex ?? 0}
+      closeLabel={copy.galleryClose}
+      confidentialNotice={copy.photoConfidentialNotice}
+      loadingLabel={copy.loadingPhoto}
+      counterLabel={(current, total) =>
+        copy.galleryCounter
+          .replace("{current}", String(current))
+          .replace("{total}", String(total))
+      }
+      onClose={() => setGalleryIndex(null)}
+    />
+    </>
   );
 }
 
@@ -459,31 +509,38 @@ function AuthenticatedPhoto({
   loadingLabel: string;
   compact?: boolean;
 }) {
-  const [headers, setHeaders] = useState<Record<string, string> | null>(null);
+  const [localUri, setLocalUri] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    void getAuthImageHeaders().then((nextHeaders) => {
-      if (!cancelled) {
-        setHeaders(nextHeaders);
-      }
-    });
+    setLocalUri(null);
+    setFailed(false);
+    void ensureLocalPhoto(uri, uri)
+      .then((next) => {
+        if (!cancelled) setLocalUri(next);
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
     return () => {
       cancelled = true;
     };
   }, [uri]);
 
-  if (!headers) {
+  if (!localUri) {
     return (
       <View style={[styles.photoPlaceholder, compact && styles.galleryPhoto]}>
-        <Text style={styles.photoPlaceholderText}>{loadingLabel}</Text>
+        <Text style={styles.photoPlaceholderText}>
+          {failed ? "—" : loadingLabel}
+        </Text>
       </View>
     );
   }
 
   return (
     <Image
-      source={{ uri, headers }}
+      source={{ uri: localUri }}
       style={[styles.photo, compact && styles.galleryPhoto]}
       resizeMode="cover"
     />
@@ -530,6 +587,13 @@ const styles = StyleSheet.create({
   photoPlaceholderText: {
     fontSize: 12,
     color: colors.zinc500,
+  },
+  galleryHint: {
+    marginTop: 8,
+    marginBottom: 8,
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.rose800,
   },
   name: {
     marginTop: 12,

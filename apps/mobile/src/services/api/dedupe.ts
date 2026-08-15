@@ -1,5 +1,10 @@
 const inflightRequests = new Map<string, Promise<unknown>>();
 const recentResponses = new Map<string, { expiresAt: number; value: unknown }>();
+const keyGenerations = new Map<string, number>();
+
+function bumpGeneration(key: string) {
+  keyGenerations.set(key, (keyGenerations.get(key) ?? 0) + 1);
+}
 
 export async function dedupeRequest<T>(
   key: string,
@@ -17,9 +22,13 @@ export async function dedupeRequest<T>(
     return inflight as Promise<T>;
   }
 
+  const generation = keyGenerations.get(key) ?? 0;
   const request = loader()
     .then((value) => {
-      if (inflightRequests.get(key) === request) {
+      if (
+        inflightRequests.get(key) === request &&
+        (keyGenerations.get(key) ?? 0) === generation
+      ) {
         recentResponses.set(key, { expiresAt: Date.now() + ttlMs, value });
       }
       return value;
@@ -35,19 +44,19 @@ export async function dedupeRequest<T>(
 }
 
 export function invalidateDedupeCache(keyPrefix?: string) {
-  if (!keyPrefix) {
-    recentResponses.clear();
-    inflightRequests.clear();
-    return;
-  }
+  const keys = new Set<string>();
   for (const key of recentResponses.keys()) {
-    if (key.startsWith(keyPrefix)) {
-      recentResponses.delete(key);
-    }
+    if (!keyPrefix || key.startsWith(keyPrefix)) keys.add(key);
   }
   for (const key of inflightRequests.keys()) {
-    if (key.startsWith(keyPrefix)) {
-      inflightRequests.delete(key);
-    }
+    if (!keyPrefix || key.startsWith(keyPrefix)) keys.add(key);
+  }
+  for (const key of keyGenerations.keys()) {
+    if (!keyPrefix || key.startsWith(keyPrefix)) keys.add(key);
+  }
+  for (const key of keys) {
+    recentResponses.delete(key);
+    inflightRequests.delete(key);
+    bumpGeneration(key);
   }
 }

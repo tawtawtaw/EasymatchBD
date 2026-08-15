@@ -72,7 +72,7 @@ export default function OtpLoginScreen({ navigation }: OtpLoginScreenProps) {
       >
         <LanguageToggle compact />
 
-        <AuthScreenHeader brand={copy.brand} subtitle={copy.subtitle} logoSize={96} />
+        <AuthScreenHeader subtitle={copy.subtitle} logoWidth={248} />
 
         <View style={styles.card}>
           <Text style={styles.title}>{copy.title}</Text>

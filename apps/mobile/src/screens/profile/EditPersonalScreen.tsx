@@ -117,6 +117,17 @@ export default function EditPersonalScreen({ navigation }: EditPersonalScreenPro
       weightInvalid: copy.weightInvalid,
       weightRange: copy.weightRange,
       heightInvalid: copy.heightInvalid,
+      fieldRequired: copy.fieldRequired,
+      gender: field("gender"),
+      maritalStatus: field("marital_status"),
+      religion: field("religion"),
+      occupation: field("occupation"),
+      educationMedium: copy.educationMedium,
+      highestQualification: copy.highestQualification,
+      division: copy.division,
+      district: copy.district,
+      cityTown: copy.cityTown,
+      addressLine: copy.addressLine,
     });
     if (validationError) {
       setError(validationError);
@@ -137,6 +148,8 @@ export default function EditPersonalScreen({ navigation }: EditPersonalScreenPro
         locale,
         isOnboardingSetup,
         refreshOnboarding,
+        completionMissing: updated.completionMissing,
+        completionPercent: updated.completionPercent,
       });
     } catch (err) {
       setError(getApiErrorMessage(err, copy.saveError));
@@ -144,17 +157,24 @@ export default function EditPersonalScreen({ navigation }: EditPersonalScreenPro
       setSaving(false);
     }
   }, [
+    copy.addressLine,
     copy.childrenCountInvalid,
     copy.childrenCountMax,
     copy.childrenCountRequired,
-    copy.smokingHabitRequired,
+    copy.cityTown,
     copy.dateOfBirthInvalid,
     copy.dateOfBirthRequired,
+    copy.district,
+    copy.division,
+    copy.educationMedium,
+    copy.fieldRequired,
     copy.heightInvalid,
+    copy.highestQualification,
     copy.introductionRequired,
     copy.prayerPracticeRequired,
     copy.saved,
     copy.saveError,
+    copy.smokingHabitRequired,
     copy.weightInvalid,
     copy.weightRange,
     form,
@@ -279,7 +299,6 @@ export default function EditPersonalScreen({ navigation }: EditPersonalScreenPro
         label={copy.weightKg}
         value={form.weightKg}
         onChange={(weightKg) => patch({ weightKg: weightKg.replace(/\D/g, "") })}
-        keyboardType="number-pad"
         keyboardType="number-pad"
       />
       <FormSelectField

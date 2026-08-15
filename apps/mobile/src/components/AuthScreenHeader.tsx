@@ -3,20 +3,21 @@ import { AppLogo } from "./AppLogo";
 import { colors } from "../theme/colors";
 
 type AuthScreenHeaderProps = {
-  brand: string;
+  brand?: string;
   subtitle?: string;
+  logoWidth?: number;
+  /** @deprecated Use logoWidth. */
   logoSize?: number;
 };
 
 export function AuthScreenHeader({
-  brand,
   subtitle,
-  logoSize = 88,
+  logoWidth,
+  logoSize = 240,
 }: AuthScreenHeaderProps) {
   return (
     <View style={styles.hero}>
-      <AppLogo size={logoSize} style={styles.logo} />
-      <Text style={styles.brand}>{brand}</Text>
+      <AppLogo width={logoWidth ?? logoSize} style={styles.logo} />
       {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
     </View>
   );
@@ -30,14 +31,8 @@ const styles = StyleSheet.create({
   logo: {
     marginBottom: 12,
   },
-  brand: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: colors.rose900,
-    textAlign: "center",
-  },
   subtitle: {
-    marginTop: 8,
+    marginTop: 4,
     fontSize: 15,
     lineHeight: 22,
     color: colors.zinc600,

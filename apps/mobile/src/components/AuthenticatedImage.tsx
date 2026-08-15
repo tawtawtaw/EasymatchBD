@@ -1,31 +1,26 @@
-import * as FileSystem from "expo-file-system/legacy";
 import { useEffect, useRef, useState } from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
 import { API_BASE_URL } from "../services/api/client";
-import { sessionStorage } from "../services/session-storage";
+import { ensureLocalPhoto } from "../lib/photo-cache";
 import { colors } from "../theme/colors";
 
 type Props = {
   path: string;
   style?: object;
   loadingLabel?: string;
+  previewUri?: string | null;
   onError?: () => void;
 };
-
-function cacheFileForPath(path: string) {
-  const safe = path.replace(/[^\w.-]+/g, "_");
-  const base = FileSystem.cacheDirectory ?? FileSystem.documentDirectory;
-  return `${base}auth-image-${safe}`;
-}
 
 export function AuthenticatedImage({
   path,
   style,
   loadingLabel = "Loading…",
+  previewUri,
   onError,
 }: Props) {
   const remoteUri = `${API_BASE_URL}${path}`;
-  const [localUri, setLocalUri] = useState<string | null>(null);
+  const [localUri, setLocalUri] = useState<string | null>(previewUri ?? null);
   const [failed, setFailed] = useState(false);
   const onErrorRef = useRef(onError);
 
@@ -37,40 +32,33 @@ export function AuthenticatedImage({
     let cancelled = false;
 
     async function load() {
-      setLocalUri(null);
-      setFailed(false);
-
+      if (previewUri) {
+        setLocalUri(previewUri);
+        setFailed(false);
+      } else {
+        setLocalUri(null);
+        setFailed(false);
+      }
       try {
-        const token = await sessionStorage.getAccessToken();
-        if (!token) {
-          throw new Error("Missing auth token");
-        }
-
-        const cacheFile = cacheFileForPath(path);
-        const result = await FileSystem.downloadAsync(remoteUri, cacheFile, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (cancelled) return;
-
-        if (result.status !== 200) {
-          throw new Error(`Image request failed (${result.status})`);
-        }
-
-        setLocalUri(result.uri);
+        const uri = await ensureLocalPhoto(remoteUri, path);
+        if (!cancelled) setLocalUri(uri);
       } catch {
         if (cancelled) return;
+        if (previewUri) {
+          setLocalUri(previewUri);
+          setFailed(false);
+          return;
+        }
         setFailed(true);
         onErrorRef.current?.();
       }
     }
 
     void load();
-
     return () => {
       cancelled = true;
     };
-  }, [path, remoteUri]);
+  }, [path, remoteUri, previewUri]);
 
   if (failed) {
     return (
@@ -94,6 +82,11 @@ export function AuthenticatedImage({
       style={[styles.image, style]}
       resizeMode="cover"
       onError={() => {
+        if (previewUri) {
+          setLocalUri(previewUri);
+          setFailed(false);
+          return;
+        }
         setFailed(true);
         onErrorRef.current?.();
       }}

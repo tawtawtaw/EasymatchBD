@@ -1,4 +1,5 @@
 import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import { Platform } from "react-native";
 import { requestInAppCameraCapture, type CameraFacing } from "./camera-capture-bridge";
@@ -61,6 +62,123 @@ function assetToFile(
   };
 }
 
+export function withFileScheme(uri: string) {
+  if (
+    uri.startsWith("file://") ||
+    uri.startsWith("content://") ||
+    uri.startsWith("ph://") ||
+    uri.startsWith("assets-library://")
+  ) {
+    return uri;
+  }
+  return `file://${uri}`;
+}
+
+export function normalizeUploadMime(type: string | undefined, name: string) {
+  const mime = (type ?? "").toLowerCase().trim();
+  if (mime === "image/jpg" || mime === "image/pjpeg" || mime === "image/jpeg") {
+    return "image/jpeg";
+  }
+  if (mime === "image/png" || mime === "image/webp" || mime === "application/pdf") {
+    return mime;
+  }
+  if (/\.png$/i.test(name)) return "image/png";
+  if (/\.webp$/i.test(name)) return "image/webp";
+  if (/\.pdf$/i.test(name)) return "application/pdf";
+  return "image/jpeg";
+}
+
+function safeFileName(name: string, mimeType: string) {
+  const cleaned = name.replace(/[^\w.-]+/g, "_") || `photo-${Date.now()}`;
+  if (/\.(jpe?g|png|webp|pdf)$/i.test(cleaned)) return cleaned;
+  if (mimeType.includes("png")) return `${cleaned}.png`;
+  if (mimeType.includes("webp")) return `${cleaned}.webp`;
+  if (mimeType.includes("pdf")) return `${cleaned}.pdf`;
+  return `${cleaned}.jpg`;
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function getFileSize(uri: string): Promise<number> {
+  try {
+    const info = await FileSystem.getInfoAsync(withFileScheme(uri));
+    if (info.exists && !info.isDirectory) return info.size;
+  } catch {
+    // ignore missing/unreadable files
+  }
+  return 0;
+}
+
+async function waitForFileSize(uri: string, attempts = 8): Promise<number> {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const size = await getFileSize(uri);
+    if (size > 0) return size;
+    await delay(60);
+  }
+  return 0;
+}
+
+async function copyToStableLocation(source: string, destination: string) {
+  try {
+    await FileSystem.copyAsync({ from: source, to: destination });
+    if ((await getFileSize(destination)) > 0) return;
+  } catch {
+    // fall through to a base64 copy, which works for some camera URIs copyAsync rejects
+  }
+
+  const contents = await FileSystem.readAsStringAsync(source, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+  await FileSystem.writeAsStringAsync(destination, contents, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+}
+
+/** Copy camera/gallery files into app documents so Android upload is not a deleted temp URI. */
+export async function persistLocalMediaFile(
+  file: PickedMediaFile,
+): Promise<PickedMediaFile> {
+  const stagingRoot =
+    FileSystem.documentDirectory ?? FileSystem.cacheDirectory;
+  if (!stagingRoot) return file;
+
+  const type = normalizeUploadMime(file.type, file.name);
+  const name = safeFileName(file.name, type);
+  const source = withFileScheme(file.uri);
+
+  if (source.includes("upload-staging/")) {
+    const existingSize = await getFileSize(source);
+    if (existingSize > 0) {
+      return { uri: source, name, type, fileSize: existingSize };
+    }
+  }
+
+  const stagingDir = `${stagingRoot}upload-staging/`;
+  await FileSystem.makeDirectoryAsync(stagingDir, { intermediates: true });
+  const destination = `${stagingDir}upload-${Date.now()}-${name}`;
+
+  await waitForFileSize(source);
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await copyToStableLocation(source, destination);
+      const size = await getFileSize(destination);
+      if (size > 0) {
+        return { uri: destination, name, type, fileSize: size };
+      }
+    } catch (error) {
+      lastError = error;
+    }
+    await delay(80);
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Could not save the photo for upload. Please take it again.");
+}
+
 async function captureWithSystemCamera(
   fallbackName: string,
   options: ImageCaptureOptions,
@@ -81,7 +199,7 @@ async function captureWithSystemCamera(
     const useCrop = Platform.OS === "ios" && (options.allowsEditing ?? false);
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ["images"],
-      quality: options.quality ?? 0.85,
+      quality: options.quality ?? 0.45,
       allowsEditing: useCrop,
       aspect: useCrop ? options.aspect : undefined,
       cameraType:
@@ -93,7 +211,7 @@ async function captureWithSystemCamera(
     if (!result.canceled && result.assets[0]) {
       return {
         status: "success",
-        file: assetToFile(result.assets[0], fallbackName),
+        file: await persistLocalMediaFile(assetToFile(result.assets[0], fallbackName)),
       };
     }
 
@@ -106,7 +224,7 @@ async function captureWithSystemCamera(
     ) {
       return {
         status: "success",
-        file: assetToFile(pending.assets[0], fallbackName),
+        file: await persistLocalMediaFile(assetToFile(pending.assets[0], fallbackName)),
       };
     }
 
@@ -151,7 +269,7 @@ export async function pickImageFromLibrary(
   try {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
-      quality: options.quality ?? 0.85,
+      quality: options.quality ?? 0.45,
       allowsEditing: options.allowsEditing ?? false,
       aspect: options.aspect,
     });
@@ -159,7 +277,7 @@ export async function pickImageFromLibrary(
     if (result.canceled || !result.assets[0]) return { status: "cancelled" };
     return {
       status: "success",
-      file: assetToFile(result.assets[0], fallbackName),
+      file: await persistLocalMediaFile(assetToFile(result.assets[0], fallbackName)),
     };
   } catch (err) {
     const message =

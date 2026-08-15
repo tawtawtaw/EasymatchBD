@@ -1,6 +1,60 @@
 import { isOnBehalfProfile } from "@easymatch/shared";
 import type { NidStatus, ProfileMedia } from "@/lib/media";
 
+const MEDIA_COMPLETION_KEYS = [
+  "primaryPhoto",
+  "nidFront",
+  "nidBack",
+  "creatorNidFront",
+  "creatorNidBack",
+] as const;
+
+export function isMediaCompletionKey(key: string) {
+  return (MEDIA_COMPLETION_KEYS as readonly string[]).includes(key);
+}
+
+/** Drop photo/NID gaps already satisfied on the media payload (stale profile after upload). */
+export function applyMediaCompletionOverrides(
+  media: Pick<ProfileMedia, "photos" | "nidDocuments" | "creationMode" | "onBehalfRelation"> | null | undefined,
+  completionMissing: string[],
+): string[] {
+  if (!media) return completionMissing;
+
+  const photos = media.photos ?? [];
+  const nidDocuments = media.nidDocuments ?? [];
+  const onBehalf = isOnBehalfProfile(media);
+  return completionMissing.filter((key) => {
+    if (key === "primaryPhoto") {
+      return !photos.some((photo) => photo.type === "primary");
+    }
+    if (onBehalf && key === "creatorNidFront") {
+      return !nidDocuments.some(
+        (doc) => doc.subject === "creator" && doc.side === "front",
+      );
+    }
+    if (onBehalf && key === "creatorNidBack") {
+      return !nidDocuments.some(
+        (doc) => doc.subject === "creator" && doc.side === "back",
+      );
+    }
+    if (!onBehalf && key === "nidFront") {
+      return !nidDocuments.some(
+        (doc) => doc.subject === "member" && doc.side === "front",
+      );
+    }
+    if (!onBehalf && key === "nidBack") {
+      return !nidDocuments.some(
+        (doc) => doc.subject === "member" && doc.side === "back",
+      );
+    }
+    return true;
+  });
+}
+
+export function isBiodataCompleteFromMissing(completionMissing: string[]) {
+  return completionMissing.every((key) => isMediaCompletionKey(key));
+}
+
 export function isVerificationPackageComplete(media: ProfileMedia) {
   const hasPrimary = media.photos.some((photo) => photo.type === "primary");
   const onBehalf = isOnBehalfProfile(media);
@@ -66,7 +120,8 @@ export function computeVerificationSubmitState(
     Boolean(options?.biodataComplete) &&
     packageComplete &&
     media.isVerified &&
-    Boolean(options?.amendmentDirty) &&
+    (Boolean(options?.amendmentDirty) ||
+      media.photos.some((photo) => photo.status === "pending")) &&
     !biodataPending &&
     !nidRejected;
   const isPendingReview =
