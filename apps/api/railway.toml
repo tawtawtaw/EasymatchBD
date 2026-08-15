@@ -15,6 +15,6 @@ watchPatterns = [
 ]
 
 [deploy]
-startCommand = "npm run start:prod -w @easymatch/api"
+startCommand = "npm run prisma:migrate:deploy -w @easymatch/api && npm run start:prod -w @easymatch/api"
 healthcheckPath = "/api/v1/health"
 restartPolicyType = "ON_FAILURE"
