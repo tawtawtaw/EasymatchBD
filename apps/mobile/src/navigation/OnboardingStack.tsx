@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import EditFamilyScreen from "../screens/profile/EditFamilyScreen";
 import EditMaritalScreen from "../screens/profile/EditMaritalScreen";
@@ -10,8 +11,12 @@ import {
   TermsAcceptanceScreen,
   TermsDeclinedScreen,
 } from "../screens/onboarding";
+import PinSetupScreen from "../screens/onboarding/PinSetupScreen";
 import { LoadingState } from "../components/ScreenState";
 import { tNavigation } from "../i18n/messages";
+import { hasSeenPinSetupPrompt } from "../lib/pin-setup-prompt";
+import { useAppLockStore } from "../store/appLockStore";
+import { useAuthStore } from "../store/authStore";
 import { useOnboardingStore } from "../store/onboardingStore";
 import { useLocaleStore } from "../store/localeStore";
 import type { OnboardingStackParamList } from "./types";
@@ -68,6 +73,48 @@ function ProfileSetupStack() {
   );
 }
 
+function CreationIntentGate() {
+  const userId = useAuthStore((s) => s.user?.id);
+  const lockEnabled = useAppLockStore((s) => s.enabled);
+  const refreshLock = useAppLockStore((s) => s.refresh);
+  const locale = useLocaleStore((s) => s.locale);
+  const nav = tNavigation(locale);
+  const [showPinSetup, setShowPinSetup] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      await refreshLock();
+      if (cancelled) return;
+      if (useAppLockStore.getState().enabled) {
+        setShowPinSetup(false);
+        return;
+      }
+      if (!userId) {
+        setShowPinSetup(false);
+        return;
+      }
+      const seen = await hasSeenPinSetupPrompt(userId);
+      if (!cancelled) setShowPinSetup(!seen);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [lockEnabled, refreshLock, userId]);
+
+  if (showPinSetup === null) {
+    return <LoadingState label={nav.app.preparingAccount} />;
+  }
+
+  if (showPinSetup) {
+    return <PinSetupScreen onFinished={() => setShowPinSetup(false)} />;
+  }
+
+  return <ProfileCreationIntentScreen />;
+}
+
 export function OnboardingStack() {
   const phase = useOnboardingStore((s) => s.phase);
   const locale = useLocaleStore((s) => s.locale);
@@ -82,7 +129,7 @@ export function OnboardingStack() {
   }
 
   if (phase === "creation_intent") {
-    return <ProfileCreationIntentScreen />;
+    return <CreationIntentGate />;
   }
 
   if (phase === "profile_setup") {

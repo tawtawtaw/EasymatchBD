@@ -9,3 +9,4 @@ export const TELECOM_PENDING_CALLS_KEY = "easymatch_telecom_pending_calls";
 export const APP_LOCK_PIN_KEY = "easymatch_app_lock_pin";
 export const APP_LOCK_ATTEMPTS_KEY = "easymatch_app_lock_attempts";
 export const APP_LOCK_BIOMETRIC_KEY = "easymatch_app_lock_biometric";
+export const APP_LOCK_SETUP_SEEN_KEY = "easymatch_app_lock_setup_seen";

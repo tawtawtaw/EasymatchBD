@@ -142,8 +142,47 @@ const profileSetup = {
   },
 } as const;
 
+const pinSetup = {
+  en: {
+    title: "Protect this device",
+    subtitle:
+      "Set a 4-digit PIN so you can reopen the app without waiting for a new OTP. You stay signed in on this phone.",
+    pinLabel: "PIN",
+    confirmPin: "Confirm PIN",
+    save: "Save and continue",
+    skip: "Not now",
+    saving: "Saving…",
+    biometricHint: "You can also unlock with fingerprint or face on this phone.",
+    mismatch: "The two PINs do not match.",
+    errorLength: "PIN must be 4 digits.",
+    errorDigits: "PIN must contain digits only.",
+    errorWeak: "Avoid repeated or sequential digits like 1111 or 1234.",
+    saveFailed: "Could not save the PIN. Please try again.",
+  },
+  bn: {
+    title: "এই ডিভাইস সুরক্ষিত করুন",
+    subtitle:
+      "৪ সংখ্যার পিন সেট করুন, যাতে নতুন OTP ছাড়াই অ্যাপ খুলতে পারেন। এই ফোনে আপনি সাইন ইন থাকবেন।",
+    pinLabel: "পিন",
+    confirmPin: "পিন নিশ্চিত করুন",
+    save: "সংরক্ষণ করে চালিয়ে যান",
+    skip: "এখন নয়",
+    saving: "সংরক্ষণ করা হচ্ছে…",
+    biometricHint: "এই ফোনে আঙুলের ছাপ বা ফেস দিয়েও আনলক করতে পারবেন।",
+    mismatch: "দুটি পিন মিলছে না।",
+    errorLength: "পিন ৪ সংখ্যার হতে হবে।",
+    errorDigits: "পিনে শুধু সংখ্যা থাকতে হবে।",
+    errorWeak: "1111 বা 1234-এর মতো একই বা ধারাবাহিক সংখ্যা এড়িয়ে চলুন।",
+    saveFailed: "পিন সংরক্ষণ করা যায়নি। আবার চেষ্টা করুন।",
+  },
+} as const;
+
 export function tOnboardingTerms(locale: AppLocale) {
   return terms[locale];
+}
+
+export function tOnboardingPinSetup(locale: AppLocale) {
+  return pinSetup[locale];
 }
 
 export function tOnboardingCreationIntent(locale: AppLocale) {

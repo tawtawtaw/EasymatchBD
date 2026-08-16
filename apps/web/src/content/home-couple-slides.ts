@@ -25,4 +25,10 @@ export const HOME_COUPLE_SLIDES: HomeCoupleSlide[] = [
     altKey: "slide3Alt",
     captionKey: "slide3Caption",
   },
+  {
+    id: "hero-6",
+    imageSrc: "/home/couples/hero-6.png",
+    altKey: "slide6Alt",
+    captionKey: "slide6Caption",
+  },
 ];

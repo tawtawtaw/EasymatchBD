@@ -228,7 +228,7 @@ export default function DiscoveryProfilePage() {
                     "thumb",
                   )}
                   alt={name}
-                  className="h-full w-full object-cover"
+                  className="h-full w-full object-cover object-[center_22%]"
                   protect
                   fetchBlob={(token, path) => {
                     const match = path.match(
@@ -467,6 +467,7 @@ export default function DiscoveryProfilePage() {
           token={authToken}
           profileId={profile.profileCode}
           photoIds={galleryPhotoIds}
+          primaryPhotoId={profile.media.primaryPhotoId}
           index={galleryIndex}
           alt={name}
           onClose={() => setGalleryIndex(null)}

@@ -69,11 +69,12 @@ export function AuthenticatedBlobImage({
     );
   }
 
+  const layoutClassName = (className ?? "").replace(/\bobject-\S+/g, "").trim();
   const image = (
     <img
       src={src}
       alt={alt}
-      className={`${className ?? ""} ${protect ? "pointer-events-none h-full w-full select-none object-cover" : ""}`}
+      className={`${className ?? ""} ${protect ? "pointer-events-none absolute inset-0 h-full w-full select-none" : ""}`}
       loading="lazy"
       draggable={false}
       onContextMenu={protect ? (event) => event.preventDefault() : undefined}
@@ -86,7 +87,7 @@ export function AuthenticatedBlobImage({
 
   return (
     <div
-      className={`relative h-full w-full overflow-hidden ${className ?? ""}`}
+      className={`relative overflow-hidden ${layoutClassName}`}
       onContextMenu={(event) => event.preventDefault()}
       role="img"
       aria-label={alt}

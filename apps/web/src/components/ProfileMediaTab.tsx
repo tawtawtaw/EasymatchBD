@@ -932,7 +932,7 @@ export function ProfileMediaTab({
                 token={authToken}
                 path={photoFileUrl(primaryPhoto.id)}
                 alt={t("passportPhoto")}
-                className="h-40 w-32 rounded-lg border border-zinc-200 object-cover"
+                className="h-40 w-[7.5rem] rounded-lg border border-zinc-200 object-cover object-[center_22%]"
                 onLoadFailed={() => void loadMedia(true)}
               />
               <div className="space-y-2 text-sm">

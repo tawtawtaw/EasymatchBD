@@ -17,6 +17,9 @@ export function CouplesPhotoCarousel({
 }: CouplesPhotoCarouselProps) {
   const t = useTranslations("publicHome.coupleGallery");
   const slides = slidesProp ?? HOME_COUPLE_SLIDES;
+  function galleryMessage(key: string, fallbackKey: string) {
+    return t.has(key) ? t(key) : t(fallbackKey);
+  }
   const [activeIndex, setActiveIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
@@ -87,7 +90,7 @@ export function CouplesPhotoCarousel({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={slide.imageSrc}
-                  alt={t(slide.altKey)}
+                  alt={galleryMessage(slide.altKey, "slide1Alt")}
                   className="h-full w-full object-cover"
                   loading={isHero ? "eager" : "lazy"}
                   decoding="async"
@@ -106,7 +109,7 @@ export function CouplesPhotoCarousel({
                         : "text-base font-medium text-white sm:text-lg"
                     }
                   >
-                    {t(slide.captionKey)}
+                    {galleryMessage(slide.captionKey, "slide1Caption")}
                   </figcaption>
                 </div>
               </div>

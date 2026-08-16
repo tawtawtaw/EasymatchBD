@@ -9,6 +9,7 @@ type Props = {
   token: string;
   profileId: string;
   photoIds: string[];
+  primaryPhotoId?: string | null;
   index: number;
   alt: string;
   onClose: () => void;
@@ -19,6 +20,7 @@ export function ProfilePhotoLightbox({
   token,
   profileId,
   photoIds,
+  primaryPhotoId,
   index,
   alt,
   onClose,
@@ -27,6 +29,7 @@ export function ProfilePhotoLightbox({
   const t = useTranslations("discovery");
   const photoId = photoIds[index];
   const total = photoIds.length;
+  const isPrimary = Boolean(primaryPhotoId && photoId === primaryPhotoId);
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -73,12 +76,22 @@ export function ProfilePhotoLightbox({
             {t("galleryPrevious")}
           </button>
         ) : null}
-        <div className="h-[min(80vh,720px)] w-[min(90vw,640px)]">
+        <div
+          className={
+            isPrimary
+              ? "flex aspect-[3/4] h-[min(80vh,720px)] w-auto max-w-[min(90vw,540px)] items-center justify-center"
+              : "flex h-[min(80vh,720px)] w-[min(90vw,640px)] items-center justify-center"
+          }
+        >
           <AuthenticatedBlobImage
             token={token}
             path={discoveryPhotoUrl(profileId, photoId, "display")}
             alt={alt}
-            className="h-full w-full object-contain"
+            className={
+              isPrimary
+                ? "h-full w-full object-contain object-[center_22%]"
+                : "h-full w-full object-contain"
+            }
             protect
             fetchBlob={(authToken, path) => {
               const match = path.match(
