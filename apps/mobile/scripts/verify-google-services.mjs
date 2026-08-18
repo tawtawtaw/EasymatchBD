@@ -30,3 +30,5 @@ if (packageName !== "com.easymatchbd.member") {
 }
 
 console.log("[easymatch] google-services.json OK for com.easymatchbd.member");
+
+await import("./verify-android-version.mjs");

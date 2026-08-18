@@ -92,6 +92,7 @@ android {
         applicationId 'com.easymatchbd.member'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
+        // Bare integer only. A trailing comma makes Gradle fail with "Value is null".
         versionCode 21
         versionName "0.1.0"
 

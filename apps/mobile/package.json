@@ -15,6 +15,7 @@
     "build:preview": "node scripts/verify-google-services.mjs && eas build --platform android --profile preview",
     "build:preview-live": "node scripts/verify-google-services.mjs && eas build --platform android --profile preview-live",
     "build:production": "node scripts/verify-google-services.mjs && eas build --platform android --profile production",
+    "bump:android": "node scripts/bump-android-version.mjs",
     "ios": "expo run:ios",
     "eas-build-pre-install": "node scripts/verify-google-services.mjs",
     "eas-build-post-install": "cd ../.. && npm run build -w @easymatch/shared"
