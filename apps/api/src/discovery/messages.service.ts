@@ -191,6 +191,7 @@ export class MessagesService {
       WHERE cm."senderId" != ${userId}
         AND cm."deletedAt" IS NULL
         AND (c."userLowId" = ${userId} OR c."userHighId" = ${userId})
+        AND c."endedAt" IS NULL
         AND (cps."lastReadAt" IS NULL OR cm."createdAt" > cps."lastReadAt")
     `;
 
@@ -291,6 +292,7 @@ export class MessagesService {
     ]);
     const connections = await this.prisma.connection.findMany({
       where: {
+        endedAt: null,
         OR: [{ userLowId: userId }, { userHighId: userId }],
       },
       include: {
@@ -352,6 +354,22 @@ export class MessagesService {
       value: items,
     });
     return items;
+  }
+
+  invalidateUserMessageCaches(userId: string) {
+    this.invalidateConversationCaches(userId);
+    this.conversationsInflight.delete(userId);
+    this.unreadCountInflight.delete(userId);
+    for (const key of this.threadMetaCache.keys()) {
+      if (key.startsWith(`${userId}:`)) {
+        this.threadMetaCache.delete(key);
+      }
+    }
+    for (const key of this.sincePollCache.keys()) {
+      if (key.startsWith(`${userId}:`)) {
+        this.sincePollCache.delete(key);
+      }
+    }
   }
 
   private invalidateConversationCaches(userId: string) {
@@ -465,10 +483,14 @@ export class MessagesService {
         userLowId: true,
         userHighId: true,
         privacyLevel: true,
+        endedAt: true,
       },
     });
     if (!access) {
       throw new NotFoundException('Connection not found');
+    }
+    if (access.endedAt) {
+      throw new ForbiddenException('This connection has ended');
     }
 
     const otherUserId =
@@ -914,6 +936,10 @@ export class MessagesService {
 
     if (!connection) {
       throw new NotFoundException('Connection not found');
+    }
+
+    if (connection.endedAt) {
+      throw new ForbiddenException('This connection has ended');
     }
 
     if (!connection.userLow.isActive || !connection.userHigh.isActive) {

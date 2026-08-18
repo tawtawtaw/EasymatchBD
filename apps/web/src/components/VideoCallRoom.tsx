@@ -984,6 +984,7 @@ export function VideoCallRoom({
                 token={livekitToken!}
                 embeddedMobile={embeddedMobile}
                 nativeShell={nativeShell}
+                autoEnableMicrophone={nativeShell}
                 showEndCall
                 ending={ending}
                 onEndCall={() => void handleEnd()}

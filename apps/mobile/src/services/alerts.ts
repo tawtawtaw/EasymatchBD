@@ -2,6 +2,16 @@ import { apiRequest } from "./api/client";
 import { dedupeRequest, invalidateDedupeCache } from "./api/dedupe";
 import type { VideoCallAlertItem } from "../types/video-calls";
 
+export type EndedConnectionAlert = {
+  connectionId: string;
+  endedAt: string;
+  reconnectAvailableAt: string | null;
+  member: {
+    profileCode: string | null;
+    fullName: string | null;
+  };
+};
+
 export type AlertsSummary = {
   unreadMessages: number;
   incomingInterests: number;
@@ -10,6 +20,7 @@ export type AlertsSummary = {
   incomingCalls: number;
   incomingCallAlert: VideoCallAlertItem | null;
   callAlerts: VideoCallAlertItem[];
+  endedConnectionAlerts?: EndedConnectionAlert[];
 };
 
 export async function getAlertsSummary(forceFresh = false) {

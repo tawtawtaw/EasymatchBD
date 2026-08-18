@@ -220,6 +220,7 @@ export type ProfileEditorBootstrap = {
   termsVersion?: string | null;
   currentTermsVersion?: string | null;
   termsDeclinedAt?: string | null;
+  phone?: string | null;
   creationMode?: "self" | "on_behalf" | null;
   onBehalfRelation?: string | null;
   profile: MemberProfile | null;

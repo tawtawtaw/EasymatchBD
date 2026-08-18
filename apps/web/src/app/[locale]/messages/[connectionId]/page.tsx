@@ -22,6 +22,7 @@ import {
   type MessageMember,
 } from "@/lib/messages";
 import { listMyConnections } from "@/lib/discovery";
+import { EndConnectionButton } from "@/components/EndConnectionButton";
 import { resolveMemberDisplayName, resolveMemberDistrict } from "@/lib/member-display";
 import { memberComplaintHref } from "@/lib/member-complaints";
 import { useMemberDropdowns } from "@/hooks/use-member-dropdowns";
@@ -324,22 +325,32 @@ export default function MessageThreadPage({
             <p className="mt-1 text-xs text-emerald-700">{t("typing")}</p>
           ) : null}
         </div>
-        {profileRef ? (
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href={`/discovery/${profileRef}`}
-              className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-800 hover:bg-zinc-50"
-            >
-              {t("viewProfile")}
-            </Link>
-            <Link
-              href={memberComplaintHref(profileRef)}
-              className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-800 hover:bg-zinc-50"
-            >
-              {t("fileComplaint")}
-            </Link>
-          </div>
-        ) : null}
+        <div className="flex flex-wrap gap-2">
+          {profileRef ? (
+            <>
+              <Link
+                href={`/discovery/${profileRef}`}
+                className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-800 hover:bg-zinc-50"
+              >
+                {t("viewProfile")}
+              </Link>
+              <Link
+                href={memberComplaintHref(profileRef)}
+                className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-800 hover:bg-zinc-50"
+              >
+                {t("fileComplaint")}
+              </Link>
+            </>
+          ) : null}
+          <EndConnectionButton
+            connectionId={connectionId}
+            privacyLevel={privacyLevel}
+            disabled={sending}
+            onEnded={() => {
+              router.replace("/messages");
+            }}
+          />
+        </div>
       </div>
 
       {error ? (

@@ -104,6 +104,7 @@ export class VideoCallGuestsService {
             userLowId: true,
             userHighId: true,
             privacyLevel: true,
+            endedAt: true,
             userLow: { select: { isActive: true } },
             userHigh: { select: { isActive: true } },
           },
@@ -120,6 +121,10 @@ export class VideoCallGuestsService {
       connection.userLowId === userId || connection.userHighId === userId;
     if (!isMember) {
       throw new ForbiddenException('Not a member of this connection');
+    }
+
+    if (connection.endedAt) {
+      throw new ForbiddenException('This connection has ended');
     }
 
     if (!connection.userLow.isActive || !connection.userHigh.isActive) {

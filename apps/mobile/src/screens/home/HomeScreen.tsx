@@ -4,6 +4,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useNavigation } from "@react-navigation/native";
 import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import { RefreshControl, ScrollView, StyleSheet, Text, View, Pressable } from "react-native";
+import { ConnectionEndedAlertsBanner } from "../../components/ConnectionEndedAlertsBanner";
 import { DiscoveryProfileCard } from "../../components/DiscoveryProfileCard";
 import { MemberProfileAvatar } from "../../components/MemberProfileAvatar";
 import { PaidMembershipGate } from "../../components/PaidMembershipGate";
@@ -150,6 +151,8 @@ export default function HomeScreen() {
       </View>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
+
+      <ConnectionEndedAlertsBanner />
 
       {!isPaid ? (
         <View style={styles.upsellWrap}>

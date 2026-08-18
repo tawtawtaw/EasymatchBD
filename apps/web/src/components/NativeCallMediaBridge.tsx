@@ -16,6 +16,7 @@ declare global {
       toggleMic: () => void;
       toggleCamera: () => void;
       enableCallMedia: () => void;
+      enableMicrophone: () => void;
     };
     __easymatchNativeCommandQueue?: string[];
     __easymatchRunNativeCommand?: (cmd: string) => boolean;
@@ -24,7 +25,10 @@ declare global {
 
 type Props = {
   nativeShell?: boolean;
+  autoEnableMicrophone?: boolean;
 };
+
+const INCOMING_MIC_ENABLE_DELAY_MS = 350;
 
 function drainNativeCommandQueue() {
   const queue = window.__easymatchNativeCommandQueue;
@@ -35,11 +39,15 @@ function drainNativeCommandQueue() {
   }
 }
 
-export function NativeCallMediaBridge({ nativeShell = false }: Props) {
+export function NativeCallMediaBridge({
+  nativeShell = false,
+  autoEnableMicrophone = false,
+}: Props) {
   const room = useRoomContext();
   const { localParticipant } = useLocalParticipant();
   const localParticipantRef = useRef(localParticipant);
   localParticipantRef.current = localParticipant;
+  const micEnableInFlightRef = useRef(false);
 
   useEffect(() => {
     if (!nativeShell) return;
@@ -88,6 +96,30 @@ export function NativeCallMediaBridge({ nativeShell = false }: Props) {
       })();
     };
 
+    const enableMicrophone = () => {
+      kickMediaUserGesture(room, { audio: true, video: false });
+      if (micEnableInFlightRef.current) return;
+      void (async () => {
+        const lp = room.localParticipant;
+        if (lp.isMicrophoneEnabled) {
+          syncMediaState();
+          return;
+        }
+        micEnableInFlightRef.current = true;
+        try {
+          await room.startAudio();
+          if (!lp.isMicrophoneEnabled) {
+            await enableMicrophoneWithRetry(lp);
+          }
+        } catch {
+          /* user can still tap the in-call mic control */
+        } finally {
+          micEnableInFlightRef.current = false;
+          syncMediaState();
+        }
+      })();
+    };
+
     const enableCallMedia = () => {
       kickMediaUserGesture(room, { audio: true, video: true });
       void (async () => {
@@ -113,6 +145,7 @@ export function NativeCallMediaBridge({ nativeShell = false }: Props) {
       toggleMic,
       toggleCamera,
       enableCallMedia,
+      enableMicrophone,
     };
 
     window.__easymatchRunNativeCommand = (cmd: string) => {
@@ -130,6 +163,10 @@ export function NativeCallMediaBridge({ nativeShell = false }: Props) {
         api.enableCallMedia();
         return true;
       }
+      if (cmd === "enableMicrophone") {
+        api.enableMicrophone();
+        return true;
+      }
       return false;
     };
 
@@ -143,8 +180,24 @@ export function NativeCallMediaBridge({ nativeShell = false }: Props) {
       JSON.stringify({ type: "video_call", status: "bridge_ready" }),
     );
 
-    const onConnected = () => syncMediaState();
+    let incomingMicTimer: number | undefined;
+    const scheduleIncomingMicrophone = () => {
+      if (!autoEnableMicrophone) return;
+      window.clearTimeout(incomingMicTimer);
+      incomingMicTimer = window.setTimeout(() => {
+        enableMicrophone();
+      }, INCOMING_MIC_ENABLE_DELAY_MS);
+    };
+
+    const onConnected = () => {
+      syncMediaState();
+      scheduleIncomingMicrophone();
+    };
     const onLocalTrack = () => syncMediaState();
+
+    if (room.state === "connected") {
+      scheduleIncomingMicrophone();
+    }
 
     room.on(RoomEvent.Connected, onConnected);
     localParticipant.on(ParticipantEvent.LocalTrackPublished, onLocalTrack);
@@ -153,6 +206,7 @@ export function NativeCallMediaBridge({ nativeShell = false }: Props) {
     localParticipant.on(ParticipantEvent.TrackUnmuted, onLocalTrack);
 
     return () => {
+      window.clearTimeout(incomingMicTimer);
       room.off(RoomEvent.Connected, onConnected);
       localParticipant.off(ParticipantEvent.LocalTrackPublished, onLocalTrack);
       localParticipant.off(ParticipantEvent.LocalTrackUnpublished, onLocalTrack);
@@ -161,7 +215,7 @@ export function NativeCallMediaBridge({ nativeShell = false }: Props) {
       delete window.__easymatchNativeCallMedia;
       delete window.__easymatchRunNativeCommand;
     };
-  }, [localParticipant, nativeShell, room]);
+  }, [autoEnableMicrophone, localParticipant, nativeShell, room]);
 
   return null;
 }

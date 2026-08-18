@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { MIN_VIDEO_CALL_PRIVACY_LEVEL } from "@easymatch/shared";
 import { EmptyState, ErrorState, LoadingState } from "../../components/ScreenState";
 import { PaidMembershipGate } from "../../components/PaidMembershipGate";
@@ -15,6 +16,7 @@ import { useIsPaidMember } from "../../hooks/use-is-paid-member";
 import { tVideoCalls } from "../../i18n/video-calls";
 import { getApiErrorMessage } from "../../lib/api-error";
 import { formatVideoCallWhen } from "../../lib/video-call-url";
+import { cancelScheduledCallAlarm } from "../../lib/scheduled-call-alarms";
 import { resolveMemberDisplayName } from "../../lib/member-display";
 import type { VideoCallsScreenProps } from "../../navigation/types";
 import { listMyConnections } from "../../services/discovery";
@@ -27,6 +29,7 @@ import { useMemberAlertsStore } from "../../store/memberAlertsStore";
 import type { ConnectionItem } from "../../types/discovery";
 import type { VideoCallAlertItem } from "../../types/video-calls";
 import { colors } from "../../theme/colors";
+import { cardShadow } from "../../theme/shadows";
 
 export default function VideoCallsScreen({ navigation }: VideoCallsScreenProps) {
   const locale = useLocaleStore((s) => s.locale);
@@ -94,6 +97,7 @@ export default function VideoCallsScreen({ navigation }: VideoCallsScreenProps) 
       if (alert.kind === "scheduled_starting") {
         await startScheduledVideoCall(alert.call.id);
       }
+      await cancelScheduledCallAlarm(alert.call.id);
       navigation.navigate("VideoCallRoom", {
         connectionId: alert.call.connectionId,
         callId: alert.call.id,
@@ -173,16 +177,29 @@ export default function VideoCallsScreen({ navigation }: VideoCallsScreenProps) 
           <Text style={styles.sectionTitle}>{copy.hubActiveSection}</Text>
           {alerts.map((alert) => (
             <View key={`${alert.kind}-${alert.call.id}`} style={styles.alertCard}>
-              <Text style={styles.alertText}>{alertMessage(alert)}</Text>
+              <View style={styles.alertHeader}>
+                <View style={styles.alertIcon}>
+                  <MaterialCommunityIcons
+                    name={
+                      alert.kind === "incoming"
+                        ? "phone-incoming"
+                        : "calendar-clock"
+                    }
+                    size={18}
+                    color={alert.kind === "incoming" ? "#047857" : "#0369a1"}
+                  />
+                </View>
+                <Text style={styles.alertText}>{alertMessage(alert)}</Text>
+              </View>
               <Pressable
                 style={[
-                  styles.primaryButton,
+                  styles.alertAction,
                   joiningAlertId === alert.call.id && styles.disabled,
                 ]}
                 onPress={() => void handleAlertAction(alert)}
                 disabled={joiningAlertId === alert.call.id}
               >
-                <Text style={styles.primaryButtonText}>
+                <Text style={styles.alertActionText}>
                   {joiningAlertId === alert.call.id ? copy.joiningScheduled : copy.openCall}
                 </Text>
               </Pressable>
@@ -204,38 +221,57 @@ export default function VideoCallsScreen({ navigation }: VideoCallsScreenProps) 
             const district = item.member.currentDistrict?.trim();
             return (
               <View key={item.connectionId} style={styles.connectionCard}>
-                <View style={styles.connectionBody}>
-                  <Text style={styles.connectionName}>{name}</Text>
-                  {district ? (
-                    <Text style={styles.connectionMeta}>{district}</Text>
-                  ) : null}
+                <View style={styles.connectionHeader}>
+                  <View style={styles.connectionIcon}>
+                    <MaterialCommunityIcons
+                      name="video-outline"
+                      size={22}
+                      color={colors.rose800}
+                    />
+                  </View>
+                  <View style={styles.connectionBody}>
+                    <Text style={styles.connectionName}>{name}</Text>
+                    {district ? (
+                      <Text style={styles.connectionMeta}>{district}</Text>
+                    ) : null}
+                  </View>
                 </View>
-                <View style={styles.connectionActions}>
-                  <Pressable
-                    style={[
-                      styles.primaryButton,
-                      callingId === item.connectionId && styles.disabled,
-                    ]}
-                    onPress={() => void handleCallNow(item)}
-                    disabled={callingId === item.connectionId}
-                  >
-                    <Text style={styles.primaryButtonText}>
+                <Pressable
+                  style={[
+                    styles.callNowButton,
+                    callingId === item.connectionId && styles.disabled,
+                  ]}
+                  onPress={() => void handleCallNow(item)}
+                  disabled={callingId === item.connectionId}
+                >
+                  <MaterialCommunityIcons name="video" size={18} color={colors.white} />
+                  <View style={styles.actionCopy}>
+                    <Text style={styles.callNowTitle}>
                       {callingId === item.connectionId ? copy.hubCalling : copy.callNow}
                     </Text>
-                  </Pressable>
-                  <Pressable
-                    style={styles.secondaryButton}
-                    onPress={() =>
-                      navigation.navigate("ChatThread", {
-                        connectionId: item.connectionId,
-                        memberName: name,
-                        profileCode: item.member.profileCode,
-                      })
-                    }
-                  >
-                    <Text style={styles.secondaryButtonText}>{copy.hubScheduleAndChat}</Text>
-                  </Pressable>
-                </View>
+                    <Text style={styles.callNowHint}>{copy.hubCallNowHint}</Text>
+                  </View>
+                </Pressable>
+                <Pressable
+                  style={styles.scheduleButton}
+                  onPress={() =>
+                    navigation.navigate("ChatThread", {
+                      connectionId: item.connectionId,
+                      memberName: name,
+                      profileCode: item.member.profileCode,
+                    })
+                  }
+                >
+                  <MaterialCommunityIcons
+                    name="calendar-clock"
+                    size={18}
+                    color="#0369a1"
+                  />
+                  <View style={styles.actionCopy}>
+                    <Text style={styles.scheduleTitle}>{copy.hubScheduleAndChat}</Text>
+                    <Text style={styles.scheduleHint}>{copy.hubScheduleCardHint}</Text>
+                  </View>
+                </Pressable>
               </View>
             );
           })
@@ -299,67 +335,122 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   alertCard: {
-    backgroundColor: colors.white,
-    borderRadius: 14,
+    backgroundColor: "#f0f9ff",
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.rose100,
+    borderColor: "#7dd3fc",
     padding: 14,
     marginBottom: 10,
+    gap: 12,
+    ...cardShadow,
+  },
+  alertHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
     gap: 10,
   },
+  alertIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.white,
+  },
   alertText: {
+    flex: 1,
     fontSize: 14,
     lineHeight: 20,
-    color: colors.zinc800,
+    fontWeight: "600",
+    color: "#0c4a6e",
+  },
+  alertAction: {
+    alignItems: "center",
+    borderRadius: 12,
+    backgroundColor: colors.rose800,
+    paddingVertical: 11,
+  },
+  alertActionText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: colors.white,
   },
   connectionCard: {
     backgroundColor: colors.white,
-    borderRadius: 14,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: colors.rose100,
     padding: 14,
-    marginBottom: 10,
+    marginBottom: 12,
     gap: 10,
+    ...cardShadow,
   },
-  connectionBody: { gap: 2 },
+  connectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  connectionIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.rose50,
+    borderWidth: 1,
+    borderColor: colors.rose100,
+  },
+  connectionBody: { flex: 1, gap: 2 },
   connectionName: {
     fontSize: 16,
-    fontWeight: "700",
+    fontWeight: "800",
     color: colors.zinc900,
   },
   connectionMeta: {
     fontSize: 12,
     color: colors.zinc500,
   },
-  connectionActions: {
+  callNowButton: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  primaryButton: {
-    borderRadius: 10,
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 14,
     backgroundColor: colors.rose800,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
   },
-  primaryButtonText: {
-    fontSize: 13,
-    fontWeight: "700",
+  callNowTitle: {
+    fontSize: 14,
+    fontWeight: "800",
     color: colors.white,
   },
-  secondaryButton: {
-    borderRadius: 10,
+  callNowHint: {
+    marginTop: 1,
+    fontSize: 11,
+    color: "#fecdd3",
+  },
+  scheduleButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: colors.rose100,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    backgroundColor: colors.white,
+    borderColor: "#7dd3fc",
+    backgroundColor: "#f0f9ff",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
   },
-  secondaryButtonText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: colors.zinc800,
+  scheduleTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#0c4a6e",
   },
+  scheduleHint: {
+    marginTop: 1,
+    fontSize: 11,
+    color: "#0369a1",
+  },
+  actionCopy: { flex: 1 },
   disabled: { opacity: 0.6 },
   upgradeHint: {
     fontSize: 13,

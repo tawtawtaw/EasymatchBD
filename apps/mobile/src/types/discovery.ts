@@ -37,6 +37,7 @@ export type DiscoveryRelationship = {
   pendingUpgradeByMe: boolean;
   sentInterestId?: string | null;
   receivedInterestId?: string | null;
+  reconnectAvailableAt?: string | null;
 };
 
 export type DiscoveryProfile = {

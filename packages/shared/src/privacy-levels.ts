@@ -16,6 +16,9 @@ export const MIN_CONSULTANT_PRIVACY_LEVEL = PrivacyLevel.PROFILE_COMPATIBILITY;
 /** Anonymous public biodata browse shows level-0 fields only (public discovery). */
 export const PUBLIC_BROWSE_PRIVACY_LEVEL = PrivacyLevel.PUBLIC;
 
+/** Days after ending a connection before either member can send interest again. */
+export const CONNECTION_RECONNECT_COOLDOWN_DAYS = 7;
+
 export const PRIVACY_LEVEL_LABELS: Record<PrivacyLevel, string> = {
   [PrivacyLevel.PUBLIC]: 'Public Discovery',
   [PrivacyLevel.BASIC_MUTUAL_INTEREST]: 'Basic Mutual Interest',

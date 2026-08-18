@@ -19,6 +19,7 @@ import { useMemberDiscoveryStats } from "@/hooks/use-member-discovery-stats";
 import { useMemberDropdowns } from "@/hooks/use-member-dropdowns";
 import { ConnectionConsultantPanel } from "@/components/ConnectionConsultantPanel";
 import { ConnectionProposalsPanel } from "@/components/ConnectionProposalsPanel";
+import { EndConnectionButton } from "@/components/EndConnectionButton";
 import { MIN_CONSULTANT_PRIVACY_LEVEL, MIN_VIDEO_CALL_PRIVACY_LEVEL } from "@easymatch/shared";
 
 function connectionProfileRef(member: ConnectionItem["member"]) {
@@ -260,6 +261,21 @@ export default function ConnectionsPage() {
                           {tv("callNow")}
                         </Link>
                       ) : null}
+                      <EndConnectionButton
+                        connectionId={connection.connectionId}
+                        privacyLevel={connection.privacyLevel}
+                        disabled={acting !== null}
+                        onEnded={async () => {
+                          setConnections((prev) =>
+                            prev.filter(
+                              (item) =>
+                                item.connectionId !== connection.connectionId,
+                            ),
+                          );
+                          setMessage(t("endSuccess"));
+                          await load();
+                        }}
+                      />
                     </div>
                   ) : null}
                 </div>

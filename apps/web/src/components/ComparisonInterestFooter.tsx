@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/routing";
 import { PaidMembershipRequired } from "@/components/PaidMembershipRequired";
+import { EndConnectionButton } from "@/components/EndConnectionButton";
 import { AUTH_TOKEN_KEY } from "@/lib/api";
 import type { DiscoveryRelationship } from "@/lib/discovery";
 import {
@@ -33,6 +34,7 @@ export function ComparisonInterestFooter({
   const router = useRouter();
   const t = useTranslations("comparison.interest");
   const td = useTranslations("discovery");
+  const locale = useLocale();
   const [acting, setActing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -114,7 +116,7 @@ export function ComparisonInterestFooter({
           <PaidMembershipRequired feature="interest" compact />
         ) : null}
 
-        {isPaid && rel.status === "none" ? (
+        {isPaid && rel.status === "none" && !rel.reconnectAvailableAt ? (
           <button
             type="button"
             disabled={acting}
@@ -123,6 +125,17 @@ export function ComparisonInterestFooter({
           >
             {td("expressInterest")}
           </button>
+        ) : null}
+
+        {rel.status === "none" && rel.reconnectAvailableAt ? (
+          <span className="rounded-lg bg-amber-100 px-3 py-2 text-sm text-amber-900">
+            {td("reconnectCooldown", {
+              date: new Date(rel.reconnectAvailableAt).toLocaleDateString(
+                locale === "bn" ? "bn-BD" : "en-GB",
+                { day: "numeric", month: "short", year: "numeric" },
+              ),
+            })}
+          </span>
         ) : null}
 
         {rel.status === "interest_sent" ? (
@@ -167,6 +180,16 @@ export function ComparisonInterestFooter({
               >
                 {td("message")}
               </Link>
+            ) : null}
+            {rel.connectionId ? (
+              <EndConnectionButton
+                connectionId={rel.connectionId}
+                privacyLevel={
+                  rel.connectionPrivacyLevel ?? rel.viewerPrivacyLevel
+                }
+                disabled={acting}
+                onEnded={onUpdated}
+              />
             ) : null}
           </>
         ) : null}

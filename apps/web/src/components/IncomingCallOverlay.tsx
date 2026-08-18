@@ -4,12 +4,17 @@ import { useCallback, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Link, usePathname, useRouter } from "@/i18n/routing";
 import { AUTH_TOKEN_KEY } from "@/lib/api";
-import { acceptVideoCall, declineVideoCall } from "@/lib/video-calls";
+import {
+  acceptVideoCall,
+  declineVideoCall,
+  startScheduledVideoCall,
+} from "@/lib/video-calls";
 import { useMemberAlerts } from "@/components/MemberAlertsProvider";
 import {
   isVideoCallPath,
   useGlobalCallSession,
 } from "@/components/GlobalCallSessionProvider";
+import { useScheduledCallRingAlert } from "@/hooks/use-scheduled-call-ring";
 import { unlockVideoCallRingtone } from "@/lib/video-call-ringtone";
 
 export function IncomingCallOverlay() {
@@ -17,7 +22,7 @@ export function IncomingCallOverlay() {
   const router = useRouter();
   const pathname = usePathname();
   const { summary, refresh, dismissIncomingCall } = useMemberAlerts();
-  const { isIncomingCallSuppressed, suppressIncomingCall, session } =
+  const { isIncomingCallSuppressed, suppressIncomingCall, session, suppressedIncomingCallIds } =
     useGlobalCallSession();
   const [busy, setBusy] = useState(false);
 
@@ -48,58 +53,83 @@ export function IncomingCallOverlay() {
     isIncomingCallSuppressed,
   ]);
 
+  const scheduledRing = useScheduledCallRingAlert(
+    summary.callAlerts,
+    suppressedIncomingCallIds,
+  );
+  const scheduled =
+    !incoming && !isVideoCallPath(pathname) ? scheduledRing : null;
+
+  const alert = incoming ?? scheduled;
+  const isScheduledRing = Boolean(scheduled && !incoming);
+
   const answer = useCallback(async () => {
-    if (!incoming) return;
+    if (!alert) return;
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
     if (!token) return;
 
     setBusy(true);
     unlockVideoCallRingtone();
     try {
-      await acceptVideoCall(token, incoming.call.id);
-      suppressIncomingCall(incoming.call.id);
-      dismissIncomingCall(incoming.call.id);
+      if (isScheduledRing) {
+        await startScheduledVideoCall(token, alert.call.id);
+      } else {
+        await acceptVideoCall(token, alert.call.id);
+        dismissIncomingCall(alert.call.id);
+      }
+      suppressIncomingCall(alert.call.id);
       await refresh({ forceFresh: true });
       router.push(
-        `/messages/${incoming.call.connectionId}/call?callId=${encodeURIComponent(incoming.call.id)}&autoJoin=1`,
+        `/messages/${alert.call.connectionId}/call?callId=${encodeURIComponent(alert.call.id)}${isScheduledRing ? "" : "&autoJoin=1"}`,
       );
     } catch {
       router.push(
-        `/messages/${incoming.call.connectionId}/call?callId=${encodeURIComponent(incoming.call.id)}&autoJoin=1`,
+        `/messages/${alert.call.connectionId}/call?callId=${encodeURIComponent(alert.call.id)}${isScheduledRing ? "" : "&autoJoin=1"}`,
       );
     } finally {
       setBusy(false);
     }
   }, [
+    alert,
     dismissIncomingCall,
-    incoming,
+    isScheduledRing,
     refresh,
     router,
     suppressIncomingCall,
   ]);
 
   const decline = useCallback(async () => {
-    if (!incoming) return;
+    if (!alert) return;
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
     if (!token) return;
 
     setBusy(true);
     try {
-      await declineVideoCall(token, incoming.call.id);
-      suppressIncomingCall(incoming.call.id);
-      dismissIncomingCall(incoming.call.id);
-      await refresh({ forceFresh: true });
+      if (isScheduledRing) {
+        suppressIncomingCall(alert.call.id);
+      } else {
+        await declineVideoCall(token, alert.call.id);
+        suppressIncomingCall(alert.call.id);
+        dismissIncomingCall(alert.call.id);
+        await refresh({ forceFresh: true });
+      }
     } finally {
       setBusy(false);
     }
-  }, [dismissIncomingCall, incoming, refresh, suppressIncomingCall]);
+  }, [
+    alert,
+    dismissIncomingCall,
+    isScheduledRing,
+    refresh,
+    suppressIncomingCall,
+  ]);
 
-  if (!incoming) {
+  if (!alert) {
     return null;
   }
 
   if (
-    session?.callId === incoming.call.id &&
+    session?.callId === alert.call.id &&
     (session.phase === "connecting" ||
       session.phase === "active" ||
       session.joining)
@@ -108,7 +138,7 @@ export function IncomingCallOverlay() {
   }
 
   const partner =
-    incoming.partnerName?.trim() || t("unknownMember");
+    alert.partnerName?.trim() || t("unknownMember");
 
   return (
     <div
@@ -122,9 +152,13 @@ export function IncomingCallOverlay() {
           {t("title")}
         </p>
         <h2 id="incoming-call-title" className="text-2xl font-bold text-white">
-          {t("incomingOverlayTitle", { partner })}
+          {isScheduledRing
+            ? t("scheduledOverlayTitle", { partner })
+            : t("incomingOverlayTitle", { partner })}
         </h2>
-        <p className="text-sm text-emerald-100/90">{t("incomingOverlayHint")}</p>
+        <p className="text-sm text-emerald-100/90">
+          {isScheduledRing ? t("scheduledOverlayHint") : t("incomingOverlayHint")}
+        </p>
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
           <button
             type="button"
@@ -132,7 +166,11 @@ export function IncomingCallOverlay() {
             onClick={() => void answer()}
             className="min-h-12 flex-1 rounded-full bg-emerald-500 px-6 py-3 text-base font-bold text-zinc-950 hover:bg-emerald-400 disabled:opacity-60"
           >
-            {busy ? t("joiningCall") : t("accept")}
+            {busy
+              ? t("joiningCall")
+              : isScheduledRing
+                ? t("joinScheduled")
+                : t("accept")}
           </button>
           <button
             type="button"
@@ -140,12 +178,15 @@ export function IncomingCallOverlay() {
             onClick={() => void decline()}
             className="min-h-12 flex-1 rounded-full bg-red-700 px-6 py-3 text-base font-bold text-white hover:bg-red-600 disabled:opacity-60"
           >
-            {t("decline")}
+            {isScheduledRing ? t("silenceRing") : t("decline")}
           </button>
         </div>
         <Link
-          href={`/messages/${incoming.call.connectionId}/call?callId=${encodeURIComponent(incoming.call.id)}&autoJoin=1`}
-          onClick={() => unlockVideoCallRingtone()}
+          href={`/messages/${alert.call.connectionId}/call?callId=${encodeURIComponent(alert.call.id)}${isScheduledRing ? "" : "&autoJoin=1"}`}
+          onClick={() => {
+            unlockVideoCallRingtone();
+            suppressIncomingCall(alert.call.id);
+          }}
           className="inline-block text-sm font-medium text-emerald-200 underline-offset-2 hover:underline"
         >
           {t("openCall")}

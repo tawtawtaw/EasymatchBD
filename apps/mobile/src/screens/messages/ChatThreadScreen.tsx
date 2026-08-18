@@ -1,7 +1,7 @@
 import { useFocusEffect } from "@react-navigation/native";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -20,10 +20,12 @@ import { PartnerPausedBanner, ProfilePausedBanner } from "../../components/Profi
 import { VideoCallPanel } from "../../components/VideoCallPanel";
 import { ErrorState, LoadingState } from "../../components/ScreenState";
 import { useIsPaidMember } from "../../hooks/use-is-paid-member";
-import { tMessages, tProfileAccountStatus } from "../../i18n/messages";
+import { tMessages, tEndConnection, tProfileAccountStatus } from "../../i18n/messages";
 import { getApiErrorMessage } from "../../lib/api-error";
+import { confirmEndConnection } from "../../lib/end-connection";
 import { getConnectionPrivacyLevel } from "../../lib/connection-privacy";
 import type { ChatThreadScreenProps } from "../../navigation/types";
+import { endConnection } from "../../services/discovery";
 import {
   listConnectionMessages,
   sendConnectionAttachment,
@@ -45,6 +47,7 @@ export default function ChatThreadScreen({ route, navigation }: ChatThreadScreen
   const insets = useSafeAreaInsets();
   const isPaid = useIsPaidMember();
   const copy = tMessages(locale);
+  const endCopy = tEndConnection(locale);
   const accountCopy = tProfileAccountStatus(locale);
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [hasMore, setHasMore] = useState(false);
@@ -108,6 +111,29 @@ export default function ChatThreadScreen({ route, navigation }: ChatThreadScreen
       setPrivacyLevel(1);
     }
   }, [connectionId]);
+
+  function handleEndConnection() {
+    confirmEndConnection(endCopy, privacyLevel, () => {
+      void (async () => {
+        try {
+          await endConnection(connectionId);
+          navigation.goBack();
+        } catch (err) {
+          setError(getApiErrorMessage(err, endCopy.error));
+        }
+      })();
+    });
+  }
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <Pressable onPress={handleEndConnection} hitSlop={8}>
+          <Text style={styles.headerEndText}>{endCopy.button}</Text>
+        </Pressable>
+      ),
+    });
+  }, [endCopy.button, navigation, privacyLevel]);
 
   const load = useCallback(
     async (options?: { silent?: boolean }) => {
@@ -369,6 +395,12 @@ export default function ChatThreadScreen({ route, navigation }: ChatThreadScreen
                 onOpenCall={openVideoCall}
               />
             ) : null}
+            <Pressable
+              style={styles.endConnectionButton}
+              onPress={handleEndConnection}
+            >
+              <Text style={styles.endConnectionText}>{endCopy.button}</Text>
+            </Pressable>
             {hasMore ? (
               <Pressable
                 style={styles.loadOlder}
@@ -462,6 +494,27 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   list: { flex: 1 },
+  headerEndText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.zinc800,
+    paddingHorizontal: 4,
+  },
+  endConnectionButton: {
+    alignSelf: "flex-start",
+    marginBottom: 12,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.zinc100,
+    backgroundColor: colors.white,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  endConnectionText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.zinc800,
+  },
   listContent: {
     padding: 16,
     paddingBottom: 8,

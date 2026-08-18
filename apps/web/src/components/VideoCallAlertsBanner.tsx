@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { Link, usePathname, useRouter } from "@/i18n/routing";
 import { AUTH_TOKEN_KEY } from "@/lib/api";
 import { useMemberAlerts } from "@/components/MemberAlertsProvider";
+import { useGlobalCallSession } from "@/components/GlobalCallSessionProvider";
 import { unlockVideoCallRingtone } from "@/lib/video-call-ringtone";
 import {
   formatVideoCallWhen,
@@ -40,6 +41,7 @@ export function VideoCallAlertsBanner({
   const router = useRouter();
   const pathname = usePathname();
   const { summary } = useMemberAlerts();
+  const { suppressIncomingCall } = useGlobalCallSession();
   const [dismissedVersion, setDismissedVersion] = useState(0);
   const [joiningCallId, setJoiningCallId] = useState<string | null>(null);
 
@@ -73,6 +75,7 @@ export function VideoCallAlertsBanner({
       try {
         unlockVideoCallRingtone();
         await startScheduledVideoCall(token, alert.call.id);
+        suppressIncomingCall(alert.call.id);
         router.push(
           `/messages/${alert.call.connectionId}/call?callId=${encodeURIComponent(alert.call.id)}`,
         );
@@ -84,7 +87,7 @@ export function VideoCallAlertsBanner({
         setJoiningCallId(null);
       }
     },
-    [router],
+    [router, suppressIncomingCall],
   );
 
   if (visibleAlerts.length === 0) return null;

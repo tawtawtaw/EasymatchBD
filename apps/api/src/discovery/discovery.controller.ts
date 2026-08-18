@@ -106,6 +106,16 @@ export class DiscoveryController {
     return this.connections.listMyConnections(user.id);
   }
 
+  @Post('connections/:connectionId/end')
+  async endConnection(
+    @CurrentUser() user: AuthUser,
+    @Param('connectionId') connectionId: string,
+  ) {
+    const result = await this.connections.endConnection(user.id, connectionId);
+    this.invalidateMemberDiscoveryViews(result.userLowId, result.userHighId);
+    return result;
+  }
+
   @Get('messages/unread-count')
   async getMessageUnreadCount(@CurrentUser() user: AuthUser) {
     try {

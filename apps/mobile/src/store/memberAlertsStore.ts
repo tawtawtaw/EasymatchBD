@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import { AppState, type AppStateStatus } from "react-native";
+import { shouldRingScheduledVideoCall } from "@easymatch/shared";
 import { invalidateConnectionsCache, refreshMemberStatusOnForeground } from "../lib/member-status-refresh";
-import { getAlertsSummary } from "../services/alerts";
+import { getAlertsSummary, type EndedConnectionAlert } from "../services/alerts";
 import type { VideoCallAlertItem } from "../types/video-calls";
 
 const SUMMARY_POLL_MS = 3_000;
@@ -63,6 +64,7 @@ type MemberAlertsState = {
   incomingCalls: number;
   incomingCallAlert: VideoCallAlertItem | null;
   callAlerts: VideoCallAlertItem[];
+  endedConnectionAlerts: EndedConnectionAlert[];
   alertsSynced: boolean;
   pollingUserId: string | null;
   suppressedCallIds: Record<string, number>;
@@ -96,6 +98,15 @@ function clearSummaryTimer() {
 
 function summaryPollIntervalMs(state: MemberAlertsState) {
   if (state.incomingCallAlert?.kind === "incoming" || state.incomingCalls > 0) {
+    return SUMMARY_POLL_INCOMING_MS;
+  }
+  if (
+    state.callAlerts.some(
+      (alert) =>
+        alert.call.scheduledAt != null &&
+        shouldRingScheduledVideoCall(alert.call.scheduledAt),
+    )
+  ) {
     return SUMMARY_POLL_INCOMING_MS;
   }
   return SUMMARY_POLL_MS;
@@ -152,6 +163,7 @@ async function refreshSummary(
         incomingCalls: incomingCallAlert ? Math.max(1, summary.incomingCalls) : 0,
         incomingCallAlert,
         callAlerts: sanitizeCallAlerts(summary.callAlerts ?? [], suppressedCallIds),
+        endedConnectionAlerts: summary.endedConnectionAlerts ?? [],
         alertsSynced: true,
         suppressedCallIds,
       });
@@ -175,6 +187,7 @@ export const useMemberAlertsStore = create<MemberAlertsState>((set, get) => ({
   incomingCalls: 0,
   incomingCallAlert: null,
   callAlerts: [],
+  endedConnectionAlerts: [],
   alertsSynced: false,
   pollingUserId: null,
   suppressedCallIds: {},
@@ -282,6 +295,7 @@ export const useMemberAlertsStore = create<MemberAlertsState>((set, get) => ({
       incomingCalls: 0,
       incomingCallAlert: null,
       callAlerts: [],
+      endedConnectionAlerts: [],
       alertsSynced: false,
     });
 
@@ -320,6 +334,7 @@ export const useMemberAlertsStore = create<MemberAlertsState>((set, get) => ({
       incomingCalls: 0,
       incomingCallAlert: null,
       callAlerts: [],
+      endedConnectionAlerts: [],
       alertsSynced: false,
     });
   },

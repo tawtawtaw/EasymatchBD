@@ -601,6 +601,55 @@ const connectionsScreen = {
   },
 } as const;
 
+const endConnectionCopy = {
+  en: {
+    button: "End connection",
+    title: "End this connection?",
+    body: "This takes effect immediately and does not need the other person's consent. You will both leave Connections. Messaging and video calls will stop, and privacy will return to public. Chat and call history is kept for records. After 7 days either of you can send a new interest, which starts again at level 1.",
+    familyNote: "Family contact already seen at level 3 cannot be un-seen.",
+    confirm: "End connection",
+    keep: "Keep connection",
+    success: "Connection ended",
+    error: "Could not end this connection",
+    reconnectCooldown: "You can send a new interest after {date}. It will start at privacy level 1.",
+    profileRef: "Profile {code}",
+    endedAlertTitle: "Connection ended",
+    endedAlertBody:
+      "A member ended this connection. Messaging and video calls have stopped. You can send a new interest after {date}.",
+    endedAlertBodyNamed:
+      "{name} ended this connection. Messaging and video calls have stopped. You can send a new interest after {date}.",
+    endedAlertBodyReady:
+      "A member ended this connection. Messaging and video calls have stopped. You can send a new interest now.",
+    endedAlertBodyNamedReady:
+      "{name} ended this connection. Messaging and video calls have stopped. You can send a new interest now.",
+    endedAlertDismiss: "Dismiss",
+    endedAlertViewProfile: "View profile",
+  },
+  bn: {
+    button: "সংযোগ শেষ করুন",
+    title: "এই সংযোগ শেষ করবেন?",
+    body: "এটি সাথে সাথে কার্যকর হবে এবং অন্যজনের সম্মতি লাগবে না। আপনারা দুজনেই সংযোগ তালিকা থেকে সরে যাবেন। মেসেজিং ও ভিডিও কল বন্ধ হবে এবং গোপনীয়তা পাবলিক স্তরে ফিরবে। চ্যাট ও কলের ইতিহাস রেকর্ডে থাকবে। ৭ দিন পর যেকোনো জন নতুন আগ্রহ পাঠাতে পারবেন, যা আবার স্তর ১ থেকে শুরু হবে।",
+    familyNote: "স্তর ৩-এ দেখা পরিবারের যোগাযোগের তথ্য আর গোপন করা যাবে না।",
+    confirm: "সংযোগ শেষ করুন",
+    keep: "সংযোগ রাখুন",
+    success: "সংযোগ শেষ হয়েছে",
+    error: "সংযোগ শেষ করা যায়নি",
+    reconnectCooldown: "আপনি {date} এর পর নতুন আগ্রহ পাঠাতে পারবেন। এটি গোপনীয়তা স্তর ১ থেকে শুরু হবে।",
+    profileRef: "প্রোফাইল {code}",
+    endedAlertTitle: "সংযোগ শেষ হয়েছে",
+    endedAlertBody:
+      "একজন সদস্য এই সংযোগ শেষ করেছেন। মেসেজিং ও ভিডিও কল বন্ধ হয়েছে। আপনি {date} এর পর নতুন আগ্রহ পাঠাতে পারবেন।",
+    endedAlertBodyNamed:
+      "{name} এই সংযোগ শেষ করেছেন। মেসেজিং ও ভিডিও কল বন্ধ হয়েছে। আপনি {date} এর পর নতুন আগ্রহ পাঠাতে পারবেন।",
+    endedAlertBodyReady:
+      "একজন সদস্য এই সংযোগ শেষ করেছেন। মেসেজিং ও ভিডিও কল বন্ধ হয়েছে। আপনি এখন নতুন আগ্রহ পাঠাতে পারবেন।",
+    endedAlertBodyNamedReady:
+      "{name} এই সংযোগ শেষ করেছেন। মেসেজিং ও ভিডিও কল বন্ধ হয়েছে। আপনি এখন নতুন আগ্রহ পাঠাতে পারবেন।",
+    endedAlertDismiss: "বন্ধ করুন",
+    endedAlertViewProfile: "প্রোফাইল দেখুন",
+  },
+} as const;
+
 const profileHome = {
   en: {
     loading: "Loading profile…",
@@ -1939,6 +1988,10 @@ export function tHomeScreen(locale: AppLocale) {
 
 export function tConnectionsScreen(locale: AppLocale) {
   return connectionsScreen[locale];
+}
+
+export function tEndConnection(locale: AppLocale) {
+  return endConnectionCopy[locale];
 }
 
 export function tProfileHome(locale: AppLocale) {

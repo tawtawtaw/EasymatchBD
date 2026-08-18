@@ -265,6 +265,7 @@ export type ProfileEditorBootstrap = {
   termsVersion: string | null;
   currentTermsVersion: string;
   termsDeclinedAt: string | null;
+  phone?: string | null;
   completionPercent?: number;
   completionMissing?: string[];
   profile: Profile | StaffProfile | null;

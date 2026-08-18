@@ -15,15 +15,17 @@ import { PhotoGalleryModal } from "../../components/PhotoGalleryModal";
 import { PaidMembershipGate } from "../../components/PaidMembershipGate";
 import { ProfilePausedBanner } from "../../components/ProfilePausedBanner";
 import { discoverySectionTitle } from "../../i18n/biodata-fields";
-import { tDiscoveryProfile } from "../../i18n/messages";
+import { tDiscoveryProfile, tEndConnection } from "../../i18n/messages";
 import { useIsPaidMember } from "../../hooks/use-is-paid-member";
 import { getApiErrorMessage } from "../../lib/api-error";
+import { confirmEndConnection } from "../../lib/end-connection";
 import { resolveMemberDisplayName } from "../../lib/member-display";
 import type { DiscoveryProfileScreenProps, MainTabParamList } from "../../navigation/types";
 import { navigateToChatThread } from "../../navigation/nestedNavigation";
 import { getDropdowns } from "../../services/dropdowns";
 import {
   discoveryPhotoUrl,
+  endConnection,
   getDiscoveryProfile,
   removeProfileBookmark,
   saveProfileBookmark,
@@ -51,6 +53,7 @@ export default function DiscoveryProfileScreen({
   const session = useAuthStore((s) => s.session);
   const isPaid = useIsPaidMember();
   const copy = tDiscoveryProfile(locale);
+  const endCopy = tEndConnection(locale);
   const [profile, setProfile] = useState<DiscoveryProfile | null>(null);
   const [dropdowns, setDropdowns] = useState<DropdownMap>({});
   const [loading, setLoading] = useState(true);
@@ -166,6 +169,32 @@ export default function DiscoveryProfileScreen({
     }
   }
 
+  function handleEndConnection() {
+    const id = profile?.relationship.connectionId;
+    if (!id) return;
+    const privacyLevel =
+      profile?.relationship.connectionPrivacyLevel ??
+      profile?.viewerPrivacyLevel ??
+      1;
+    confirmEndConnection(endCopy, privacyLevel, () => {
+      void (async () => {
+        setActing(true);
+        setError(null);
+        setMessage(null);
+        try {
+          await endConnection(id);
+          setMessage(endCopy.success);
+          void useMemberAlertsStore.getState().refresh();
+          await load({ silent: true, forceFresh: true });
+        } catch (err) {
+          setError(getApiErrorMessage(err, endCopy.error));
+        } finally {
+          setActing(false);
+        }
+      })();
+    });
+  }
+
   if (loading) {
     return <LoadingState label={copy.loading} />;
   }
@@ -189,8 +218,10 @@ export default function DiscoveryProfileScreen({
     String(profile.viewerPrivacyLevel),
   );
   const relationshipStatus = profile.relationship.status;
+  const reconnectAvailableAt = profile.relationship.reconnectAvailableAt;
   const isProfilePaused = Boolean(session?.isPaused);
-  const canSendInterest = relationshipStatus === "none" && !isProfilePaused;
+  const canSendInterest =
+    relationshipStatus === "none" && !isProfilePaused && !reconnectAvailableAt;
   const isConnected = relationshipStatus === "connected" && connectionId;
   const tokenReady = photoUri !== null;
   const galleryPhotos = visibleProfilePhotoIds(profile.media).map((id) => ({
@@ -296,15 +327,18 @@ export default function DiscoveryProfileScreen({
 
       <DiscoveryInterestActions
         copy={copy}
+        endCopy={endCopy}
         locale={locale}
         isSelf={isSelf}
         isPaid={isPaid}
         acting={acting}
         relationshipStatus={relationshipStatus}
+        reconnectAvailableAt={reconnectAvailableAt}
         canSendInterest={canSendInterest}
         isConnected={Boolean(isConnected)}
         onSendInterest={() => void handleSendInterest()}
         onOpenChat={openChat}
+        onEndConnection={handleEndConnection}
       />
 
       {profile.media.galleryPhotoIds?.length ? (
@@ -391,15 +425,18 @@ export default function DiscoveryProfileScreen({
 
       <DiscoveryInterestActions
         copy={copy}
+        endCopy={endCopy}
         locale={locale}
         isSelf={isSelf}
         isPaid={isPaid}
         acting={acting}
         relationshipStatus={relationshipStatus}
+        reconnectAvailableAt={reconnectAvailableAt}
         canSendInterest={canSendInterest}
         isConnected={Boolean(isConnected)}
         onSendInterest={() => void handleSendInterest()}
         onOpenChat={openChat}
+        onEndConnection={handleEndConnection}
         bottom
       />
     </ScrollView>
@@ -423,29 +460,35 @@ export default function DiscoveryProfileScreen({
 
 type DiscoveryInterestActionsProps = {
   copy: ReturnType<typeof tDiscoveryProfile>;
+  endCopy: ReturnType<typeof tEndConnection>;
   locale: AppLocale;
   isSelf: boolean;
   isPaid: boolean;
   acting: boolean;
   relationshipStatus: DiscoveryProfile["relationship"]["status"];
+  reconnectAvailableAt?: string | null;
   canSendInterest: boolean;
   isConnected: boolean;
   onSendInterest: () => void;
   onOpenChat: () => void;
+  onEndConnection: () => void;
   bottom?: boolean;
 };
 
 function DiscoveryInterestActions({
   copy,
+  endCopy,
   locale,
   isSelf,
   isPaid,
   acting,
   relationshipStatus,
+  reconnectAvailableAt,
   canSendInterest,
   isConnected,
   onSendInterest,
   onOpenChat,
+  onEndConnection,
   bottom = false,
 }: DiscoveryInterestActionsProps) {
   if (isSelf) {
@@ -453,6 +496,15 @@ function DiscoveryInterestActions({
   }
 
   const wrapperStyle = bottom ? styles.bottomInterestActions : undefined;
+  const cooldownLabel = reconnectAvailableAt
+    ? endCopy.reconnectCooldown.replace(
+        "{date}",
+        new Date(reconnectAvailableAt).toLocaleDateString(
+          locale === "bn" ? "bn-BD" : "en-GB",
+          { day: "numeric", month: "short", year: "numeric" },
+        ),
+      )
+    : null;
 
   return (
     <View style={wrapperStyle}>
@@ -470,6 +522,10 @@ function DiscoveryInterestActions({
         ) : (
           <PaidMembershipGate feature="interest" locale={locale} compact />
         )
+      ) : relationshipStatus === "none" && cooldownLabel ? (
+        <View style={styles.interestSentBadge}>
+          <Text style={styles.interestSentBadgeText}>{cooldownLabel}</Text>
+        </View>
       ) : relationshipStatus === "interest_sent" ? (
         <View style={styles.interestSentBadge}>
           <Text style={styles.interestSentBadgeText}>{copy.interestSentBadge}</Text>
@@ -490,6 +546,13 @@ function DiscoveryInterestActions({
           ) : (
             <PaidMembershipGate feature="messages" locale={locale} compact />
           )}
+          <Pressable
+            style={[styles.secondaryButton, acting && styles.buttonDisabled]}
+            onPress={onEndConnection}
+            disabled={acting}
+          >
+            <Text style={styles.secondaryButtonText}>{endCopy.button}</Text>
+          </Pressable>
         </>
       ) : relationshipStatus === "connected" ? (
         <View style={styles.connectedBadge}>
@@ -774,26 +837,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: colors.zinc900,
     marginBottom: 10,
-  },
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 12,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.zinc100,
-  },
-  rowLabel: {
-    flex: 1,
-    fontSize: 13,
-    color: colors.zinc500,
-  },
-  rowValue: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: "600",
-    color: colors.zinc900,
-    textAlign: "right",
   },
   muted: {
     fontSize: 13,

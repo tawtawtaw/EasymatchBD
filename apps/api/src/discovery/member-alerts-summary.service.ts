@@ -11,6 +11,16 @@ import {
 const CACHE_TTL_MS = 30_000;
 const STALE_TTL_MS = 120_000;
 
+export type EndedConnectionAlert = {
+  connectionId: string;
+  endedAt: string;
+  reconnectAvailableAt: string | null;
+  member: {
+    profileCode: string | null;
+    fullName: string | null;
+  };
+};
+
 export type MemberAlertsSummaryResponse = {
   unreadMessages: number;
   incomingInterests: number;
@@ -21,6 +31,7 @@ export type MemberAlertsSummaryResponse = {
     ReturnType<VideoCallsService['listCallAlerts']>
   >[number] | null;
   callAlerts: Awaited<ReturnType<VideoCallsService['listCallAlerts']>>;
+  endedConnectionAlerts: EndedConnectionAlert[];
 };
 
 @Injectable()
@@ -86,7 +97,7 @@ export class MemberAlertsSummaryService {
   private async fetchSummary(
     userId: string,
   ): Promise<MemberAlertsSummaryResponse> {
-    const [unread, stats, callAlerts] = await Promise.all([
+    const [unread, stats, callAlerts, endedConnectionAlerts] = await Promise.all([
       this.messages.getUnreadCount(userId).catch(() => ({ unreadCount: 0 })),
       this.connections.getMemberDiscoveryStats(userId),
       this.videoCalls
@@ -94,6 +105,9 @@ export class MemberAlertsSummaryService {
         .catch(
           (): Awaited<ReturnType<VideoCallsService['listCallAlerts']>> => [],
         ),
+      this.connections.listEndedConnectionAlerts(userId).catch(
+        (): EndedConnectionAlert[] => [],
+      ),
     ]);
 
     const incomingCallAlerts = callAlerts.filter(
@@ -108,6 +122,7 @@ export class MemberAlertsSummaryService {
       incomingCalls: incomingCallAlerts.length,
       incomingCallAlert: incomingCallAlerts[0] ?? null,
       callAlerts,
+      endedConnectionAlerts,
     };
 
     this.cache.set(userId, {

@@ -79,6 +79,7 @@ import {
   updatePartner,
   updatePersonal,
 } from "@/lib/api";
+import { phoneTelHref } from "@/lib/about-company";
 import {
   dismissVerificationAlerts,
   getVerificationFeedback,
@@ -397,6 +398,7 @@ export default function ProfilePage() {
   const [profilePaused, setProfilePaused] = useState(false);
   const [profilePausedAt, setProfilePausedAt] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [loginPhone, setLoginPhone] = useState<string | null>(null);
   const [staffBootstrap, setStaffBootstrap] = useState<{
     dropdowns: DropdownMap;
     profile: StaffProfile;
@@ -783,6 +785,7 @@ export default function ProfilePage() {
     getProfileEditorBootstrap(token, locale)
       .then((data) => {
         setUserRole(data.role);
+        setLoginPhone(data.phone ?? null);
         if (isStaffRole(data.role)) {
           setTermsAccepted(true);
           if (data.profile && data.dropdowns) {
@@ -1199,6 +1202,17 @@ export default function ProfilePage() {
                 <p className="text-sm font-medium text-zinc-700">
                   {t("profileCodeLabel", { code: profile.profileCode })}
                 </p>
+                {loginPhone ? (
+                  <p className="text-sm text-zinc-700">
+                    <span className="text-zinc-500">{t("loginPhoneLabel")}: </span>
+                    <a
+                      href={phoneTelHref(loginPhone)}
+                      className="font-medium text-zinc-800 hover:underline"
+                    >
+                      {loginPhone}
+                    </a>
+                  </p>
+                ) : null}
                 <p className="text-xs text-zinc-500">{t("profileCodeHint")}</p>
                 <Link
                   href="/profile/biodata"

@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { MIN_CONSULTANT_PRIVACY_LEVEL } from "@easymatch/shared";
 import { ConnectionConsultantPanel } from "../../components/ConnectionConsultantPanel";
+import { ConnectionEndedAlertsBanner } from "../../components/ConnectionEndedAlertsBanner";
 import { EmptyState, LoadingState } from "../../components/ScreenState";
 import { PaidMembershipGate } from "../../components/PaidMembershipGate";
 import { useIsPaidMember } from "../../hooks/use-is-paid-member";
@@ -33,10 +34,12 @@ import {
   respondDiscoveryInterest,
   respondPrivacyUpgrade,
   withdrawDiscoveryInterest,
+  endConnection,
 } from "../../services/discovery";
 import { useLocaleStore } from "../../store/localeStore";
 import { useMemberAlertsStore } from "../../store/memberAlertsStore";
-import { tConnectionsScreen, tPrivacyLevel } from "../../i18n/messages";
+import { tConnectionsScreen, tEndConnection, tPrivacyLevel } from "../../i18n/messages";
+import { confirmEndConnection } from "../../lib/end-connection";
 import type {
   ConnectionItem,
   IncomingInterest,
@@ -95,6 +98,7 @@ export default function ConnectionsScreen() {
   const route = useRoute<RouteProp<MainTabParamList, "Connections">>();
   const locale = useLocaleStore((s) => s.locale);
   const copy = tConnectionsScreen(locale);
+  const endCopy = tEndConnection(locale);
   const privacyLabels = tPrivacyLevel(locale);
   const isPaid = useIsPaidMember();
   const [tab, setTab] = useState<TabKey>(route.params?.initialTab ?? "incoming");
@@ -241,6 +245,29 @@ export default function ConnectionsScreen() {
     }
   }
 
+  function handleEnd(item: ConnectionItem) {
+    confirmEndConnection(endCopy, item.privacyLevel, () => {
+      void (async () => {
+        setPrivacyActingRef(item.connectionId);
+        setError(null);
+        setSuccess(null);
+        try {
+          await endConnection(item.connectionId);
+          setConnections((prev) =>
+            prev.filter((connection) => connection.connectionId !== item.connectionId),
+          );
+          setSuccess(endCopy.success);
+          void useMemberAlertsStore.getState().refresh();
+          await load({ refresh: true, forceFresh: true });
+        } catch (err) {
+          setError(getApiErrorMessage(err, endCopy.error));
+        } finally {
+          setPrivacyActingRef(null);
+        }
+      })();
+    });
+  }
+
   async function handlePrivacyRespond(profileRef: string, accept: boolean) {
     setPrivacyActingRef(profileRef);
     setError(null);
@@ -302,6 +329,10 @@ export default function ConnectionsScreen() {
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {success ? <Text style={styles.success}>{success}</Text> : null}
+
+      <View style={styles.endedAlertWrap}>
+        <ConnectionEndedAlertsBanner />
+      </View>
 
       <ScrollView
         contentContainerStyle={styles.list}
@@ -456,6 +487,13 @@ export default function ConnectionsScreen() {
                         <PaidMembershipGate feature="messages" locale={locale} compact />
                       </View>
                     )}
+                    <Pressable
+                      style={styles.outlineButton}
+                      disabled={privacyActingRef === item.connectionId}
+                      onPress={() => handleEnd(item)}
+                    >
+                      <Text style={styles.outlineButtonText}>{endCopy.button}</Text>
+                    </Pressable>
                   </View>
                   {isPaid && item.privacyLevel >= MIN_CONSULTANT_PRIVACY_LEVEL ? (
                     <ConnectionConsultantPanel
@@ -522,6 +560,7 @@ export default function ConnectionsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.rose50 },
+  endedAlertWrap: { paddingHorizontal: 12, paddingTop: 8 },
   tabs: {
     flexDirection: "row",
     gap: 8,

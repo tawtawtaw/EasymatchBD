@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   AppState,
   Platform,
@@ -11,6 +11,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { tVideoCalls } from "../i18n/video-calls";
 import { getApiErrorMessage } from "../lib/api-error";
+import { useScheduledCallRingAlert } from "../hooks/use-scheduled-call-ring";
 import {
   startIncomingCallRing,
   stopIncomingCallRing,
@@ -19,16 +20,19 @@ import { useActiveRouteName } from "../navigation/active-route";
 import { declineIncomingCall } from "../services/incoming-call-actions";
 import { openIncomingVideoCall } from "../services/incoming-call-navigation";
 import { isAndroidConnectionServiceEnabled } from "../services/android-incoming-call-telecom";
+import { startScheduledVideoCall } from "../services/video-calls";
 import { useMemberAlertsStore } from "../store/memberAlertsStore";
 import { useLocaleStore } from "../store/localeStore";
 import { colors } from "../theme/colors";
+import { cancelScheduledCallAlarm } from "../lib/scheduled-call-alarms";
 
 const RING_VIBRATION_PATTERN = [0, 700, 200, 700, 200, 700, 200, 900];
 
 export function IncomingCallBanner() {
   const locale = useLocaleStore((s) => s.locale);
   const copy = tVideoCalls(locale);
-  const alert = useMemberAlertsStore((s) => s.incomingCallAlert);
+  const incomingAlert = useMemberAlertsStore((s) => s.incomingCallAlert);
+  const callAlerts = useMemberAlertsStore((s) => s.callAlerts);
   const dismissIncomingCall = useMemberAlertsStore((s) => s.dismissIncomingCall);
   const isCallSuppressed = useMemberAlertsStore((s) => s.isCallSuppressed);
   const routeName = useActiveRouteName();
@@ -36,15 +40,34 @@ export function IncomingCallBanner() {
   const [joining, setJoining] = useState(false);
   const [declining, setDeclining] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
-  const suppressed =
-    alert?.call.id != null ? isCallSuppressed(alert.call.id) : false;
+  const [silencedIds, setSilencedIds] = useState<Record<string, true>>({});
+
+  const incomingSuppressed =
+    incomingAlert?.call.id != null
+      ? isCallSuppressed(incomingAlert.call.id)
+      : false;
+  const hideIncomingForTelecom =
+    Platform.OS === "android" && isAndroidConnectionServiceEnabled();
+  const incoming =
+    incomingAlert?.kind === "incoming" &&
+    !incomingSuppressed &&
+    !hideIncomingForTelecom
+      ? incomingAlert
+      : null;
+
+  const isRingSuppressed = useCallback(
+    (callId: string) => isCallSuppressed(callId) || Boolean(silencedIds[callId]),
+    [isCallSuppressed, silencedIds],
+  );
+  const scheduledRing = useScheduledCallRingAlert(callAlerts, isRingSuppressed);
+  const scheduled = incoming || routeName === "VideoCallRoom" ? null : scheduledRing;
+  const alert = incoming ?? scheduled;
+  const isScheduledRing = Boolean(scheduled && !incoming);
 
   // Depends on the call id rather than the alert object: polling replaces that
   // object every few seconds, and re-running the effect tore the ringtone down.
   const ringingCallId =
-    alert?.kind === "incoming" && !suppressed && routeName !== "VideoCallRoom"
-      ? alert.call.id
-      : null;
+    alert && routeName !== "VideoCallRoom" ? alert.call.id : null;
 
   useEffect(() => {
     if (!ringingCallId) return;
@@ -68,11 +91,7 @@ export function IncomingCallBanner() {
     };
   }, [ringingCallId]);
 
-  if (!alert || alert.kind !== "incoming" || suppressed) {
-    return null;
-  }
-
-  if (Platform.OS === "android" && isAndroidConnectionServiceEnabled()) {
+  if (!alert) {
     return null;
   }
 
@@ -81,7 +100,9 @@ export function IncomingCallBanner() {
   }
 
   const partner = alert.partnerName?.trim() || copy.unknownMember;
-  const message = copy.alertsIncoming.replace("{partner}", partner);
+  const message = isScheduledRing
+    ? copy.alertsScheduledRing.replace("{partner}", partner)
+    : copy.alertsIncoming.replace("{partner}", partner);
 
   return (
     <View style={[styles.banner, { paddingTop: insets.top + 10 }]}>
@@ -102,6 +123,12 @@ export function IncomingCallBanner() {
           disabled={joining || declining}
           onPress={() => {
             if (!alert) return;
+            if (isScheduledRing) {
+              setSilencedIds((prev) => ({ ...prev, [alert.call.id]: true }));
+              Vibration.cancel();
+              void stopIncomingCallRing();
+              return;
+            }
             setDeclining(true);
             void declineIncomingCall(alert.call.id).finally(() => {
               setDeclining(false);
@@ -109,7 +136,11 @@ export function IncomingCallBanner() {
           }}
         >
           <Text style={styles.declineButtonText}>
-            {declining ? copy.decliningCall : copy.declineCall}
+            {isScheduledRing
+              ? copy.silenceRing
+              : declining
+                ? copy.decliningCall
+                : copy.declineCall}
           </Text>
         </Pressable>
         <Pressable
@@ -119,31 +150,48 @@ export function IncomingCallBanner() {
             if (!alert) return;
             setJoinError(null);
             setJoining(true);
-            void openIncomingVideoCall({
-              connectionId: alert.call.connectionId,
-              callId: alert.call.id,
-              memberName: partner,
-              autoJoin: true,
-            })
-              .then((opened) => {
+            void (async () => {
+              try {
+                if (isScheduledRing) {
+                  await startScheduledVideoCall(alert.call.id);
+                  await cancelScheduledCallAlarm(alert.call.id);
+                }
+                const opened = await openIncomingVideoCall({
+                  connectionId: alert.call.connectionId,
+                  callId: alert.call.id,
+                  memberName: partner,
+                  autoJoin: true,
+                });
                 if (opened) {
                   Vibration.cancel();
                   void stopIncomingCallRing();
-                  dismissIncomingCall();
+                  if (isScheduledRing) {
+                    setSilencedIds((prev) => ({
+                      ...prev,
+                      [alert.call.id]: true,
+                    }));
+                  } else {
+                    dismissIncomingCall();
+                  }
                   return;
                 }
                 setJoinError(copy.signInRequired);
-              })
-              .catch((err) => {
+              } catch (err) {
                 setJoinError(getApiErrorMessage(err, copy.actionsError));
-              })
-              .finally(() => {
+              } finally {
                 setJoining(false);
-              });
+              }
+            })();
           }}
         >
           <Text style={styles.buttonText}>
-            {joining ? copy.joiningCall : copy.answer}
+            {joining
+              ? isScheduledRing
+                ? copy.joiningScheduled
+                : copy.joiningCall
+              : isScheduledRing
+                ? copy.joinScheduled
+                : copy.answer}
           </Text>
         </Pressable>
       </View>

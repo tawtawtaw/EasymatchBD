@@ -36,7 +36,8 @@ Notifications.setNotificationHandler({
             type === "connection" ||
             type === "privacy_upgrade" ||
             type === "privacy_upgrade_accepted" ||
-            type === "verification"
+            type === "verification" ||
+            type === "scheduled_call"
           ? Notifications.AndroidNotificationPriority.HIGH
           : Notifications.AndroidNotificationPriority.DEFAULT;
     const appInForeground = AppState.currentState === "active";
@@ -202,8 +203,32 @@ function isIncomingActivityType(type: string | null) {
     type === "interest" ||
     type === "connection" ||
     type === "privacy_upgrade" ||
-    type === "privacy_upgrade_accepted"
+    type === "privacy_upgrade_accepted" ||
+    type === "scheduled_call"
   );
+}
+
+function navigateToScheduledCallChat(data: Record<string, unknown>) {
+  const connectionId =
+    typeof data.connectionId === "string" ? data.connectionId : null;
+  if (!connectionId) return;
+
+  const memberName =
+    typeof data.callerName === "string" && data.callerName.trim()
+      ? data.callerName
+      : "Video call";
+
+  navigationRef.navigate("Main", {
+    screen: "Messages",
+    params: {
+      screen: "ChatThread",
+      params: {
+        connectionId,
+        memberName,
+        profileCode: null,
+      },
+    },
+  });
 }
 
 function navigateFromPushData(data: Record<string, unknown> | undefined) {
@@ -240,6 +265,12 @@ function navigateFromPushData(data: Record<string, unknown> | undefined) {
 
   if (!navigationRef.isReady()) {
     pendingPushData = data;
+    return;
+  }
+
+  if (type === "scheduled_call") {
+    handleIncomingActivityPush();
+    navigateToScheduledCallChat(data);
     return;
   }
 

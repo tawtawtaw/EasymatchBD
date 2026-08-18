@@ -35,6 +35,7 @@ import {
   PRIMARY_PHOTO_ASPECT,
 } from "@/lib/photo-crop";
 import { PhotoCropModal } from "@/components/PhotoCropModal";
+import { WebcamCaptureModal, cameraCaptureSupported } from "@/components/WebcamCaptureModal";
 import { AUTH_TOKEN_KEY } from "@/lib/api";
 import {
   computeVerificationSubmitState,
@@ -152,7 +153,11 @@ function UploadCard({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const tc = useTranslations("common");
+  const t = useTranslations("profile.media");
   const [inlineError, setInlineError] = useState<string | null>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const mounted = useMounted();
+  const canUseCamera = mounted && cameraCaptureSupported();
 
   function handleFileSelected(file: File) {
     const validationMessage = getFileError?.(file) ?? null;
@@ -186,14 +191,26 @@ function UploadCard({
           </h3>
           <p className="mt-1 text-sm text-zinc-600">{hint}</p>
         </div>
-        <button
-          type="button"
-          disabled={disabled || uploading}
-          onClick={() => inputRef.current?.click()}
-          className="rounded-lg bg-rose-700 px-3 py-2 text-sm font-semibold text-white hover:bg-rose-800 disabled:opacity-50"
-        >
-          {uploading ? tc("loading") : tc("select")}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {canUseCamera ? (
+            <button
+              type="button"
+              disabled={disabled || uploading}
+              onClick={() => setCameraOpen(true)}
+              className="rounded-lg border border-rose-300 bg-white px-3 py-2 text-sm font-semibold text-rose-900 hover:bg-rose-50 disabled:opacity-50"
+            >
+              {t("takePhoto")}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            disabled={disabled || uploading}
+            onClick={() => inputRef.current?.click()}
+            className="rounded-lg bg-rose-700 px-3 py-2 text-sm font-semibold text-white hover:bg-rose-800 disabled:opacity-50"
+          >
+            {uploading ? tc("loading") : tc("select")}
+          </button>
+        </div>
       </div>
       <input
         ref={inputRef}
@@ -210,6 +227,16 @@ function UploadCard({
         <p className="mt-3 text-sm font-medium text-red-700" role="alert">
           {inlineError}
         </p>
+      ) : null}
+      {cameraOpen ? (
+        <WebcamCaptureModal
+          title={title}
+          onCancel={() => setCameraOpen(false)}
+          onCapture={(file) => {
+            setCameraOpen(false);
+            handleFileSelected(file);
+          }}
+        />
       ) : null}
       {children && <div className="mt-4">{children}</div>}
     </div>

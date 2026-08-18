@@ -12,6 +12,7 @@ import { MemberAlertsProvider } from "@/components/MemberAlertsProvider";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { VideoCallAlertsBanner } from "@/components/VideoCallAlertsBanner";
+import { ConnectionEndedAlertsBanner } from "@/components/ConnectionEndedAlertsBanner";
 import { GlobalCallSessionProvider } from "@/components/GlobalCallSessionProvider";
 import { CallRuntimeUi } from "@/components/CallRuntimeUi";
 import { ChunkLoadRecovery } from "@/components/ChunkLoadRecovery";
@@ -94,6 +95,7 @@ export default async function LocaleLayout({
                   header={
                     <>
                       <SiteHeader />
+                      <ConnectionEndedAlertsBanner />
                       <VideoCallAlertsBanner variant="global" />
                     </>
                   }

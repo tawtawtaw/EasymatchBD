@@ -20,6 +20,21 @@ import {
 import type { AppLocale } from "../lib/locale";
 import { colors } from "../theme/colors";
 
+const ENABLE_MICROPHONE_SCRIPT = `
+  (function () {
+    var cmd = "enableMicrophone";
+    try {
+      if (window.__easymatchRunNativeCommand && window.__easymatchRunNativeCommand(cmd)) {
+        true;
+        return;
+      }
+    } catch (e) {}
+    window.__easymatchNativeCommandQueue = window.__easymatchNativeCommandQueue || [];
+    window.__easymatchNativeCommandQueue.push(cmd);
+    true;
+  })();
+`;
+
 type Props = {
   locale: AppLocale;
   connectionId: string;
@@ -66,6 +81,7 @@ export const VideoCallWebView = forwardRef<unknown, Props>(
     _ref,
   ) {
   const webViewRef = useRef<WebView>(null);
+  const micCommandSentRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [permissionsReady, setPermissionsReady] = useState(Platform.OS !== "android");
@@ -74,6 +90,10 @@ export const VideoCallWebView = forwardRef<unknown, Props>(
     memberName,
     nativeShell: true,
   });
+
+  useEffect(() => {
+    micCommandSentRef.current = false;
+  }, [uri]);
 
   useEffect(() => {
     void ensureCallMediaPermissions()
@@ -107,6 +127,13 @@ export const VideoCallWebView = forwardRef<unknown, Props>(
         title?: string;
       };
       if (data.type === "video_call" && data.status) {
+        if (
+          data.status === "bridge_ready" &&
+          !micCommandSentRef.current
+        ) {
+          micCommandSentRef.current = true;
+          webViewRef.current?.injectJavaScript(ENABLE_MICROPHONE_SCRIPT);
+        }
         onCallStateChange?.(data.status);
         return;
       }

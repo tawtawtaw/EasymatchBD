@@ -123,6 +123,7 @@ export type DiscoveryRelationship = {
   sentInterestId?: string | null;
   receivedInterestId?: string | null;
   partnerIsPaused?: boolean;
+  reconnectAvailableAt?: string | null;
 };
 
 export type DiscoveryProfile = {
@@ -420,6 +421,24 @@ export async function respondPrivacyUpgrade(
   invalidateDedupeCache("discovery-connections");
   invalidateDedupeCache(`discovery-profile:${profileId}`);
   return parseResponse<{ privacyLevel: number; accepted: boolean }>(res);
+}
+
+export async function endConnection(token: string, connectionId: string) {
+  const res = await apiFetch(
+    `${apiUrl()}/discovery/connections/${encodeURIComponent(connectionId)}/end`,
+    { method: "POST", headers: authHeaders(token) },
+  );
+  invalidateDedupeCache("discovery-connections");
+  invalidateDedupeCache("discovery-interests");
+  invalidateDedupeCache("discovery:home-bootstrap");
+  invalidateDedupeCache("alerts-summary");
+  invalidateDedupeCache("discovery-profile");
+  invalidateDedupeCache("discovery-comparison");
+  return parseResponse<{
+    ended: boolean;
+    connectionId: string;
+    otherUserId: string;
+  }>(res);
 }
 
 export function discoveryPhotoUrl(

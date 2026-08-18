@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { isStaffRole } from "@easymatch/shared";
+import { shouldRingScheduledVideoCall } from "@easymatch/shared";
 import { AUTH_TOKEN_KEY } from "@/lib/api";
 import { useAuthSession } from "@/hooks/use-auth-session";
 import { useMounted } from "@/hooks/use-mounted";
@@ -21,7 +22,7 @@ import {
   type MemberAlertsSummary,
 } from "@/lib/member-alerts";
 
-const POLL_MS = 20_000;
+const POLL_MS = 5_000;
 const POLL_MS_INCOMING = 2_000;
 const POLL_MS_ON_CALL = 6_000;
 const MIN_REFRESH_GAP_MS = 1_500;
@@ -39,6 +40,7 @@ const emptySummary: MemberAlertsSummary = {
   incomingCalls: 0,
   incomingCallAlert: null,
   callAlerts: [],
+  endedConnectionAlerts: [],
 };
 
 type MemberAlertsContextValue = {
@@ -155,7 +157,12 @@ export function MemberAlertsProvider({ children }: { children: ReactNode }) {
 
     const hasIncoming =
       summary.incomingCalls > 0 ||
-      summary.callAlerts.some((alert) => alert.kind === "incoming");
+      summary.callAlerts.some(
+        (alert) =>
+          alert.kind === "incoming" ||
+          (alert.call.scheduledAt != null &&
+            shouldRingScheduledVideoCall(alert.call.scheduledAt)),
+      );
 
     const pollMs = onVideoCall
       ? POLL_MS_ON_CALL

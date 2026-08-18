@@ -4,7 +4,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InterestStatus, Prisma } from '@prisma/client';
-import { PrivacyLevel, resolveVisibleFullName } from '@easymatch/shared';
+import {
+  CONNECTION_RECONNECT_COOLDOWN_DAYS,
+  PrivacyLevel,
+  resolveVisibleFullName,
+} from '@easymatch/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { PrivacyFieldsService } from '../privacy/privacy-fields.service';
 import { SubscriptionAccessService } from '../subscriptions/subscription-access.service';
@@ -17,6 +21,20 @@ import { invalidateHomeBootstrapCache } from './discovery-home-bootstrap-cache';
 import { invalidateAlertsSummaryCache } from './alerts-summary-cache';
 import { invalidateDiscoveryListCache } from './discovery-list-cache';
 import { ProfilePauseService } from '../profiles/profile-pause.service';
+import { MessagesService } from './messages.service';
+import { VideoCallsService } from './video-calls.service';
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+function reconnectAvailableAt(endedAt: Date | null | undefined): Date | null {
+  if (!endedAt) {
+    return null;
+  }
+  const available = new Date(
+    endedAt.getTime() + CONNECTION_RECONNECT_COOLDOWN_DAYS * MS_PER_DAY,
+  );
+  return available.getTime() > Date.now() ? available : null;
+}
 
 const interestProfileSelect = {
   id: true,
@@ -97,6 +115,8 @@ export class ConnectionsService {
     private readonly privacyFields: PrivacyFieldsService,
     private readonly pushNotifications: PushNotificationService,
     private readonly profilePause: ProfilePauseService,
+    private readonly messages: MessagesService,
+    private readonly videoCalls: VideoCallsService,
   ) {}
 
   canonicalPair(userAId: string, userBId: string): [string, string] {
@@ -116,7 +136,11 @@ export class ConnectionsService {
       where: { userLowId_userHighId: { userLowId: lowId, userHighId: highId } },
     });
 
-    return connection?.privacyLevel ?? PrivacyLevel.PUBLIC;
+    if (!connection || connection.endedAt) {
+      return PrivacyLevel.PUBLIC;
+    }
+
+    return connection.privacyLevel;
   }
 
   async batchGetListRelationshipSummaries(
@@ -163,12 +187,14 @@ export class ConnectionsService {
       receivedInterests.map((interest) => [interest.senderId, interest]),
     );
     const connectionByOther = new Map(
-      connections.map((connection) => [
-        connection.userLowId === viewerUserId
-          ? connection.userHighId
-          : connection.userLowId,
-        connection,
-      ]),
+      connections
+        .filter((connection) => !connection.endedAt)
+        .map((connection) => [
+          connection.userLowId === viewerUserId
+            ? connection.userHighId
+            : connection.userLowId,
+          connection,
+        ]),
     );
 
     for (const profileUserId of uniqueIds) {
@@ -229,12 +255,13 @@ export class ConnectionsService {
       }),
     ]);
 
+    const activeConnection = connection && !connection.endedAt ? connection : null;
     const viewerPrivacyLevel =
-      connection?.privacyLevel ?? PrivacyLevel.PUBLIC;
+      activeConnection?.privacyLevel ?? PrivacyLevel.PUBLIC;
 
     let status: 'none' | 'interest_sent' | 'interest_received' | 'connected' =
       'none';
-    if (connection) {
+    if (activeConnection) {
       status = 'connected';
     } else if (sentInterest?.status === InterestStatus.pending) {
       status = 'interest_sent';
@@ -245,17 +272,19 @@ export class ConnectionsService {
     return {
       status,
       viewerPrivacyLevel,
-      connectionId: connection?.id ?? null,
-      connectionPrivacyLevel: connection?.privacyLevel ?? null,
-      pendingUpgradeLevel: connection?.pendingUpgradeLevel ?? null,
+      connectionId: activeConnection?.id ?? null,
+      connectionPrivacyLevel: activeConnection?.privacyLevel ?? null,
+      pendingUpgradeLevel: activeConnection?.pendingUpgradeLevel ?? null,
       pendingUpgradeByMe:
-        connection?.pendingUpgradeById === viewerUserId &&
-        connection.pendingUpgradeLevel != null,
+        activeConnection?.pendingUpgradeById === viewerUserId &&
+        activeConnection.pendingUpgradeLevel != null,
       sentInterestId: sentInterest?.id ?? null,
       receivedInterestId: receivedInterest?.id ?? null,
       sentInterestStatus: sentInterest?.status ?? null,
       receivedInterestStatus: receivedInterest?.status ?? null,
       partnerIsPaused: partnerProfile?.isPaused ?? false,
+      reconnectAvailableAt:
+        reconnectAvailableAt(connection?.endedAt)?.toISOString() ?? null,
     };
   }
 
@@ -284,14 +313,26 @@ export class ConnectionsService {
       );
     }
 
+    const existingConnection = await this.getConnectionRecord(senderId, receiverId);
+    if (existingConnection && !existingConnection.endedAt) {
+      throw new BadRequestException('You are already connected');
+    }
+    const cooldownUntil = reconnectAvailableAt(existingConnection?.endedAt);
+    if (cooldownUntil) {
+      const daysLeft = Math.max(
+        1,
+        Math.ceil((cooldownUntil.getTime() - Date.now()) / MS_PER_DAY),
+      );
+      throw new BadRequestException(
+        `This connection ended recently. You can send interest again in ${daysLeft} day${daysLeft === 1 ? '' : 's'}.`,
+      );
+    }
+
     const existing = await this.prisma.interest.findUnique({
       where: {
         senderId_receiverId: { senderId, receiverId },
       },
     });
-    if (existing?.status === InterestStatus.accepted) {
-      throw new BadRequestException('You are already connected');
-    }
     if (existing?.status === InterestStatus.pending) {
       throw new BadRequestException('Interest already sent');
     }
@@ -473,6 +514,138 @@ export class ConnectionsService {
     return { privacyLevel: updated.privacyLevel, accepted: true };
   }
 
+  async endConnection(userId: string, connectionId: string) {
+    await this.subscriptionAccess.assertPaidMember(userId);
+
+    const connection = await this.prisma.connection.findFirst({
+      where: {
+        id: connectionId,
+        OR: [{ userLowId: userId }, { userHighId: userId }],
+      },
+    });
+    if (!connection) {
+      throw new NotFoundException('Connection not found');
+    }
+    if (connection.endedAt) {
+      throw new BadRequestException('This connection has already ended');
+    }
+
+    const now = new Date();
+    const otherUserId =
+      connection.userLowId === userId
+        ? connection.userHighId
+        : connection.userLowId;
+
+    await this.prisma.$transaction([
+      this.prisma.connection.update({
+        where: { id: connection.id },
+        data: {
+          endedAt: now,
+          endedById: userId,
+          privacyLevel: PrivacyLevel.PUBLIC,
+          pendingUpgradeLevel: null,
+          pendingUpgradeById: null,
+        },
+      }),
+      this.prisma.interest.updateMany({
+        where: {
+          OR: [
+            {
+              senderId: connection.userLowId,
+              receiverId: connection.userHighId,
+            },
+            {
+              senderId: connection.userHighId,
+              receiverId: connection.userLowId,
+            },
+          ],
+          status: { in: [InterestStatus.pending, InterestStatus.accepted] },
+        },
+        data: { status: InterestStatus.ended, respondedAt: now },
+      }),
+      this.prisma.videoCall.updateMany({
+        where: {
+          connectionId: connection.id,
+          status: { in: ['ringing', 'scheduled'] },
+        },
+        data: { status: 'cancelled', endedAt: now },
+      }),
+      this.prisma.videoCall.updateMany({
+        where: {
+          connectionId: connection.id,
+          status: 'active',
+        },
+        data: { status: 'completed', endedAt: now },
+      }),
+      this.prisma.videoCallGuest.updateMany({
+        where: {
+          status: { in: ['pending_approval', 'approved', 'joined'] },
+          videoCall: { connectionId: connection.id },
+        },
+        data: { status: 'expired' },
+      }),
+    ]);
+
+    this.invalidateDiscoveryCachesForPair(userId, otherUserId);
+    this.messages.invalidateUserMessageCaches(userId);
+    this.messages.invalidateUserMessageCaches(otherUserId);
+    this.videoCalls.invalidateUserCallCaches(userId);
+    this.videoCalls.invalidateUserCallCaches(otherUserId);
+    void this.notifyConnectionEnded(otherUserId);
+
+    return {
+      ended: true,
+      connectionId: connection.id,
+      userLowId: connection.userLowId,
+      userHighId: connection.userHighId,
+      otherUserId,
+    };
+  }
+
+  async listEndedConnectionAlerts(userId: string) {
+    const since = new Date(
+      Date.now() - CONNECTION_RECONNECT_COOLDOWN_DAYS * MS_PER_DAY,
+    );
+
+    const rows = await this.prisma.connection.findMany({
+      where: {
+        endedAt: { not: null, gte: since },
+        endedById: { not: userId },
+        OR: [{ userLowId: userId }, { userHighId: userId }],
+      },
+      orderBy: { endedAt: 'desc' },
+      take: 10,
+      include: {
+        userLow: {
+          select: {
+            id: true,
+            profile: { select: { profileCode: true, fullName: true } },
+          },
+        },
+        userHigh: {
+          select: {
+            id: true,
+            profile: { select: { profileCode: true, fullName: true } },
+          },
+        },
+      },
+    });
+
+    return rows.map((row) => {
+      const other = row.userLowId === userId ? row.userHigh : row.userLow;
+      const endedAt = row.endedAt!;
+      return {
+        connectionId: row.id,
+        endedAt: endedAt.toISOString(),
+        reconnectAvailableAt: reconnectAvailableAt(endedAt)?.toISOString() ?? null,
+        member: {
+          profileCode: other.profile?.profileCode ?? null,
+          fullName: other.profile?.fullName?.trim() || null,
+        },
+      };
+    });
+  }
+
   async listMyConnections(userId: string) {
     const cached = this.connectionsCache.get(userId);
     if (cached && cached.expiresAt > Date.now()) {
@@ -511,6 +684,7 @@ export class ConnectionsService {
 
     const connections = await this.prisma.connection.findMany({
       where: {
+        endedAt: null,
         OR: [{ userLowId: userId }, { userHighId: userId }],
       },
       include: {
@@ -633,6 +807,7 @@ export class ConnectionsService {
   async getConnectionCount(userId: string) {
     return this.prisma.connection.count({
       where: {
+        endedAt: null,
         OR: [{ userLowId: userId }, { userHighId: userId }],
       },
     });
@@ -667,8 +842,8 @@ export class ConnectionsService {
         (
           SELECT COUNT(*)::bigint
           FROM "Connection"
-          WHERE "userLowId" = ${userId}
-            OR "userHighId" = ${userId}
+          WHERE ("userLowId" = ${userId} OR "userHighId" = ${userId})
+            AND "endedAt" IS NULL
         ) AS connections
     `;
 
@@ -802,22 +977,43 @@ export class ConnectionsService {
 
   private async ensureConnection(userAId: string, userBId: string) {
     const [userLowId, userHighId] = this.canonicalPair(userAId, userBId);
-    await this.prisma.connection.upsert({
+    const existing = await this.prisma.connection.findUnique({
+      where: { userLowId_userHighId: { userLowId, userHighId } },
+    });
+    if (existing && !existing.endedAt) {
+      return existing;
+    }
+
+    return this.prisma.connection.upsert({
       where: { userLowId_userHighId: { userLowId, userHighId } },
       create: {
         userLowId,
         userHighId,
         privacyLevel: PrivacyLevel.BASIC_MUTUAL_INTEREST,
       },
-      update: {},
+      update: {
+        endedAt: null,
+        endedById: null,
+        privacyLevel: PrivacyLevel.BASIC_MUTUAL_INTEREST,
+        pendingUpgradeLevel: null,
+        pendingUpgradeById: null,
+      },
     });
   }
 
-  private async getConnection(userAId: string, userBId: string) {
+  private async getConnectionRecord(userAId: string, userBId: string) {
     const [userLowId, userHighId] = this.canonicalPair(userAId, userBId);
     return this.prisma.connection.findUnique({
       where: { userLowId_userHighId: { userLowId, userHighId } },
     });
+  }
+
+  private async getConnection(userAId: string, userBId: string) {
+    const connection = await this.getConnectionRecord(userAId, userBId);
+    if (!connection || connection.endedAt) {
+      return null;
+    }
+    return connection;
   }
 
   private redactInterestProfile(
@@ -837,6 +1033,20 @@ export class ConnectionsService {
       currentDivision: profile.currentDivision,
       isVerified: profile.isVerified,
     };
+  }
+
+  private async notifyConnectionEnded(otherUserId: string) {
+    try {
+      await this.pushNotifications.sendToUser(otherUserId, {
+        title: 'Connection ended',
+        body: 'A member ended this connection. Messaging and video calls have stopped. You can send a new interest after 7 days.',
+        data: { type: 'connection_ended' },
+        channelId: PUSH_CHANNEL_ACTIVITY,
+        ...MEMBER_INCOMING_PUSH,
+      });
+    } catch {
+      // Push delivery must not block ending a connection.
+    }
   }
 
   private async notifyConnectionEstablished(userAId: string, userBId: string) {

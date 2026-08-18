@@ -21,6 +21,7 @@ type LiveKitVideoCallRoomProps = {
   token: string;
   embeddedMobile?: boolean;
   nativeShell?: boolean;
+  autoEnableMicrophone?: boolean;
   showEndCall?: boolean;
   ending?: boolean;
   onEndCall?: () => void;
@@ -32,6 +33,7 @@ type LiveKitVideoCallRoomProps = {
 function ConferenceLayout({
   embeddedMobile,
   nativeShell,
+  autoEnableMicrophone,
   showEndCall,
   ending,
   onEndCall,
@@ -39,6 +41,7 @@ function ConferenceLayout({
 }: {
   embeddedMobile?: boolean;
   nativeShell?: boolean;
+  autoEnableMicrophone?: boolean;
   showEndCall?: boolean;
   ending?: boolean;
   onEndCall?: () => void;
@@ -78,7 +81,12 @@ function ConferenceLayout({
         <DeferredCallCamera onDeviceError={onMediaDeviceError} />
       ) : null}
       <LiveKitAudioBootstrap nativeShell={nativeShell} />
-      {nativeShell ? <NativeCallMediaBridge nativeShell /> : null}
+      {nativeShell ? (
+        <NativeCallMediaBridge
+          nativeShell
+          autoEnableMicrophone={autoEnableMicrophone}
+        />
+      ) : null}
       {nativeShell ? <NativeCallRemotePlayback nativeShell /> : null}
       <NativeCallDiagnostics />
       <RoomAudioRenderer />
@@ -109,6 +117,7 @@ export function LiveKitVideoCallRoom({
   token,
   embeddedMobile = false,
   nativeShell = false,
+  autoEnableMicrophone = false,
   showEndCall = false,
   ending = false,
   onEndCall,
@@ -178,6 +187,7 @@ export function LiveKitVideoCallRoom({
         <ConferenceLayout
           embeddedMobile={embeddedMobile}
           nativeShell={nativeShell}
+          autoEnableMicrophone={autoEnableMicrophone}
           showEndCall={showEndCall}
           ending={ending}
           onEndCall={onEndCall}

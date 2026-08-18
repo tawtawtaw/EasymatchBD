@@ -18,6 +18,16 @@ async function parseResponse<T>(res: Response): Promise<T> {
   return readJsonResponse<T>(res);
 }
 
+export type EndedConnectionAlert = {
+  connectionId: string;
+  endedAt: string;
+  reconnectAvailableAt: string | null;
+  member: {
+    profileCode: string | null;
+    fullName: string | null;
+  };
+};
+
 export type MemberAlertsSummary = {
   unreadMessages: number;
   incomingInterests: number;
@@ -26,6 +36,7 @@ export type MemberAlertsSummary = {
   incomingCalls: number;
   incomingCallAlert: VideoCallAlertItem | null;
   callAlerts: VideoCallAlertItem[];
+  endedConnectionAlerts: EndedConnectionAlert[];
 };
 
 export type MemberDiscoveryStats = {
@@ -58,7 +69,11 @@ export async function getMemberAlertsSummary(
       const res = await apiFetch(`${apiUrl()}/discovery/alerts-summary`, {
         headers: authHeaders(token),
       });
-      return parseResponse<MemberAlertsSummary>(res);
+      const data = await parseResponse<MemberAlertsSummary>(res);
+      return {
+        ...data,
+        endedConnectionAlerts: data.endedConnectionAlerts ?? [],
+      };
     },
     dedupeMs,
   );

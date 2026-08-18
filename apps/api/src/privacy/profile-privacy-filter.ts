@@ -58,6 +58,7 @@ export function buildVisibleProfileView(
   profile: ProfilePayload,
   rules: PrivacyRule[],
   viewerLevel: number,
+  options?: { includeOwnerPhone?: boolean },
 ): VisibleProfileView {
   const ruleMap = new Map(rules.map((rule) => [rule.fieldKey, rule]));
   const visibleFieldKeys: string[] = [];
@@ -390,8 +391,11 @@ export function buildVisibleProfileView(
       profile.isVerified &&
       profile.verifiedOnBehalf &&
       profile.nidVerifiedAt != null,
-    phone: isVisible(PROFILE_PRIVACY_FIELDS.PHONE)
-      ? (profile.user?.phone ?? null)
+    // Login phone is never shared with connections or public viewers.
+    phone: options?.includeOwnerPhone
+      ? isVisible(PROFILE_PRIVACY_FIELDS.PHONE)
+        ? (profile.user?.phone ?? null)
+        : null
       : null,
   };
 

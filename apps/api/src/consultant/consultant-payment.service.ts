@@ -91,6 +91,10 @@ export class ConsultantPaymentService {
       throw new ForbiddenException('Not a member of this connection');
     }
 
+    if (connection.endedAt) {
+      throw new ForbiddenException('This connection has ended');
+    }
+
     if (!connection.userLow.isActive || !connection.userHigh.isActive) {
       throw new ForbiddenException('Connection is not active');
     }

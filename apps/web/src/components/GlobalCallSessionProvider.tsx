@@ -10,6 +10,7 @@ import {
 } from "react";
 import { usePathname } from "@/i18n/routing";
 import { useMemberAlerts } from "@/components/MemberAlertsProvider";
+import { useScheduledCallRingAlert } from "@/hooks/use-scheduled-call-ring";
 import { useVideoCallRingtone } from "@/hooks/use-video-call-ringtone";
 
 const VIDEO_CALL_PATH = /\/(?:mobile\/video-call|messages\/[^/]+\/call)(?:\/|$)/;
@@ -117,6 +118,11 @@ export function GlobalCallSessionProvider({ children }: { children: ReactNode })
     [suppressedIncomingCallIds],
   );
 
+  const scheduledRingAlert = useScheduledCallRingAlert(
+    summary.callAlerts,
+    suppressedIncomingCallIds,
+  );
+
   const ringtoneKind = useMemo((): "incoming" | "outgoing" | null => {
     const onCallPage = isVideoCallPath(pathname);
 
@@ -132,6 +138,18 @@ export function GlobalCallSessionProvider({ children }: { children: ReactNode })
         : null;
 
     if ((incomingAlert || legacyIncoming) && !onCallPage) {
+      return "incoming";
+    }
+
+    if (scheduledRingAlert && !onCallPage) {
+      if (
+        session?.callId === scheduledRingAlert.call.id &&
+        (session.joining ||
+          session.phase === "connecting" ||
+          session.phase === "active")
+      ) {
+        return null;
+      }
       return "incoming";
     }
 
@@ -154,6 +172,7 @@ export function GlobalCallSessionProvider({ children }: { children: ReactNode })
     return null;
   }, [
     pathname,
+    scheduledRingAlert,
     session,
     summary.callAlerts,
     summary.incomingCallAlert,

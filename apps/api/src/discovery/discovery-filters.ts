@@ -113,12 +113,12 @@ export function buildDiscoveryProfileWhere(
           },
           {
             connectionsAsLow: {
-              some: { userHighId: viewerUserId },
+              some: { userHighId: viewerUserId, endedAt: null },
             },
           },
           {
             connectionsAsHigh: {
-              some: { userLowId: viewerUserId },
+              some: { userLowId: viewerUserId, endedAt: null },
             },
           },
         ],

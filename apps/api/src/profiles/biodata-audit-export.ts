@@ -39,6 +39,7 @@ export function buildAuditBiodataExport(
     profile,
     buildAuditPrivacyRules(rules),
     PrivacyLevel.SERIOUS_CONSIDERATION,
+    { includeOwnerPhone: true },
   );
 
   const primaryPhoto = profile.photos.find(

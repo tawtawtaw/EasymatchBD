@@ -29,6 +29,7 @@ import { resolveMemberDisplayName } from "@/lib/member-display";
 import { memberComplaintHref } from "@/lib/member-complaints";
 import { ProfileBookmarkButton } from "@/components/ProfileBookmarkButton";
 import { DiscoveryProfileInterestFooter } from "@/components/DiscoveryProfileInterestFooter";
+import { EndConnectionButton } from "@/components/EndConnectionButton";
 import { ProfilePhotoLightbox } from "@/components/ProfilePhotoLightbox";
 import { visibleProfilePhotoIds } from "@easymatch/shared";
 
@@ -322,7 +323,7 @@ export default function DiscoveryProfilePage() {
                   </Link>
                 </>
               ) : null}
-              {isPaid && rel.status === "none" ? (
+              {isPaid && rel.status === "none" && !rel.reconnectAvailableAt ? (
                 <button
                   type="button"
                   disabled={acting}
@@ -331,6 +332,16 @@ export default function DiscoveryProfilePage() {
                 >
                   {t("expressInterest")}
                 </button>
+              ) : null}
+              {rel.status === "none" && rel.reconnectAvailableAt ? (
+                <span className="rounded-lg bg-amber-100 px-3 py-2 text-sm text-amber-900">
+                  {t("reconnectCooldown", {
+                    date: new Date(rel.reconnectAvailableAt).toLocaleDateString(
+                      locale === "bn" ? "bn-BD" : "en-GB",
+                      { day: "numeric", month: "short", year: "numeric" },
+                    ),
+                  })}
+                </span>
               ) : null}
               {rel.status === "interest_sent" ? (
                 <span className="rounded-lg bg-amber-100 px-3 py-2 text-sm text-amber-900">
@@ -354,6 +365,14 @@ export default function DiscoveryProfilePage() {
                     >
                       {t("message")}
                     </Link>
+                  ) : null}
+                  {rel.connectionId ? (
+                    <EndConnectionButton
+                      connectionId={rel.connectionId}
+                      privacyLevel={rel.connectionPrivacyLevel ?? rel.viewerPrivacyLevel}
+                      disabled={acting}
+                      onEnded={() => void load()}
+                    />
                   ) : null}
                 </>
               ) : null}
@@ -534,6 +553,7 @@ export default function DiscoveryProfilePage() {
         rel={rel}
         acting={acting}
         onSendInterest={() => void handleSendInterest()}
+        onEnded={() => void load()}
       />
 
       {rel.status === "interest_received" && rel.receivedInterestId ? (

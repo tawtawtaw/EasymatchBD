@@ -189,7 +189,9 @@ export class ProfilesService {
       throw new NotFoundException('Profile not found');
     }
 
-    const view = buildVisibleProfileView(profile, rules, level);
+    const view = buildVisibleProfileView(profile, rules, level, {
+      includeOwnerPhone: true,
+    });
 
     return {
       profileCode: profile.profileCode,

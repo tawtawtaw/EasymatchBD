@@ -16,7 +16,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PrivacyFieldsService } from '../privacy/privacy-fields.service';
 import { SubscriptionAccessService } from '../subscriptions/subscription-access.service';
 import { LiveKitService } from './livekit.service';
-import { PushNotificationService, MEMBER_INCOMING_PUSH, PUSH_CHANNEL_CALLS } from '../push/push-notification.service';
+import { PushNotificationService, MEMBER_INCOMING_PUSH, PUSH_CHANNEL_ACTIVITY, PUSH_CHANNEL_CALLS } from '../push/push-notification.service';
 import { ProfilePauseService } from '../profiles/profile-pause.service';
 import { invalidateAlertsSummaryCache } from './alerts-summary-cache';
 import { VideoCallStatus, Prisma } from '@prisma/client';
@@ -127,6 +127,10 @@ export class VideoCallsService {
       throw new ForbiddenException('Not a member of this connection');
     }
 
+    if (connection.endedAt) {
+      throw new ForbiddenException('This connection has ended');
+    }
+
     const otherUser =
       connection.userLowId === userId
         ? connection.userHigh
@@ -156,6 +160,7 @@ export class VideoCallsService {
             userLowId: true,
             userHighId: true,
             privacyLevel: true,
+            endedAt: true,
             userLow: { select: { isActive: true } },
             userHigh: { select: { isActive: true } },
           },
@@ -172,6 +177,10 @@ export class VideoCallsService {
       connection.userLowId === userId || connection.userHighId === userId;
     if (!isMember) {
       throw new ForbiddenException('Not a member of this connection');
+    }
+
+    if (call.connection.endedAt) {
+      throw new ForbiddenException('This connection has ended');
     }
 
     if (!connection.userLow.isActive || !connection.userHigh.isActive) {
@@ -281,6 +290,15 @@ export class VideoCallsService {
           ...(callerName ? { callerName } : {}),
         },
       });
+    } else {
+      void this.notifyPartnerOfScheduledCall({
+        partnerUserId: otherUserId,
+        schedulerUserId: userId,
+        connectionId,
+        callId: call.id,
+        privacyLevel: connection.privacyLevel,
+        rescheduled: false,
+      });
     }
 
     return serializeCall(call, userId);
@@ -377,6 +395,7 @@ export class VideoCallsService {
       },
       select: {
         privacyLevel: true,
+        endedAt: true,
         userLow: { select: { isActive: true } },
         userHigh: { select: { isActive: true } },
       },
@@ -384,6 +403,10 @@ export class VideoCallsService {
 
     if (!connection) {
       throw new NotFoundException('Connection not found');
+    }
+
+    if (connection.endedAt) {
+      throw new ForbiddenException('This connection has ended');
     }
 
     if (!connection.userLow.isActive || !connection.userHigh.isActive) {
@@ -401,6 +424,7 @@ export class VideoCallsService {
     await this.requirePaid(userId);
     const connections = await this.prisma.connection.findMany({
       where: {
+        endedAt: null,
         OR: [{ userLowId: userId }, { userHighId: userId }],
         privacyLevel: { gte: MIN_VIDEO_CALL_PRIVACY_LEVEL },
       },
@@ -480,6 +504,7 @@ export class VideoCallsService {
 
     const connections = await this.prisma.connection.findMany({
       where: {
+        endedAt: null,
         OR: [{ userLowId: userId }, { userHighId: userId }],
         privacyLevel: { gte: MIN_VIDEO_CALL_PRIVACY_LEVEL },
         userLow: { isActive: true },
@@ -732,7 +757,19 @@ export class VideoCallsService {
       data: { scheduledAt: parsedScheduled },
     });
 
-    this.invalidateCallCaches(userId, call.connectionId, callId);
+    const otherUserId =
+      call.connection.userLowId === userId
+        ? call.connection.userHighId
+        : call.connection.userLowId;
+    this.invalidateCallCaches(userId, call.connectionId, callId, [otherUserId]);
+    void this.notifyPartnerOfScheduledCall({
+      partnerUserId: otherUserId,
+      schedulerUserId: userId,
+      connectionId: call.connectionId,
+      callId,
+      privacyLevel: call.connection.privacyLevel,
+      rescheduled: true,
+    });
     return serializeCall(updated, userId);
   }
 
@@ -870,6 +907,56 @@ export class VideoCallsService {
     }));
   }
 
+  private async notifyPartnerOfScheduledCall(input: {
+    partnerUserId: string;
+    schedulerUserId: string;
+    connectionId: string;
+    callId: string;
+    privacyLevel: number;
+    rescheduled: boolean;
+  }) {
+    try {
+      const callerName = await this.resolveVisibleNameFor(
+        input.schedulerUserId,
+        input.privacyLevel,
+      );
+      await this.pushNotifications.sendToUser(input.partnerUserId, {
+        title: input.rescheduled
+          ? 'Video call rescheduled'
+          : 'Video call scheduled',
+        body: input.rescheduled
+          ? 'A connection changed the time of a video call with you'
+          : 'A connection scheduled a video call with you',
+        channelId: PUSH_CHANNEL_ACTIVITY,
+        ...MEMBER_INCOMING_PUSH,
+        data: {
+          type: 'scheduled_call',
+          connectionId: input.connectionId,
+          callId: input.callId,
+          ...(callerName ? { callerName } : {}),
+        },
+      });
+    } catch {
+      // Push delivery must not block scheduling.
+    }
+  }
+
+  invalidateUserCallCaches(userId: string) {
+    this.callAlertsCache.delete(userId);
+    this.callAlertsInflight.delete(userId);
+    invalidateAlertsSummaryCache(userId);
+    for (const key of this.listCallsCache.keys()) {
+      if (key.startsWith(`${userId}:`)) {
+        this.listCallsCache.delete(key);
+      }
+    }
+    for (const key of this.callSnapshotCache.keys()) {
+      if (key.startsWith(`${userId}:`)) {
+        this.callSnapshotCache.delete(key);
+      }
+    }
+  }
+
   private invalidateCallCaches(
     userId: string,
     connectionId: string,
@@ -879,6 +966,7 @@ export class VideoCallsService {
     const userIds = new Set([userId, ...alsoInvalidateUserIds]);
     for (const uid of userIds) {
       this.callAlertsCache.delete(uid);
+      this.callAlertsInflight.delete(uid);
       invalidateAlertsSummaryCache(uid);
       for (const key of this.listCallsCache.keys()) {
         if (key.startsWith(`${uid}:${connectionId}:`)) {
@@ -899,6 +987,7 @@ export class VideoCallsService {
         if (!connection) return;
         for (const uid of [connection.userLowId, connection.userHighId]) {
           this.callAlertsCache.delete(uid);
+          this.callAlertsInflight.delete(uid);
           invalidateAlertsSummaryCache(uid);
         }
       });

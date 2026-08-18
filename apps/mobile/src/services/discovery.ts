@@ -198,6 +198,22 @@ export async function respondPrivacyUpgrade(profileIdOrCode: string, accept: boo
   return result;
 }
 
+export async function endConnection(connectionId: string) {
+  const result = await apiRequest<{
+    ended: boolean;
+    connectionId: string;
+    otherUserId: string;
+  }>(`/discovery/connections/${encodeURIComponent(connectionId)}/end`, {
+    method: "POST",
+  });
+  invalidateDedupeCache("discovery-connections");
+  invalidateDedupeCache("discovery-interests");
+  invalidateDedupeCache("discovery:home-bootstrap");
+  invalidateDedupeCache("alerts-summary");
+  invalidateDedupeCache("discovery-profile");
+  return result;
+}
+
 export async function withdrawDiscoveryInterest(interestId: string) {
   const result = await apiRequest<{ withdrawn: boolean }>(
     `/discovery/interests/${encodeURIComponent(interestId)}`,
