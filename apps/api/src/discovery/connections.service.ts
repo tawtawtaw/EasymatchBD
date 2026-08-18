@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InterestStatus, Prisma } from '@prisma/client';
@@ -108,6 +109,7 @@ export class ConnectionsService {
       value: MemberDiscoveryStats;
     }
   >();
+  private readonly logger = new Logger(ConnectionsService.name);
 
   constructor(
     private readonly prisma: PrismaService,
@@ -825,27 +827,54 @@ export class ConnectionsService {
       connections: bigint;
     };
 
-    const rows = await this.prisma.$queryRaw<StatsRow[]>`
-      SELECT
-        (
-          SELECT COUNT(*)::bigint
-          FROM "Interest"
-          WHERE "receiverId" = ${userId}
-            AND status = 'pending'
-        ) AS incoming,
-        (
-          SELECT COUNT(*)::bigint
-          FROM "Interest"
-          WHERE "senderId" = ${userId}
-            AND status = 'pending'
-        ) AS outgoing,
-        (
-          SELECT COUNT(*)::bigint
-          FROM "Connection"
-          WHERE ("userLowId" = ${userId} OR "userHighId" = ${userId})
-            AND "endedAt" IS NULL
-        ) AS connections
-    `;
+    let rows: StatsRow[];
+    try {
+      rows = await this.prisma.$queryRaw<StatsRow[]>`
+        SELECT
+          (
+            SELECT COUNT(*)::bigint
+            FROM "Interest"
+            WHERE "receiverId" = ${userId}
+              AND status = 'pending'
+          ) AS incoming,
+          (
+            SELECT COUNT(*)::bigint
+            FROM "Interest"
+            WHERE "senderId" = ${userId}
+              AND status = 'pending'
+          ) AS outgoing,
+          (
+            SELECT COUNT(*)::bigint
+            FROM "Connection"
+            WHERE ("userLowId" = ${userId} OR "userHighId" = ${userId})
+              AND "endedAt" IS NULL
+          ) AS connections
+      `;
+    } catch (error) {
+      this.logger.error(
+        `Member discovery stats query failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      rows = await this.prisma.$queryRaw<StatsRow[]>`
+        SELECT
+          (
+            SELECT COUNT(*)::bigint
+            FROM "Interest"
+            WHERE "receiverId" = ${userId}
+              AND status = 'pending'
+          ) AS incoming,
+          (
+            SELECT COUNT(*)::bigint
+            FROM "Interest"
+            WHERE "senderId" = ${userId}
+              AND status = 'pending'
+          ) AS outgoing,
+          (
+            SELECT COUNT(*)::bigint
+            FROM "Connection"
+            WHERE ("userLowId" = ${userId} OR "userHighId" = ${userId})
+          ) AS connections
+      `;
+    }
 
     const row = rows[0];
     const connections = Number(row?.connections ?? 0);

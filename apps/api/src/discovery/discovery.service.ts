@@ -985,7 +985,12 @@ export class DiscoveryService implements OnModuleInit {
       userTermsPromise,
       this.legal.getCurrentVersion(),
       this.profiles.getMemberHomeSummary(userId),
-      this.connections.getMemberDiscoveryStats(userId),
+      this.connections.getMemberDiscoveryStats(userId).catch(() => ({
+        incoming: 0,
+        outgoing: 0,
+        connections: 0,
+        conversations: 0,
+      })),
       viewerProfilePromise.then((viewer) =>
         this.listProfiles(userId, 1, 3, {}, {
           candidatePoolLimit: DISCOVERY_HOME_SUGGESTION_POOL_LIMIT,
@@ -993,7 +998,13 @@ export class DiscoveryService implements OnModuleInit {
           skipTotalCount: true,
           skipBookmarks: true,
           viewerProfile: viewer,
-        }),
+        }).catch(() => ({
+          items: [],
+          total: 0,
+          page: 1,
+          limit: 3,
+          hasMore: false,
+        })),
       ),
     ]);
 

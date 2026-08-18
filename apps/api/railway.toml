@@ -8,6 +8,7 @@ watchPatterns = [
   "apps/api/**",
   "packages/shared/**",
   "scripts/railway-api-build.mjs",
+  "scripts/railway-api-start.mjs",
   "scripts/hostinger-prisma-generate.mjs",
   "package.json",
   "package-lock.json",
@@ -15,6 +16,6 @@ watchPatterns = [
 ]
 
 [deploy]
-startCommand = "npm run prisma:migrate:deploy -w @easymatch/api && npm run start:prod -w @easymatch/api"
+startCommand = "node scripts/railway-api-start.mjs"
 healthcheckPath = "/api/v1/health"
 restartPolicyType = "ON_FAILURE"

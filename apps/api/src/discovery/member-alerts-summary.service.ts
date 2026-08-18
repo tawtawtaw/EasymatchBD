@@ -99,7 +99,12 @@ export class MemberAlertsSummaryService {
   ): Promise<MemberAlertsSummaryResponse> {
     const [unread, stats, callAlerts, endedConnectionAlerts] = await Promise.all([
       this.messages.getUnreadCount(userId).catch(() => ({ unreadCount: 0 })),
-      this.connections.getMemberDiscoveryStats(userId),
+      this.connections.getMemberDiscoveryStats(userId).catch(() => ({
+        incoming: 0,
+        outgoing: 0,
+        connections: 0,
+        conversations: 0,
+      })),
       this.videoCalls
         .listCallAlerts(userId)
         .catch(
