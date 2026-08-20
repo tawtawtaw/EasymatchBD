@@ -17,9 +17,12 @@ import {
   createVideoCall,
   formatVideoCallWhen,
   listVideoCallAlerts,
+  listVideoCallLog,
   startScheduledVideoCall,
   type VideoCallAlertItem,
+  type VideoCallLogItem,
 } from "@/lib/video-calls";
+import { CallLogRow } from "@/components/CallLogRow";
 import { unlockVideoCallRingtone } from "@/lib/video-call-ringtone";
 import { MIN_VIDEO_CALL_PRIVACY_LEVEL } from "@easymatch/shared";
 
@@ -38,6 +41,7 @@ export default function VideoCallsPage() {
   const isPaid = membershipFromSession(session);
   const [connections, setConnections] = useState<ConnectionItem[]>([]);
   const [alerts, setAlerts] = useState<VideoCallAlertItem[]>([]);
+  const [callLog, setCallLog] = useState<VideoCallLogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [callingId, setCallingId] = useState<string | null>(null);
   const [joiningAlertId, setJoiningAlertId] = useState<string | null>(null);
@@ -52,10 +56,11 @@ export default function VideoCallsPage() {
 
     setError(null);
     try {
-      const [sessionData, connectionList, alertList] = await Promise.all([
+      const [sessionData, connectionList, alertList, logList] = await Promise.all([
         getSession(token),
         listMyConnections(token),
         listVideoCallAlerts(token).catch(() => [] as VideoCallAlertItem[]),
+        listVideoCallLog(token).catch(() => [] as VideoCallLogItem[]),
       ]);
 
       if (!sessionData.termsAccepted) {
@@ -65,6 +70,7 @@ export default function VideoCallsPage() {
 
       setConnections(connectionList);
       setAlerts(alertList);
+      setCallLog(logList);
     } catch (err) {
       setError(err instanceof Error ? err.message : tv("actions.error"));
     } finally {
@@ -101,6 +107,11 @@ export default function VideoCallsPage() {
     } finally {
       setCallingId(null);
     }
+  }
+
+  async function handleCallAgain(item: VideoCallLogItem) {
+    if (!item.canCallBack) return;
+    await handleCallNow(item.connectionId);
   }
 
   async function handleAlertAction(alert: VideoCallAlertItem) {
@@ -226,7 +237,7 @@ export default function VideoCallsPage() {
         </section>
       ) : null}
 
-      {eligible.length === 0 && needsUpgrade.length === 0 ? (
+      {eligible.length === 0 && needsUpgrade.length === 0 && callLog.length === 0 ? (
         <div className="rounded-xl border border-zinc-200 bg-white p-6 text-center shadow-sm">
           <p className="text-zinc-600">{t("empty")}</p>
           <Link
@@ -238,6 +249,40 @@ export default function VideoCallsPage() {
         </div>
       ) : (
         <>
+          {callLog.length > 0 ? (
+            <section className="mb-8">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">
+                {t("logSection")}
+              </h2>
+              <ul className="mt-3 divide-y divide-zinc-100 overflow-hidden rounded-2xl border border-zinc-200 bg-white px-3">
+                {callLog.map((item) => {
+                  const name = resolveMemberDisplayName(
+                    {
+                      fullName: item.partnerName,
+                      profileCode: item.partnerProfileCode,
+                    },
+                    {
+                      profileRef: (code) => tv("profileRef", { code }),
+                      anonymous: tv("unknownMember"),
+                    },
+                  );
+                  return (
+                    <li key={item.id}>
+                      <CallLogRow
+                        call={item}
+                        partnerName={name}
+                        showPartner
+                        canCallBack={item.canCallBack}
+                        calling={callingId === item.connectionId}
+                        onCallAgain={() => void handleCallAgain(item)}
+                      />
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ) : null}
+
           {eligible.length > 0 ? (
             <section className="space-y-3">
               <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">

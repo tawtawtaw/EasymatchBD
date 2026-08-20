@@ -9,13 +9,16 @@ type WebcamCaptureModalProps = {
   title: string;
   onCancel: () => void;
   onCapture: (file: File) => void;
+  facingMode?: "user" | "environment";
 };
 
 function stopStream(stream: MediaStream | null) {
   stream?.getTracks().forEach((track) => track.stop());
 }
 
-async function startCamera(): Promise<MediaStream> {
+async function startCamera(
+  facingMode: "user" | "environment" = "user",
+): Promise<MediaStream> {
   if (!navigator.mediaDevices?.getUserMedia) {
     throw new Error("unavailable");
   }
@@ -23,7 +26,7 @@ async function startCamera(): Promise<MediaStream> {
     return await navigator.mediaDevices.getUserMedia({
       audio: false,
       video: {
-        facingMode: "user",
+        facingMode: { ideal: facingMode },
         width: { ideal: 1280 },
         height: { ideal: 720 },
       },
@@ -87,6 +90,7 @@ export function WebcamCaptureModal({
   title,
   onCancel,
   onCapture,
+  facingMode = "user",
 }: WebcamCaptureModalProps) {
   const t = useTranslations("profile.media.camera");
   const mounted = useMounted();
@@ -117,7 +121,7 @@ export function WebcamCaptureModal({
     streamRef.current = null;
 
     try {
-      const stream = await startCamera();
+      const stream = await startCamera(facingMode);
       streamRef.current = stream;
       const video = videoRef.current;
       if (!video) {
@@ -136,7 +140,7 @@ export function WebcamCaptureModal({
     } finally {
       setStarting(false);
     }
-  }, [t]);
+  }, [facingMode, t]);
 
   useEffect(() => {
     if (!mounted || capturedFile) return;

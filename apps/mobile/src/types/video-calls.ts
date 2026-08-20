@@ -21,6 +21,12 @@ export type VideoCallItem = {
   consultantEngagementId?: string | null;
 };
 
+export type VideoCallLogItem = VideoCallItem & {
+  partnerName: string | null;
+  partnerProfileCode: string | null;
+  canCallBack: boolean;
+};
+
 export type VideoCallAlertKind =
   | "incoming"
   | "scheduled_partner"

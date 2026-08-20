@@ -49,6 +49,12 @@ export type VideoCallItem = {
   consultantEngagementId?: string | null;
 };
 
+export type VideoCallLogItem = VideoCallItem & {
+  partnerName: string | null;
+  partnerProfileCode: string | null;
+  canCallBack: boolean;
+};
+
 export type VideoCallSignal = {
   id: string;
   type: "offer" | "answer" | "ice";
@@ -90,6 +96,21 @@ export async function listVideoCallAlerts(
       return parseResponse<VideoCallAlertItem[]>(res);
     },
     10_000,
+  );
+}
+
+export async function listVideoCallLog(
+  token: string,
+): Promise<VideoCallLogItem[]> {
+  return dedupeRequest(
+    "video-call-log",
+    async () => {
+      const res = await apiFetch(`${apiUrl()}/discovery/calls/log`, {
+        headers: authHeaders(token),
+      });
+      return parseResponse<VideoCallLogItem[]>(res);
+    },
+    8_000,
   );
 }
 

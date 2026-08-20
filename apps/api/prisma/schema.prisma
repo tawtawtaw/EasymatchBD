@@ -712,19 +712,24 @@ model MembershipPayment {
 }
 
 model MembershipTariff {
-  id            String           @id @default(cuid())
-  plan          SubscriptionPlan @unique
-  labelEn       String
-  labelBn       String?
-  priceBdt      Decimal          @db.Decimal(10, 2)
-  currency      String           @default("BDT")
-  durationDays  Int              @default(30)
-  isActive      Boolean          @default(true)
-  sortOrder     Int              @default(0)
-  descriptionEn String?
-  descriptionBn String?
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
+  id                String           @id @default(cuid())
+  plan              SubscriptionPlan @unique
+  labelEn           String
+  labelBn           String?
+  priceBdt          Decimal          @db.Decimal(10, 2)
+  currency          String           @default("BDT")
+  durationDays      Int              @default(30)
+  isActive          Boolean          @default(true)
+  sortOrder         Int              @default(0)
+  descriptionEn     String?
+  descriptionBn     String?
+  discountPriceBdt  Decimal?         @db.Decimal(10, 2)
+  discountStartsAt  DateTime?
+  discountEndsAt    DateTime?
+  discountLabelEn   String?
+  discountLabelBn   String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 }
 
 enum ConsultantServiceType {

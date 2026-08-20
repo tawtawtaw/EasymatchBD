@@ -449,6 +449,80 @@ export class VideoCallsService {
     return calls.map((call) => serializeCall(call, userId));
   }
 
+  async listCallLog(userId: string) {
+    await this.requirePaid(userId);
+
+    const connections = await this.prisma.connection.findMany({
+      where: {
+        OR: [{ userLowId: userId }, { userHighId: userId }],
+      },
+      select: {
+        id: true,
+        endedAt: true,
+        privacyLevel: true,
+        userLowId: true,
+        userHighId: true,
+        userLow: {
+          select: {
+            isActive: true,
+            profile: { select: { fullName: true, profileCode: true } },
+          },
+        },
+        userHigh: {
+          select: {
+            isActive: true,
+            profile: { select: { fullName: true, profileCode: true } },
+          },
+        },
+      },
+    });
+
+    if (connections.length === 0) {
+      return [];
+    }
+
+    const byId = new Map(
+      connections.map((connection) => [connection.id, connection]),
+    );
+    const fullNameRule = await this.privacyFields.getFullNameRule();
+
+    const calls = await this.prisma.videoCall.findMany({
+      where: {
+        connectionId: { in: [...byId.keys()] },
+        status: { in: ['completed', 'cancelled', 'declined', 'missed'] },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+
+    return calls.map((call) => {
+      const connection = byId.get(call.connectionId);
+      const otherUser =
+        connection?.userLowId === userId
+          ? connection.userHigh
+          : connection?.userLow;
+      const partnerName = resolveVisibleFullName(
+        otherUser?.profile?.fullName ?? null,
+        connection?.privacyLevel ?? 1,
+        fullNameRule,
+      );
+      const canCallBack = Boolean(
+        connection &&
+          !connection.endedAt &&
+          connection.privacyLevel >= MIN_VIDEO_CALL_PRIVACY_LEVEL &&
+          connection.userLow.isActive &&
+          connection.userHigh.isActive,
+      );
+
+      return {
+        ...serializeCall(call, userId),
+        partnerName,
+        partnerProfileCode: otherUser?.profile?.profileCode ?? null,
+        canCallBack,
+      };
+    });
+  }
+
   async listCallAlerts(userId: string): Promise<VideoCallAlert[]> {
     const cached = this.callAlertsCache.get(userId);
     if (cached && cached.expiresAt > Date.now()) {

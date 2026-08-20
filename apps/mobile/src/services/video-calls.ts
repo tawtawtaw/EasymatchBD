@@ -4,6 +4,7 @@ import { dedupeRequest, invalidateDedupeCache } from "./api/dedupe";
 import type {
   VideoCallAlertItem,
   VideoCallItem,
+  VideoCallLogItem,
 } from "../types/video-calls";
 
 export async function listVideoCallAlerts() {
@@ -11,6 +12,14 @@ export async function listVideoCallAlerts() {
     "video-call-alerts",
     () => apiRequest<VideoCallAlertItem[]>("/discovery/calls/alerts"),
     10_000,
+  );
+}
+
+export async function listVideoCallLog() {
+  return dedupeRequest(
+    "video-call-log",
+    () => apiRequest<VideoCallLogItem[]>("/discovery/calls/log"),
+    8_000,
   );
 }
 
@@ -44,6 +53,7 @@ export async function createVideoCall(
   );
   invalidateDedupeCache("video-call-alerts");
   invalidateDedupeCache("alerts-summary");
+  invalidateDedupeCache("video-call-log");
   return result;
 }
 
@@ -92,6 +102,7 @@ export async function endVideoCall(callId: string) {
   );
   invalidateDedupeCache("video-call-alerts");
   invalidateDedupeCache("alerts-summary");
+  invalidateDedupeCache("video-call-log");
   return result;
 }
 

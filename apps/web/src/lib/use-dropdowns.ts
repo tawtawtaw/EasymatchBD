@@ -38,7 +38,7 @@ export function useDropdowns(locale: string): DropdownMap {
   useEffect(() => {
     const cached = loaded.get(locale);
     if (cached) {
-      setMap(cached);
+      setMap((current) => (current === cached ? current : cached));
       return;
     }
 

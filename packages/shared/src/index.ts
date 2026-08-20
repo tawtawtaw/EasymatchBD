@@ -33,6 +33,7 @@ export * from './marital-alignment-comparison';
 export * from './verification-biodata-snapshot';
 export * from './video-call-guests';
 export * from './video-call-scheduling';
+export * from './video-call-log';
 export * from './connection-messages';
 export * from './profile-gallery-slots';
 export * from './photo-variants';

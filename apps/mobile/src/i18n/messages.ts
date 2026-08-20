@@ -86,6 +86,12 @@ const discoveryList = {
     relationshipInterestSent: "Interest sent",
     relationshipInterestReceived: "Interest received",
     relationshipConnected: "Connected",
+    passProfile: "Pass",
+    sendInterest: "Send interest",
+    sendingInterest: "Sending…",
+    sendInterestError: "Could not send interest",
+    swipePaidOnly: "Paid membership is required to send interest.",
+    queueHint: "Swipe left to pass, right to send interest, or use the buttons. The next match moves up.",
   },
   bn: {
     loading: "প্রোফাইল লোড হচ্ছে…",
@@ -145,6 +151,12 @@ const discoveryList = {
     relationshipInterestSent: "আগ্রহ পাঠানো হয়েছে",
     relationshipInterestReceived: "আগ্রহ পেয়েছেন",
     relationshipConnected: "সংযুক্ত",
+    passProfile: "এখন নয়",
+    sendInterest: "আগ্রহ পাঠান",
+    sendingInterest: "পাঠানো হচ্ছে…",
+    sendInterestError: "আগ্রহ পাঠানো যায়নি",
+    swipePaidOnly: "আগ্রহ পাঠাতে পেইড সদস্যতা প্রয়োজন।",
+    queueHint: "বামে সোয়াইপ করলে পাস, ডানে সোয়াইপ করলে আগ্রহ, অথবা বাটন ব্যবহার করুন। পরের মিল উপরে উঠে আসে।",
   },
 } as const;
 
@@ -357,6 +369,10 @@ const messagesScreen = {
     attachPhoto: "Photo from gallery",
     attachDocument: "PDF or document",
     documentAttachError: "Could not send document",
+    takePhoto: "Take photo",
+    attachFile: "Attach photo or document",
+    cameraPermissionDenied: "Allow camera access to take photos.",
+    cameraUnavailable: "Could not open the camera. Try again or attach a photo instead.",
   },
   bn: {
     loading: "বার্তা লোড হচ্ছে…",
@@ -403,6 +419,10 @@ const messagesScreen = {
     attachPhoto: "গ্যালারি থেকে ছবি",
     attachDocument: "PDF বা ডকুমেন্ট",
     documentAttachError: "ডকুমেন্ট পাঠানো যায়নি",
+    takePhoto: "ছবি তুলুন",
+    attachFile: "ছবি বা ডকুমেন্ট সংযুক্ত করুন",
+    cameraPermissionDenied: "ছবি তুলতে ক্যামেরার অনুমতি দিন।",
+    cameraUnavailable: "ক্যামেরা খোলা যায়নি। আবার চেষ্টা করুন অথবা ছবি সংযুক্ত করুন।",
   },
 } as const;
 
@@ -1530,6 +1550,11 @@ const membership = {
     plansLoadError: "Could not load membership plans.",
     checkoutError: "Could not open the website. Try again.",
     durationLabel: "{days} days",
+    saveAmount: "Save ৳{amount}",
+    offerUntil: "Offer until {date}",
+    limitedOffer: "Limited offer",
+    popularBadge: "Popular",
+    bestValueBadge: "Best value",
     webPayLead:
       "Google Play and the App Store require membership purchases on our website. Use the same phone number you use in this app.",
     webPayStep1: "Tap “Open membership website” below (opens your browser).",
@@ -1623,6 +1648,11 @@ const membership = {
     plansLoadError: "সদস্যপদ প্ল্যান লোড করা যায়নি।",
     checkoutError: "ওয়েবসাইট খোলা যায়নি। আবার চেষ্টা করুন।",
     durationLabel: "{days} দিন",
+    saveAmount: "৳{amount} সাশ্রয়",
+    offerUntil: "অফার চলবে {date} পর্যন্ত",
+    limitedOffer: "সীমিত অফার",
+    popularBadge: "জনপ্রিয়",
+    bestValueBadge: "সেরা মূল্য",
     webPayLead:
       "Google Play ও App Store-এর নিয়মে সদস্যপদ ওয়েবসাইটে কেনা হয়। এই অ্যাপে যে নম্বর ব্যবহার করেন, সেই অ্যাকাউন্ট দিয়ে লগইন করুন।",
     webPayStep1: "নিচে “সদস্যতা ওয়েবসাইট খুলুন” ট্যাপ করুন (ব্রাউজার খুলবে)।",

@@ -4,15 +4,15 @@ import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
 import type { MembershipTariff } from "@easymatch/shared";
-import { formatTariffPriceBdt } from "@easymatch/shared";
-import type { DropdownMap } from "@/lib/api";
 import { PublicBrowseProfileCard } from "@/components/PublicBrowseProfileCard";
 import { CouplesPhotoCarousel } from "@/components/CouplesPhotoCarousel";
+import { MembershipPlanCard } from "@/components/MembershipPlanCard";
 import { HOME_GALLERY_SLIDES } from "@/content/home-gallery-slides";
 import {
   HOME_MARKETING_IMAGES,
   HOME_TESTIMONIAL_IMAGES,
 } from "@/content/home-marketing-images";
+import type { DropdownMap } from "@/lib/api";
 import {
   getPublicPlatformStats,
   type PublicBrowseListItem,
@@ -124,16 +124,6 @@ export function PublicMarketingHome({
   const activeTariffs = tariffs
     .filter((tariff) => tariff.isActive)
     .sort((a, b) => a.sortOrder - b.sortOrder);
-
-  function tariffLabel(tariff: MembershipTariff) {
-    return locale === "bn" && tariff.labelBn ? tariff.labelBn : tariff.labelEn;
-  }
-
-  function tariffDescription(tariff: MembershipTariff) {
-    return locale === "bn" && tariff.descriptionBn
-      ? tariff.descriptionBn
-      : tariff.descriptionEn;
-  }
 
   return (
     <div className="overflow-hidden">
@@ -403,27 +393,31 @@ export function PublicMarketingHome({
           {activeTariffs.length > 0 ? (
             <div className="mt-6 grid gap-5 md:grid-cols-2">
               {activeTariffs.map((tariff) => (
-                <article
+                <MembershipPlanCard
                   key={tariff.id}
-                  className="flex flex-col rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm"
+                  tariff={tariff}
+                  locale={locale}
+                  durationText={t("membership.durationDays", {
+                    days: tariff.durationDays,
+                  })}
+                  priceLabel={(price) => `৳${price}`}
+                  saveLabel={(amount) => t("membership.saveAmount", { amount })}
+                  offerUntilLabel={(date) => t("membership.offerUntil", { date })}
+                  limitedOfferLabel={t("membership.limitedOffer")}
+                  popularLabel={t("membership.popularBadge")}
+                  bestValueLabel={t("membership.bestValueBadge")}
                 >
-                  <h3 className="text-xl font-bold text-zinc-900">{tariffLabel(tariff)}</h3>
-                  {tariffDescription(tariff) ? (
-                    <p className="mt-2 text-sm text-zinc-600">{tariffDescription(tariff)}</p>
-                  ) : null}
-                  <p className="mt-4 text-3xl font-bold text-rose-800">
-                    ৳{formatTariffPriceBdt(tariff.priceBdt)}
-                  </p>
-                  <p className="text-xs text-zinc-500">
-                    {t("membership.durationDays", { days: tariff.durationDays })}
-                  </p>
                   <Link
                     href="/membership"
-                    className="mt-6 inline-flex justify-center rounded-full bg-rose-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-rose-800"
+                    className={`mt-6 inline-flex justify-center rounded-full px-5 py-2.5 text-sm font-semibold text-white ${
+                      tariff.plan === "platinum"
+                        ? "bg-rose-800 hover:bg-rose-900"
+                        : "bg-amber-700 hover:bg-amber-800"
+                    }`}
                   >
                     {t("membership.viewPlan")}
                   </Link>
-                </article>
+                </MembershipPlanCard>
               ))}
             </div>
           ) : (

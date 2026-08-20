@@ -25,6 +25,7 @@ import {
   sendDiscoveryInterest,
   type DiscoveryRelationship,
 } from "@/lib/discovery";
+import { markDiscoveryProfileLeft } from "@/lib/discovery-grid-transition";
 import { resolveMemberDisplayName } from "@/lib/member-display";
 import { memberComplaintHref } from "@/lib/member-complaints";
 import { ProfileBookmarkButton } from "@/components/ProfileBookmarkButton";
@@ -161,6 +162,7 @@ export default function DiscoveryProfilePage() {
           : prev,
       );
       setMessage(t("actions.success"));
+      markDiscoveryProfileLeft(profile?.profileCode ?? profileId);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : t("actions.error"));

@@ -12,7 +12,12 @@ import {
   Text,
   View,
 } from "react-native";
-import { MIN_VIDEO_CALL_PRIVACY_LEVEL } from "@easymatch/shared";
+import {
+  isClosedVideoCallStatus,
+  MIN_VIDEO_CALL_PRIVACY_LEVEL,
+  videoCallOccurredAt,
+} from "@easymatch/shared";
+import { CallLogRow } from "./CallLogRow";
 import { PaidMembershipGate } from "./PaidMembershipGate";
 import { useIsPaidMember } from "../hooks/use-is-paid-member";
 import { tVideoCalls } from "../i18n/video-calls";
@@ -335,6 +340,15 @@ export function VideoCallPanel({
       call.status === "active",
   );
 
+  const history = calls
+    .filter((call) => isClosedVideoCallStatus(call.status))
+    .sort(
+      (a, b) =>
+        new Date(videoCallOccurredAt(b)).getTime() -
+        new Date(videoCallOccurredAt(a)).getTime(),
+    )
+    .slice(0, 20);
+
   const incomingRinging = upcoming.find(
     (call) => call.status === "ringing" && !call.isInitiator,
   );
@@ -645,6 +659,23 @@ export function VideoCallPanel({
                 </View>
               ) : null}
             </View>
+          ))}
+        </View>
+      ) : null}
+
+      {history.length > 0 ? (
+        <View style={styles.upcoming}>
+          <Text style={styles.upcomingTitle}>{copy.log.title}</Text>
+          {history.map((call) => (
+            <CallLogRow
+              key={call.id}
+              call={call}
+              locale={locale}
+              copy={copy}
+              canCallBack
+              calling={loading}
+              onCallAgain={() => void handleCallNow()}
+            />
           ))}
         </View>
       ) : null}

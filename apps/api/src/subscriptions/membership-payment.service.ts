@@ -11,6 +11,7 @@ import {
   PROFILE_REQUIRED_FOR_SUBSCRIPTION_MESSAGE,
   VERIFIED_MEMBER_REQUIRED_FOR_SUBSCRIPTION_MESSAGE,
   getMembershipServicePackage,
+  membershipEffectivePriceBdt,
 } from '@easymatch/shared';
 import {
   MembershipPaymentStatus,
@@ -118,7 +119,7 @@ export class MembershipPaymentService {
       );
     }
 
-    const amount = new Prisma.Decimal(tariff.priceBdt);
+    const amount = new Prisma.Decimal(membershipEffectivePriceBdt(tariff));
     const tranId = `EM-${randomBytes(6).toString('hex')}-${Date.now()}`;
     const callbackBase = this.callbackBaseUrl();
     const servicePackage = getMembershipServicePackage(plan);

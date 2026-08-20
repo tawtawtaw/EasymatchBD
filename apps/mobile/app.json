@@ -14,7 +14,7 @@
     },
     "android": {
       "package": "com.easymatchbd.member",
-      "versionCode": 21,
+      "versionCode": 22,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
@@ -47,9 +47,9 @@
     },
     "ios": {
       "infoPlist": {
-        "NSCameraUsageDescription": "EasymatchBD needs camera access to take profile photos, NID images, and for video calls.",
+        "NSCameraUsageDescription": "EasymatchBD needs camera access to take profile photos, NID images, chat photos, and for video calls.",
         "NSMicrophoneUsageDescription": "EasymatchBD needs microphone access for video calls with your connections.",
-        "NSPhotoLibraryUsageDescription": "EasymatchBD needs access to your photos to upload profile and NID images.",
+        "NSPhotoLibraryUsageDescription": "EasymatchBD needs access to your photos to upload profile and NID images and to send photos in chat.",
         "NSUserNotificationsUsageDescription": "EasymatchBD sends notifications for new messages, interests, and video calls.",
         "LSApplicationQueriesSchemes": [
           "whatsapp",

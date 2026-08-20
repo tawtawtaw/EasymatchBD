@@ -8,8 +8,9 @@ import {
   Text,
   View,
 } from "react-native";
-import { formatTariffPriceBdt, type MembershipTariff } from "@easymatch/shared";
+import { type MembershipTariff } from "@easymatch/shared";
 import { ErrorState, LoadingState } from "../../components/ScreenState";
+import { MembershipPlanCard } from "../../components/MembershipPlanCard";
 import { useIsPaidMember } from "../../hooks/use-is-paid-member";
 import { useMemberVerificationState } from "../../hooks/use-member-verification-state";
 import { tMembership } from "../../i18n/messages";
@@ -43,7 +44,8 @@ export default function MembershipCheckoutScreen({
     setLoading(true);
     setError(null);
     try {
-      setTariffs(await getMembershipTariffs());
+      const rows = await getMembershipTariffs();
+      setTariffs(rows);
     } catch (err) {
       setError(getApiErrorMessage(err, copy.plansLoadError));
     } finally {
@@ -52,8 +54,25 @@ export default function MembershipCheckoutScreen({
   }, [copy.plansLoadError]);
 
   useEffect(() => {
-    void loadTariffs();
-  }, [loadTariffs]);
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    void getMembershipTariffs()
+      .then((rows) => {
+        if (!cancelled) setTariffs(rows);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(getApiErrorMessage(err, copy.plansLoadError));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [copy.plansLoadError]);
 
   useLayoutEffect(() => {
     navigation.setOptions({ title: copy.checkoutTitle });
@@ -115,16 +134,6 @@ export default function MembershipCheckoutScreen({
     } finally {
       setOpeningWeb(false);
     }
-  }
-
-  function tariffLabel(tariff: MembershipTariff) {
-    return locale === "bn" && tariff.labelBn ? tariff.labelBn : tariff.labelEn;
-  }
-
-  function tariffDescription(tariff: MembershipTariff) {
-    return locale === "bn" && tariff.descriptionBn
-      ? tariff.descriptionBn
-      : tariff.descriptionEn;
   }
 
   if (verificationLoading) {
@@ -207,18 +216,11 @@ export default function MembershipCheckoutScreen({
             <Text style={styles.empty}>{copy.plansEmpty}</Text>
           ) : (
             tariffs.map((tariff) => (
-              <View key={tariff.id} style={styles.planCard}>
-                <Text style={styles.planTitle}>{tariffLabel(tariff)}</Text>
-                <Text style={styles.planPrice}>
-                  ৳{formatTariffPriceBdt(tariff.priceBdt)} {tariff.currency}
-                </Text>
-                <Text style={styles.planDuration}>
-                  {copy.durationLabel.replace("{days}", String(tariff.durationDays))}
-                </Text>
-                {tariffDescription(tariff) ? (
-                  <Text style={styles.planDescription}>{tariffDescription(tariff)}</Text>
-                ) : null}
-              </View>
+              <MembershipPlanCard
+                key={tariff.id}
+                tariff={tariff}
+                locale={locale}
+              />
             ))
           )}
         </ScrollView>
@@ -280,34 +282,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     color: colors.zinc600,
-  },
-  planCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.rose100,
-    backgroundColor: colors.white,
-    padding: 16,
-    gap: 6,
-  },
-  planTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.zinc900,
-  },
-  planPrice: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: colors.rose900,
-  },
-  planDuration: {
-    fontSize: 13,
-    color: colors.zinc600,
-  },
-  planDescription: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: colors.zinc600,
-    marginTop: 4,
   },
   primaryButton: {
     marginTop: 4,

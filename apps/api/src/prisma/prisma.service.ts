@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { ensureConnectionEndedSchema } from './ensure-connection-ended-schema';
+import { ensureMembershipTariffDiscountSchema } from './ensure-membership-tariff-discount-schema';
 
 @Injectable()
 export class PrismaService
@@ -17,8 +18,11 @@ export class PrismaService
         'Database connection failed in production. Check Railway DATABASE_URL (use Supabase Transaction pooler / Supavisor on aws-0-*.pooler.supabase.com:6543).',
       );
     }
-    if (connected && process.env.NODE_ENV === 'production') {
-      await ensureConnectionEndedSchema(this, this.logger);
+    if (connected) {
+      await ensureMembershipTariffDiscountSchema(this, this.logger);
+      if (process.env.NODE_ENV === 'production') {
+        await ensureConnectionEndedSchema(this, this.logger);
+      }
     }
   }
 

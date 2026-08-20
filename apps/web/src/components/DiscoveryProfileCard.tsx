@@ -1,10 +1,11 @@
 "use client";
 
-import { Fragment } from "react";
+import { Fragment, useState, type CSSProperties } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { ageFromDateOfBirth } from "@easymatch/shared";
 import { Link } from "@/i18n/routing";
-import { DiscoveryListItem } from "@/lib/discovery";
+import { DiscoveryListItem, sendDiscoveryInterest } from "@/lib/discovery";
+import { discoveryCardTransitionName } from "@/lib/discovery-grid-transition";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import { ProfileBookmarkButton } from "@/components/ProfileBookmarkButton";
 import { GenderProfilePlaceholder } from "@/components/GenderProfilePlaceholder";
@@ -16,6 +17,9 @@ import type { DropdownMap } from "@/lib/api";
 type DiscoveryProfileCardProps = {
   token: string;
   item: DiscoveryListItem;
+  isPaid?: boolean;
+  onLeave?: (profileCode: string, reason: "pass" | "interest") => void;
+  onActionError?: (message: string) => void;
 };
 
 /** Matches the palette GenderProfilePlaceholder already uses for the avatar. */
@@ -80,10 +84,17 @@ function profileFacts(
   ].filter((fact): fact is { label: string; value: string } => fact !== null);
 }
 
-export function DiscoveryProfileCard({ item }: DiscoveryProfileCardProps) {
+export function DiscoveryProfileCard({
+  token,
+  item,
+  isPaid = false,
+  onLeave,
+  onActionError,
+}: DiscoveryProfileCardProps) {
   const locale = useLocale();
   const t = useTranslations("discovery");
   const dropdowns = useDropdowns(locale);
+  const [busy, setBusy] = useState(false);
   const name = displayName(item.personal, item.profileCode, t);
   const gender =
     typeof item.personal.gender === "string" ? item.personal.gender : null;
@@ -92,11 +103,31 @@ export function DiscoveryProfileCard({ item }: DiscoveryProfileCardProps) {
   // the profile code and repeating it below just says the same thing twice.
   const showProfileCode = name !== t("profileRef", { code: item.profileCode });
 
+  async function handleInterest() {
+    if (!onLeave || busy) return;
+    setBusy(true);
+    try {
+      await sendDiscoveryInterest(token, item.profileCode);
+      onLeave(item.profileCode, "interest");
+    } catch (err) {
+      onActionError?.(
+        err instanceof Error ? err.message : t("actions.error"),
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <article
       className={`flex gap-3 rounded-xl border-2 bg-white p-3 shadow-sm transition hover:shadow-md ${
         (gender && GENDER_BORDER[gender]) || NEUTRAL_BORDER
       }`}
+      style={
+        {
+          viewTransitionName: discoveryCardTransitionName(item.profileCode),
+        } as CSSProperties
+      }
     >
       <GenderProfilePlaceholder gender={gender} className="h-12 w-12 sm:h-14 sm:w-14" />
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
@@ -149,6 +180,28 @@ export function DiscoveryProfileCard({ item }: DiscoveryProfileCardProps) {
             {t("viewProfile")}
           </Link>
         </div>
+        {onLeave && item.relationshipStatus === "none" ? (
+          <div className="mt-1 flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => onLeave(item.profileCode, "pass")}
+              className="inline-flex flex-1 justify-center rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-60"
+            >
+              {t("passProfile")}
+            </button>
+            {isPaid ? (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void handleInterest()}
+                className="inline-flex flex-1 justify-center rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-900 hover:bg-rose-100 disabled:opacity-60"
+              >
+                {t("expressInterest")}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </article>
   );

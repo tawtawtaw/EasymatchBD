@@ -1,4 +1,5 @@
 import { useFocusEffect } from "@react-navigation/native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -24,6 +25,7 @@ import { tMessages, tEndConnection, tProfileAccountStatus } from "../../i18n/mes
 import { getApiErrorMessage } from "../../lib/api-error";
 import { confirmEndConnection } from "../../lib/end-connection";
 import { getConnectionPrivacyLevel } from "../../lib/connection-privacy";
+import { persistLocalMediaFile } from "../../lib/media-capture";
 import type { ChatThreadScreenProps } from "../../navigation/types";
 import { endConnection } from "../../services/discovery";
 import {
@@ -261,12 +263,73 @@ export default function ChatThreadScreen({ route, navigation }: ChatThreadScreen
     setMessages((current) => current.map((item) => (item.id === updated.id ? updated : item)));
   }, []);
 
+  async function sendPickedFile(
+    file: {
+      uri: string;
+      name: string;
+      type: string;
+    },
+    errorFallback = copy.attachError,
+  ) {
+    if (sending) return;
+    setSending(true);
+    setError(null);
+    try {
+      const message = await sendConnectionAttachment(
+        connectionId,
+        file,
+        draft.trim() || undefined,
+      );
+      setMessages((current) => {
+        const merged = mergeMessages(current, [message]);
+        trackLatestMessage(merged);
+        return merged;
+      });
+      setDraft("");
+      requestAnimationFrame(() => {
+        listRef.current?.scrollToEnd({ animated: true });
+      });
+    } catch (err) {
+      setError(getApiErrorMessage(err, errorFallback));
+    } finally {
+      setSending(false);
+    }
+  }
+
   function showAttachOptions() {
     Alert.alert(copy.attachTitle, undefined, [
       { text: copy.attachPhoto, onPress: () => void handleAttachPhoto() },
       { text: copy.attachDocument, onPress: () => void handleAttachDocument() },
       { text: copy.cancel, style: "cancel" },
     ]);
+  }
+
+  async function handleTakePhoto() {
+    if (sending) return;
+
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      setError(copy.cameraPermissionDenied);
+      return;
+    }
+
+    try {
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ["images"],
+        quality: 0.85,
+      });
+      if (result.canceled || !result.assets[0]) return;
+
+      const asset = result.assets[0];
+      const file = await persistLocalMediaFile({
+        uri: asset.uri,
+        name: asset.fileName ?? `photo-${Date.now()}.jpg`,
+        type: asset.mimeType ?? "image/jpeg",
+      });
+      await sendPickedFile(file);
+    } catch (err) {
+      setError(getApiErrorMessage(err, copy.cameraUnavailable));
+    }
   }
 
   async function handleAttachPhoto() {
@@ -286,31 +349,15 @@ export default function ChatThreadScreen({ route, navigation }: ChatThreadScreen
     if (result.canceled || !result.assets[0]) return;
 
     const asset = result.assets[0];
-    setSending(true);
-    setError(null);
     try {
-      const message = await sendConnectionAttachment(
-        connectionId,
-        {
-          uri: asset.uri,
-          name: asset.fileName ?? `photo-${Date.now()}.jpg`,
-          type: asset.mimeType ?? "image/jpeg",
-        },
-        draft.trim() || undefined,
-      );
-      setMessages((current) => {
-        const merged = mergeMessages(current, [message]);
-        trackLatestMessage(merged);
-        return merged;
+      const file = await persistLocalMediaFile({
+        uri: asset.uri,
+        name: asset.fileName ?? `photo-${Date.now()}.jpg`,
+        type: asset.mimeType ?? "image/jpeg",
       });
-      setDraft("");
-      requestAnimationFrame(() => {
-        listRef.current?.scrollToEnd({ animated: true });
-      });
+      await sendPickedFile(file);
     } catch (err) {
       setError(getApiErrorMessage(err, copy.attachError));
-    } finally {
-      setSending(false);
     }
   }
 
@@ -325,32 +372,11 @@ export default function ChatThreadScreen({ route, navigation }: ChatThreadScreen
     if (result.canceled || !result.assets[0]) return;
 
     const asset = result.assets[0];
-    setSending(true);
-    setError(null);
-    try {
-      const message = await sendConnectionAttachment(
-        connectionId,
-        {
-          uri: asset.uri,
-          name: asset.name ?? `file-${Date.now()}.pdf`,
-          type: asset.mimeType ?? "application/pdf",
-        },
-        draft.trim() || undefined,
-      );
-      setMessages((current) => {
-        const merged = mergeMessages(current, [message]);
-        trackLatestMessage(merged);
-        return merged;
-      });
-      setDraft("");
-      requestAnimationFrame(() => {
-        listRef.current?.scrollToEnd({ animated: true });
-      });
-    } catch (err) {
-      setError(getApiErrorMessage(err, copy.documentAttachError));
-    } finally {
-      setSending(false);
-    }
+    await sendPickedFile({
+      uri: asset.uri,
+      name: asset.name ?? `file-${Date.now()}.pdf`,
+      type: asset.mimeType ?? "application/pdf",
+    }, copy.documentAttachError);
   }
 
   if (loading) {
@@ -436,37 +462,57 @@ export default function ChatThreadScreen({ route, navigation }: ChatThreadScreen
       ) : (
         <View style={[styles.composerWrap, { paddingBottom: composerBottomInset }]}>
           <View style={styles.composer}>
-            <Pressable
-              style={[styles.attachButton, sending && styles.sendDisabled]}
-              onPress={showAttachOptions}
-              disabled={sending}
-            >
-              <Text style={styles.attachText}>📷</Text>
-            </Pressable>
-            <TextInput
-              style={styles.input}
-              value={draft}
-              onChangeText={(text) => {
-                setDraft(text);
-                notifyTyping();
-              }}
-              onFocus={() => {
-                requestAnimationFrame(() => {
-                  listRef.current?.scrollToEnd({ animated: true });
-                });
-              }}
-              placeholder={copy.inputPlaceholder}
-              placeholderTextColor={colors.zinc500}
-              multiline
-              maxLength={2000}
-              editable={!sending}
-            />
+            <View style={styles.inputPill}>
+              <TextInput
+                style={styles.input}
+                value={draft}
+                onChangeText={(text) => {
+                  setDraft(text);
+                  notifyTyping();
+                }}
+                onFocus={() => {
+                  requestAnimationFrame(() => {
+                    listRef.current?.scrollToEnd({ animated: true });
+                  });
+                }}
+                placeholder={copy.inputPlaceholder}
+                placeholderTextColor={colors.zinc500}
+                multiline
+                maxLength={2000}
+                editable={!sending}
+              />
+              <Pressable
+                style={[styles.iconButton, sending && styles.sendDisabled]}
+                onPress={showAttachOptions}
+                disabled={sending}
+                accessibilityLabel={copy.attachFile}
+              >
+                <MaterialCommunityIcons
+                  name="paperclip"
+                  size={22}
+                  color={colors.zinc600}
+                />
+              </Pressable>
+              <Pressable
+                style={[styles.iconButton, sending && styles.sendDisabled]}
+                onPress={() => void handleTakePhoto()}
+                disabled={sending}
+                accessibilityLabel={copy.takePhoto}
+              >
+                <MaterialCommunityIcons
+                  name="camera-outline"
+                  size={22}
+                  color={colors.zinc600}
+                />
+              </Pressable>
+            </View>
             <Pressable
               style={[styles.sendButton, (!draft.trim() || sending) && styles.sendDisabled]}
               onPress={() => void handleSend()}
               disabled={!draft.trim() || sending}
+              accessibilityLabel={sending ? copy.sending : copy.send}
             >
-              <Text style={styles.sendText}>{sending ? copy.sending : copy.send}</Text>
+              <MaterialCommunityIcons name="send" size={20} color={colors.white} />
             </Pressable>
           </View>
         </View>
@@ -573,49 +619,49 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-end",
     gap: 8,
-    paddingHorizontal: 12,
-    paddingTop: 12,
-    paddingBottom: 12,
+    paddingHorizontal: 10,
+    paddingTop: 10,
+    paddingBottom: 10,
     backgroundColor: colors.white,
   },
-  attachButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: colors.rose50,
+  inputPill: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "flex-end",
+    minHeight: 44,
     borderWidth: 1,
-    borderColor: colors.rose100,
+    borderColor: colors.zinc100,
+    borderRadius: 24,
+    backgroundColor: colors.zinc50,
+    paddingLeft: 14,
+    paddingRight: 4,
+    paddingVertical: 2,
+  },
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
   },
-  attachText: {
-    fontSize: 18,
-  },
   input: {
     flex: 1,
-    minHeight: 42,
+    minHeight: 40,
     maxHeight: 120,
-    borderWidth: 1,
-    borderColor: colors.rose100,
-    borderRadius: 20,
-    paddingHorizontal: 14,
     paddingVertical: 10,
+    paddingRight: 4,
     fontSize: 15,
     color: colors.zinc900,
-    backgroundColor: colors.rose50,
   },
   sendButton: {
-    borderRadius: 999,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: colors.rose800,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    alignItems: "center",
+    justifyContent: "center",
   },
   sendDisabled: {
     opacity: 0.5,
-  },
-  sendText: {
-    color: colors.white,
-    fontSize: 14,
-    fontWeight: "700",
   },
 });

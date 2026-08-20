@@ -7,7 +7,11 @@ import { AUTH_TOKEN_KEY } from "@/lib/api";
 import { useAuthSession } from "@/hooks/use-auth-session";
 import { membershipFromSession } from "@/lib/membership";
 import { PaidMembershipRequired } from "@/components/PaidMembershipRequired";
-import { MIN_VIDEO_CALL_PRIVACY_LEVEL } from "@easymatch/shared";
+import {
+  isClosedVideoCallStatus,
+  MIN_VIDEO_CALL_PRIVACY_LEVEL,
+  videoCallOccurredAt,
+} from "@easymatch/shared";
 import {
   canJoinScheduledCall,
   cancelVideoCall,
@@ -17,6 +21,7 @@ import {
   startScheduledVideoCall,
   type VideoCallItem,
 } from "@/lib/video-calls";
+import { CallLogRow } from "@/components/CallLogRow";
 import { unlockVideoCallRingtone } from "@/lib/video-call-ringtone";
 import {
   linkConsultantVideoCall,
@@ -118,7 +123,7 @@ export function VideoCallPanel({
     refreshInFlightRef.current = true;
     try {
       const [list, engagements] = await Promise.all([
-        listConnectionVideoCalls(token, connectionId, { activeOnly: true }),
+        listConnectionVideoCalls(token, connectionId),
         listConnectionConsultantEngagements(token, connectionId),
       ]);
       setCalls(list);
@@ -310,6 +315,15 @@ export function VideoCallPanel({
       call.status === "ringing" ||
       call.status === "active",
   );
+
+  const history = calls
+    .filter((call) => isClosedVideoCallStatus(call.status))
+    .sort(
+      (a, b) =>
+        new Date(videoCallOccurredAt(b)).getTime() -
+        new Date(videoCallOccurredAt(a)).getTime(),
+    )
+    .slice(0, 20);
 
   const incomingRinging = upcoming.find(
     (call) => call.status === "ringing" && !call.isInitiator,
@@ -641,6 +655,25 @@ export function VideoCallPanel({
               ) : null}
             </li>
           ))}
+          </ul>
+        </div>
+      ) : null}
+      {history.length > 0 ? (
+        <div>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+            {t("log.title")}
+          </h3>
+          <ul className="mt-1 divide-y divide-zinc-100">
+            {history.map((call) => (
+              <li key={call.id}>
+                <CallLogRow
+                  call={call}
+                  canCallBack
+                  calling={loading}
+                  onCallAgain={() => void handleCallNow()}
+                />
+              </li>
+            ))}
           </ul>
         </div>
       ) : null}

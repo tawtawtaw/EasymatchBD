@@ -129,3 +129,11 @@ textarea.field-input {
     break-inside: avoid;
   }
 }
+
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+    mix-blend-mode: normal;
+  }
+}

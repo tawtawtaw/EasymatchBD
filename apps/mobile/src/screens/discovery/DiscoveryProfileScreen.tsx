@@ -19,6 +19,7 @@ import { tDiscoveryProfile, tEndConnection } from "../../i18n/messages";
 import { useIsPaidMember } from "../../hooks/use-is-paid-member";
 import { getApiErrorMessage } from "../../lib/api-error";
 import { confirmEndConnection } from "../../lib/end-connection";
+import { markDiscoveryProfileLeft } from "../../lib/discovery-queue";
 import { resolveMemberDisplayName } from "../../lib/member-display";
 import type { DiscoveryProfileScreenProps, MainTabParamList } from "../../navigation/types";
 import { navigateToChatThread } from "../../navigation/nestedNavigation";
@@ -160,6 +161,7 @@ export default function DiscoveryProfileScreen({
           : current,
       );
       setMessage(result.mutual ? copy.mutualInterest : copy.interestSent);
+      markDiscoveryProfileLeft(profileId);
       void useMemberAlertsStore.getState().refresh();
       void load({ silent: true, forceFresh: true });
     } catch (err) {

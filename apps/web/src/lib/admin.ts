@@ -163,6 +163,11 @@ export type MembershipTariffConfig = {
   sortOrder: number;
   descriptionEn: string | null;
   descriptionBn: string | null;
+  discountPriceBdt: string | null;
+  discountStartsAt: string | null;
+  discountEndsAt: string | null;
+  discountLabelEn: string | null;
+  discountLabelBn: string | null;
   updatedAt: string;
 };
 
@@ -186,6 +191,11 @@ export async function updateAdminMembershipTariffs(
     sortOrder: number;
     descriptionEn?: string | null;
     descriptionBn?: string | null;
+    discountPriceBdt?: number | null;
+    discountStartsAt?: string | null;
+    discountEndsAt?: string | null;
+    discountLabelEn?: string | null;
+    discountLabelBn?: string | null;
   }[],
 ) {
   const res = await fetch(`${API_URL}/admin/membership-tariffs`, {

@@ -22,12 +22,14 @@ import type { VideoCallsScreenProps } from "../../navigation/types";
 import { listMyConnections } from "../../services/discovery";
 import {
   createVideoCall,
+  listVideoCallLog,
   startScheduledVideoCall,
 } from "../../services/video-calls";
+import { CallLogRow } from "../../components/CallLogRow";
 import { useLocaleStore } from "../../store/localeStore";
 import { useMemberAlertsStore } from "../../store/memberAlertsStore";
 import type { ConnectionItem } from "../../types/discovery";
-import type { VideoCallAlertItem } from "../../types/video-calls";
+import type { VideoCallAlertItem, VideoCallLogItem } from "../../types/video-calls";
 import { colors } from "../../theme/colors";
 import { cardShadow } from "../../theme/shadows";
 
@@ -37,6 +39,7 @@ export default function VideoCallsScreen({ navigation }: VideoCallsScreenProps) 
   const alerts = useMemberAlertsStore((s) => s.callAlerts);
   const copy = tVideoCalls(locale);
   const [connections, setConnections] = useState<ConnectionItem[]>([]);
+  const [callLog, setCallLog] = useState<VideoCallLogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,8 +56,12 @@ export default function VideoCallsScreen({ navigation }: VideoCallsScreenProps) 
     else setLoading(true);
     setError(null);
     try {
-      const connectionList = await listMyConnections();
+      const [connectionList, logList] = await Promise.all([
+        listMyConnections(),
+        listVideoCallLog().catch(() => [] as VideoCallLogItem[]),
+      ]);
       setConnections(connectionList);
+      setCallLog(logList);
     } catch (err) {
       setError(getApiErrorMessage(err, copy.actionsError));
     } finally {
@@ -82,6 +89,34 @@ export default function VideoCallsScreen({ navigation }: VideoCallsScreenProps) 
           member: copy.unknownMember,
           profileRef: (code) => copy.profileRef.replace("{code}", code),
         }),
+      });
+    } catch (err) {
+      setError(getApiErrorMessage(err, copy.actionsError));
+    } finally {
+      setCallingId(null);
+    }
+  }
+
+  async function handleCallAgain(item: VideoCallLogItem) {
+    if (!item.canCallBack) return;
+    const name =
+      item.partnerName?.trim() ||
+      resolveMemberDisplayName(
+        { fullName: item.partnerName, profileCode: item.partnerProfileCode },
+        undefined,
+        {
+          member: copy.unknownMember,
+          profileRef: (code) => copy.profileRef.replace("{code}", code),
+        },
+      );
+    setCallingId(item.connectionId);
+    setError(null);
+    try {
+      const call = await createVideoCall(item.connectionId);
+      navigation.navigate("VideoCallRoom", {
+        connectionId: item.connectionId,
+        callId: call.id,
+        memberName: name,
       });
     } catch (err) {
       setError(getApiErrorMessage(err, copy.actionsError));
@@ -205,6 +240,44 @@ export default function VideoCallsScreen({ navigation }: VideoCallsScreenProps) 
               </Pressable>
             </View>
           ))}
+        </View>
+      ) : null}
+
+      {callLog.length > 0 ? (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{copy.hubLogSection}</Text>
+          <View style={styles.logCard}>
+            {callLog.map((item, index) => {
+              const name = resolveMemberDisplayName(
+                {
+                  fullName: item.partnerName,
+                  profileCode: item.partnerProfileCode,
+                },
+                undefined,
+                {
+                  member: copy.unknownMember,
+                  profileRef: (code) => copy.profileRef.replace("{code}", code),
+                },
+              );
+              return (
+                <View
+                  key={item.id}
+                  style={index > 0 ? styles.logDivider : undefined}
+                >
+                  <CallLogRow
+                    call={item}
+                    locale={locale}
+                    copy={copy}
+                    partnerName={name}
+                    showPartner
+                    canCallBack={item.canCallBack}
+                    calling={callingId === item.connectionId}
+                    onCallAgain={() => void handleCallAgain(item)}
+                  />
+                </View>
+              );
+            })}
+          </View>
         </View>
       ) : null}
 
@@ -333,6 +406,18 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
     color: colors.zinc500,
     marginBottom: 10,
+  },
+  logCard: {
+    backgroundColor: colors.white,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.zinc100,
+    paddingHorizontal: 12,
+    ...cardShadow,
+  },
+  logDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.zinc100,
   },
   alertCard: {
     backgroundColor: "#f0f9ff",

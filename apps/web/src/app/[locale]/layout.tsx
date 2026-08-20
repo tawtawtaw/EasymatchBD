@@ -1,4 +1,4 @@
-import type { Metadata, Viewport } from "next";
+import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Noto_Sans_Bengali } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
@@ -18,7 +18,7 @@ import { CallRuntimeUi } from "@/components/CallRuntimeUi";
 import { ChunkLoadRecovery } from "@/components/ChunkLoadRecovery";
 import { WhatsAppSupport } from "@/components/WhatsAppSupport";
 import { LocaleShell } from "@/components/LocaleShell";
-import "../globals.css";
+import { DocumentLocale } from "@/components/DocumentLocale";
 
 const geistSans = Geist({
   subsets: ["latin"],
@@ -52,12 +52,6 @@ export async function generateMetadata({
   };
 }
 
-export const viewport: Viewport = {
-  width: "device-width",
-  initialScale: 1,
-  viewportFit: "cover",
-};
-
 export default async function LocaleLayout({
   children,
   params,
@@ -78,39 +72,38 @@ export default async function LocaleLayout({
     locale === "bn" ? notoBengali.className : geistSans.className;
 
   return (
-    <html lang={locale} className="light" suppressHydrationWarning>
-      <body
-        className={`${bodyFont} ${geistMono.variable} bg-white text-zinc-950 antialiased`}
-        suppressHydrationWarning
-      >
-        <ChunkLoadRecovery />
-        <NextIntlClientProvider locale={locale} messages={messages}>
-          <AuthSessionProvider>
-            <StaffAlertsProvider>
+    <div
+      lang={locale}
+      className={`${bodyFont} ${geistMono.variable} min-h-dvh bg-white text-zinc-950 antialiased`}
+    >
+      <DocumentLocale locale={locale} />
+      <ChunkLoadRecovery />
+      <NextIntlClientProvider locale={locale} messages={messages}>
+        <AuthSessionProvider>
+          <StaffAlertsProvider>
             <MemberAlertsProvider>
               <GlobalCallSessionProvider>
-              <FeatureCommandPaletteProvider>
-                <CallRuntimeUi />
-                <LocaleShell
-                  header={
-                    <>
-                      <SiteHeader />
-                      <ConnectionEndedAlertsBanner />
-                      <VideoCallAlertsBanner variant="global" />
-                    </>
-                  }
-                  footer={<SiteFooter />}
-                  widgets={<WhatsAppSupport />}
-                >
-                  {children}
-                </LocaleShell>
-              </FeatureCommandPaletteProvider>
+                <FeatureCommandPaletteProvider>
+                  <CallRuntimeUi />
+                  <LocaleShell
+                    header={
+                      <>
+                        <SiteHeader />
+                        <ConnectionEndedAlertsBanner />
+                        <VideoCallAlertsBanner variant="global" />
+                      </>
+                    }
+                    footer={<SiteFooter />}
+                    widgets={<WhatsAppSupport />}
+                  >
+                    {children}
+                  </LocaleShell>
+                </FeatureCommandPaletteProvider>
               </GlobalCallSessionProvider>
             </MemberAlertsProvider>
-            </StaffAlertsProvider>
-          </AuthSessionProvider>
-        </NextIntlClientProvider>
-      </body>
-    </html>
+          </StaffAlertsProvider>
+        </AuthSessionProvider>
+      </NextIntlClientProvider>
+    </div>
   );
 }

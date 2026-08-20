@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { Link } from "@/i18n/routing";
@@ -15,13 +15,29 @@ import { getMembershipTariffs, type MembershipTariff } from "@/lib/membership-ta
 import { startMembershipCheckout, confirmMembershipPayment } from "@/lib/membership-checkout";
 import { AUTH_TOKEN_KEY } from "@/lib/api";
 import { notifyAuthChanged } from "@/lib/auth-session";
-import { formatTariffPriceBdt, getMembershipServicePackage } from "@easymatch/shared";
+import { getMembershipServicePackage } from "@easymatch/shared";
 import { PaidMembershipRequired } from "@/components/PaidMembershipRequired";
 import { MemberSubscriptionPanel } from "@/components/MemberSubscriptionPanel";
 import { MembershipCheckoutCompliance } from "@/components/MembershipCheckoutCompliance";
+import { MembershipPlanCard } from "@/components/MembershipPlanCard";
 import { markMobileCheckoutSession } from "@/lib/mobile-membership-checkout";
 
 export default function MembershipPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
+          <div className="h-8 w-48 animate-pulse rounded bg-zinc-200" />
+          <div className="mt-4 h-4 w-full max-w-md animate-pulse rounded bg-zinc-100" />
+        </main>
+      }
+    >
+      <MembershipPageContent />
+    </Suspense>
+  );
+}
+
+function MembershipPageContent() {
   const t = useTranslations("membership");
   const locale = useLocale();
   const searchParams = useSearchParams();
@@ -76,11 +92,20 @@ export default function MembershipPage() {
   }, [loggedIn, ready, isPaid, searchParams]);
 
   useEffect(() => {
+    let cancelled = false;
+    const loadError = t("plansLoadError");
     getMembershipTariffs()
-      .then(setTariffs)
-      .catch((err) =>
-        setTariffsError(err instanceof Error ? err.message : t("plansLoadError")),
-      );
+      .then((rows) => {
+        if (!cancelled) setTariffs(rows);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setTariffsError(err instanceof Error ? err.message : loadError);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [t]);
 
   useEffect(() => {
@@ -103,16 +128,6 @@ export default function MembershipPage() {
     );
     setEligibilityReady(true);
   }, [loggedIn, ready, user?.hasProfile, user?.isVerified]);
-
-  function tariffLabel(tariff: MembershipTariff) {
-    return locale === "bn" && tariff.labelBn ? tariff.labelBn : tariff.labelEn;
-  }
-
-  function tariffDescription(tariff: MembershipTariff) {
-    return locale === "bn" && tariff.descriptionBn
-      ? tariff.descriptionBn
-      : tariff.descriptionEn;
-  }
 
   async function handleCheckout(plan: string) {
     setCheckoutError(null);
@@ -279,28 +294,23 @@ export default function MembershipPage() {
                 paying ||
                 !eligibilityReady ||
                 (showCheckoutCompliance && !policiesAccepted);
+              const payClass =
+                tariff.plan === "platinum"
+                  ? "bg-rose-800 hover:bg-rose-900"
+                  : "bg-amber-700 hover:bg-amber-800";
               return (
-                <article
+                <MembershipPlanCard
                   key={tariff.id}
-                  className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm"
+                  tariff={tariff}
+                  locale={locale}
+                  durationText={t("durationLabel", { days: tariff.durationDays })}
+                  priceLabel={(price) => t("priceLabel", { price })}
+                  saveLabel={(amount) => t("saveAmount", { amount })}
+                  offerUntilLabel={(date) => t("offerUntil", { date })}
+                  limitedOfferLabel={t("limitedOffer")}
+                  popularLabel={t("popularBadge")}
+                  bestValueLabel={t("bestValueBadge")}
                 >
-                  <h3 className="text-base font-semibold text-zinc-900">
-                    {tariffLabel(tariff)}
-                  </h3>
-                  <p className="mt-2 text-2xl font-bold text-rose-900">
-                    {t("priceLabel", {
-                      price: formatTariffPriceBdt(tariff.priceBdt),
-                      currency: tariff.currency,
-                    })}
-                  </p>
-                  <p className="mt-1 text-sm text-zinc-600">
-                    {t("durationLabel", { days: tariff.durationDays })}
-                  </p>
-                  {tariffDescription(tariff) ? (
-                    <p className="mt-3 text-sm text-zinc-700">
-                      {tariffDescription(tariff)}
-                    </p>
-                  ) : null}
                   {servicePackage ? (
                     <p className="mt-2 font-mono text-xs text-zinc-500">
                       {t("serviceCodeLabel", { code: servicePackage.code })}
@@ -310,11 +320,11 @@ export default function MembershipPage() {
                     type="button"
                     disabled={payDisabled}
                     onClick={() => handleCheckout(tariff.plan)}
-                    className="mt-4 w-full rounded-lg bg-rose-900 px-3 py-2 text-sm font-semibold text-white hover:bg-rose-950 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:text-zinc-600"
+                    className={`mt-4 w-full rounded-lg px-3 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:text-zinc-600 ${payClass}`}
                   >
                     {paying ? t("redirecting") : t("payWithSslCommerz")}
                   </button>
-                </article>
+                </MembershipPlanCard>
               );
             })}
           </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { tariffCalendarDate } from "@easymatch/shared";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 import { AUTH_TOKEN_KEY } from "@/lib/api";
@@ -9,7 +10,24 @@ import {
   type MembershipTariffConfig,
 } from "@/lib/admin";
 
-type EditableTariff = MembershipTariffConfig;
+type EditableTariff = MembershipTariffConfig & {
+  discountPriceBdt: string;
+  discountStartsAt: string;
+  discountEndsAt: string;
+  discountLabelEn: string;
+  discountLabelBn: string;
+};
+
+function toEditable(row: MembershipTariffConfig): EditableTariff {
+  return {
+    ...row,
+    discountPriceBdt: row.discountPriceBdt ?? "",
+    discountStartsAt: tariffCalendarDate(row.discountStartsAt) ?? "",
+    discountEndsAt: tariffCalendarDate(row.discountEndsAt) ?? "",
+    discountLabelEn: row.discountLabelEn ?? "",
+    discountLabelBn: row.discountLabelBn ?? "",
+  };
+}
 
 export function AdminTariffsPanel({
   onError,
@@ -27,19 +45,32 @@ export function AdminTariffsPanel({
 
   const loadTariffs = useCallback(async () => {
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
-    if (!token) return;
+    if (!token) return null;
     const data = await getAdminMembershipTariffs(token);
-    setTariffs(data);
-    setDirty(false);
+    return data.map(toEditable);
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    const loadError = t("loadError");
     loadTariffs()
-      .catch((err) =>
-        onError(err instanceof Error ? err.message : t("loadError")),
-      )
-      .finally(() => setLoading(false));
-  }, [loadTariffs, onError, tc]);
+      .then((rows) => {
+        if (cancelled || rows == null) return;
+        setTariffs(rows);
+        setDirty(false);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          onError(err instanceof Error ? err.message : loadError);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [loadTariffs, onError, t]);
 
   function updateTariff(plan: string, patch: Partial<EditableTariff>) {
     setTariffs((current) =>
@@ -70,9 +101,16 @@ export function AdminTariffsPanel({
           sortOrder: row.sortOrder,
           descriptionEn: row.descriptionEn,
           descriptionBn: row.descriptionBn,
+          discountPriceBdt: row.discountPriceBdt.trim()
+            ? Number(row.discountPriceBdt)
+            : null,
+          discountStartsAt: row.discountStartsAt || null,
+          discountEndsAt: row.discountEndsAt || null,
+          discountLabelEn: row.discountLabelEn.trim() || null,
+          discountLabelBn: row.discountLabelBn.trim() || null,
         })),
       );
-      setTariffs(updated);
+      setTariffs(updated.map(toEditable));
       setDirty(false);
       onMessage(t("saved"));
     } catch (err) {
@@ -212,6 +250,69 @@ export function AdminTariffsPanel({
                   }
                 />
               </label>
+            </div>
+
+            <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+              <h4 className="text-sm font-semibold text-emerald-950">{t("discountTitle")}</h4>
+              <p className="mt-1 text-xs text-emerald-800">{t("discountHint")}</p>
+              <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                <label className="block text-sm">
+                  <span className="font-medium text-zinc-700">{t("discountPriceBdt")}</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2"
+                    value={row.discountPriceBdt}
+                    onChange={(event) =>
+                      updateTariff(row.plan, { discountPriceBdt: event.target.value })
+                    }
+                  />
+                </label>
+                <label className="block text-sm">
+                  <span className="font-medium text-zinc-700">{t("discountEndsAt")}</span>
+                  <input
+                    type="date"
+                    className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2"
+                    value={row.discountEndsAt}
+                    onChange={(event) =>
+                      updateTariff(row.plan, { discountEndsAt: event.target.value })
+                    }
+                  />
+                </label>
+                <label className="block text-sm">
+                  <span className="font-medium text-zinc-700">{t("discountStartsAt")}</span>
+                  <input
+                    type="date"
+                    className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2"
+                    value={row.discountStartsAt}
+                    onChange={(event) =>
+                      updateTariff(row.plan, { discountStartsAt: event.target.value })
+                    }
+                  />
+                </label>
+                <div />
+                <label className="block text-sm">
+                  <span className="font-medium text-zinc-700">{t("discountLabelEn")}</span>
+                  <input
+                    className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2"
+                    value={row.discountLabelEn}
+                    onChange={(event) =>
+                      updateTariff(row.plan, { discountLabelEn: event.target.value })
+                    }
+                  />
+                </label>
+                <label className="block text-sm">
+                  <span className="font-medium text-zinc-700">{t("discountLabelBn")}</span>
+                  <input
+                    className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2"
+                    value={row.discountLabelBn}
+                    onChange={(event) =>
+                      updateTariff(row.plan, { discountLabelBn: event.target.value })
+                    }
+                  />
+                </label>
+              </div>
             </div>
           </article>
         ))}

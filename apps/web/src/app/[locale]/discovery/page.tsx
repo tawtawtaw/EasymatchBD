@@ -15,17 +15,19 @@ import { ProfilePausedBanner } from "@/components/ProfilePausedBanner";
 import { AUTH_TOKEN_KEY, DropdownMap, getDropdowns, getMyProfile } from "@/lib/api";
 import { useAuthToken } from "@/hooks/use-auth-token";
 import { useAuthSession } from "@/hooks/use-auth-session";
+import { useDiscoveryProfileQueue } from "@/hooks/use-discovery-profile-queue";
 import { useMounted } from "@/hooks/use-mounted";
 import { useRequireMember } from "@/hooks/use-require-member";
 import {
   EMPTY_DISCOVERY_FILTERS,
   filtersFromPartnerPreference,
 } from "@/lib/discovery-filters";
+import { consumeDiscoveryProfilesLeft } from "@/lib/discovery-grid-transition";
 import {
-  DiscoveryFilters,
-  DiscoveryListItem,
+  type DiscoveryFilters,
   listDiscoveryProfiles,
 } from "@/lib/discovery";
+import { membershipFromSession } from "@/lib/membership";
 
 const DISCOVERY_LIMIT_STORAGE_KEY = "easymatch_discovery_profile_limit";
 
@@ -47,6 +49,7 @@ export default function DiscoveryPage() {
   const authToken = useAuthToken();
   const { user: session, ready: sessionReady } = useAuthSession();
   const { isMember } = useRequireMember();
+  const isPaid = membershipFromSession(session);
   const [dropdowns, setDropdowns] = useState<DropdownMap>({});
   const [draftFilters, setDraftFilters] = useState<DiscoveryFilters>(
     EMPTY_DISCOVERY_FILTERS,
@@ -55,8 +58,8 @@ export default function DiscoveryPage() {
     EMPTY_DISCOVERY_FILTERS,
   );
   const [filtersExpanded, setFiltersExpanded] = useState(false);
-  const [items, setItems] = useState<DiscoveryListItem[]>([]);
-  const [matchTotal, setMatchTotal] = useState(0);
+  const { items, matchTotal, resetQueue, refillReserve, leaveProfiles } =
+    useDiscoveryProfileQueue();
   const [profileLimit, setProfileLimit] = useState(DISCOVERY_DEFAULT_PROFILE_LIMIT);
   const [limitHydrated, setLimitHydrated] = useState(false);
   const [loadingProfiles, setLoadingProfiles] = useState(true);
@@ -91,8 +94,7 @@ export default function DiscoveryPage() {
     }
 
     if (session?.isPaused) {
-      setItems([]);
-      setMatchTotal(0);
+      resetQueue([], 0, false);
       setLoadingProfiles(false);
       return;
     }
@@ -105,19 +107,76 @@ export default function DiscoveryPage() {
         listDiscoveryProfiles(token, 1, profileLimit, appliedFilters),
       ]);
       setDropdowns(dd);
-      setItems(list.items);
-      setMatchTotal(list.total);
+      resetQueue(
+        list.items,
+        list.total,
+        list.hasMore ?? list.total > list.items.length,
+      );
+      void refillReserve(token, profileLimit, appliedFilters);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("actions.error"));
     } finally {
       setLoadingProfiles(false);
     }
-  }, [appliedFilters, locale, profileLimit, router, session, sessionReady, t]);
+  }, [
+    appliedFilters,
+    locale,
+    profileLimit,
+    refillReserve,
+    resetQueue,
+    router,
+    session,
+    sessionReady,
+    t,
+  ]);
 
   useEffect(() => {
     if (!mounted || !limitHydrated || !sessionReady) return;
     void loadProfiles();
   }, [mounted, limitHydrated, loadProfiles, sessionReady]);
+
+  const handleLeaveProfile = useCallback(
+    (profileCode: string, reason: "pass" | "interest") => {
+      const token = localStorage.getItem(AUTH_TOKEN_KEY);
+      leaveProfiles([profileCode], profileLimit, {
+        decrementTotal: reason === "interest",
+        refill: token
+          ? { token, filters: appliedFilters }
+          : undefined,
+      });
+    },
+    [appliedFilters, leaveProfiles, profileLimit],
+  );
+
+  useEffect(() => {
+    if (!mounted || loadingProfiles) return;
+
+    const applyLeft = () => {
+      const left = consumeDiscoveryProfilesLeft();
+      if (left.length === 0) return;
+      const token = localStorage.getItem(AUTH_TOKEN_KEY);
+      leaveProfiles(left, profileLimit, {
+        decrementTotal: true,
+        refill: token
+          ? { token, filters: appliedFilters }
+          : undefined,
+      });
+    };
+
+    applyLeft();
+    window.addEventListener("focus", applyLeft);
+    document.addEventListener("visibilitychange", applyLeft);
+    return () => {
+      window.removeEventListener("focus", applyLeft);
+      document.removeEventListener("visibilitychange", applyLeft);
+    };
+  }, [
+    appliedFilters,
+    leaveProfiles,
+    loadingProfiles,
+    mounted,
+    profileLimit,
+  ]);
 
   async function handleUseMyPreferences() {
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
@@ -221,6 +280,9 @@ export default function DiscoveryPage() {
               })}
             </p>
           ) : null}
+          {!loadingProfiles && items.length > 0 ? (
+            <p className="mt-1 text-xs text-zinc-500">{t("queueHint")}</p>
+          ) : null}
         </div>
         <label className="flex flex-col gap-1 text-xs text-zinc-600">
           {t("profilesToShow")}
@@ -249,6 +311,9 @@ export default function DiscoveryPage() {
               key={item.profileCode}
               token={authToken}
               item={item}
+              isPaid={isPaid}
+              onLeave={handleLeaveProfile}
+              onActionError={setError}
             />
           ))}
         </div>

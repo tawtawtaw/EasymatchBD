@@ -29,6 +29,13 @@ import { useMemberDropdowns } from "@/hooks/use-member-dropdowns";
 import { VideoCallPanel } from "@/components/VideoCallPanel";
 import { ProfilePausedBanner } from "@/components/ProfilePausedBanner";
 import { MessageBubble } from "@/components/MessageBubble";
+import { EmojiPickerButton } from "@/components/EmojiPickerButton";
+import {
+  ChatCameraIcon,
+  ChatPaperclipIcon,
+  ChatSendIcon,
+} from "@/components/ChatComposerIcons";
+import { WebcamCaptureModal, cameraCaptureSupported } from "@/components/WebcamCaptureModal";
 import { PaidMembershipRequired } from "@/components/PaidMembershipRequired";
 import { useAuthSession } from "@/hooks/use-auth-session";
 import { membershipFromSession } from "@/lib/membership";
@@ -66,8 +73,11 @@ export default function MessageThreadPage({
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const typingSentAtRef = useRef(0);
   const initialScrollRef = useRef(true);
 
@@ -228,6 +238,23 @@ export default function MessageThreadPage({
     void setConnectionTyping(token, connectionId);
   }
 
+  function insertEmoji(emoji: string) {
+    const el = textareaRef.current;
+    const start = el?.selectionStart ?? draft.length;
+    const end = el?.selectionEnd ?? draft.length;
+    const next = `${draft.slice(0, start)}${emoji}${draft.slice(end)}`;
+    if (next.length > 2000) return;
+    const caret = start + emoji.length;
+    setDraft(next);
+    notifyTyping();
+    requestAnimationFrame(() => {
+      const input = textareaRef.current;
+      if (!input) return;
+      input.focus();
+      input.setSelectionRange(caret, caret);
+    });
+  }
+
   async function handleSend(event: FormEvent) {
     event.preventDefault();
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
@@ -249,10 +276,8 @@ export default function MessageThreadPage({
     }
   }
 
-  async function handleAttachment(event: ChangeEvent<HTMLInputElement>) {
+  async function sendFile(file: File) {
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
-    const file = event.target.files?.[0];
-    event.target.value = "";
     if (!token || !connectionId || !file) return;
 
     setSending(true);
@@ -272,6 +297,26 @@ export default function MessageThreadPage({
     } finally {
       setSending(false);
     }
+  }
+
+  async function handleAttachment(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    await sendFile(file);
+  }
+
+  function handleTakePhoto() {
+    if (sending) return;
+    if (cameraCaptureSupported()) {
+      setCameraOpen(true);
+      return;
+    }
+    if (cameraInputRef.current) {
+      cameraInputRef.current.click();
+      return;
+    }
+    setError(t("cameraUnavailable"));
   }
 
   if (!mounted || !isMember || !connectionId || loading) {
@@ -428,7 +473,7 @@ export default function MessageThreadPage({
           {viewerIsPaused ? (
             <p className="text-sm text-zinc-600">{tAccount("pausedBannerBody")}</p>
           ) : (
-          <div className="flex gap-2">
+          <div className="flex items-end gap-2">
             <input
               ref={fileInputRef}
               type="file"
@@ -436,35 +481,71 @@ export default function MessageThreadPage({
               className="hidden"
               onChange={(event) => void handleAttachment(event)}
             />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={sending}
-              className="self-end rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50 disabled:opacity-60"
-              title={t("attachFile")}
-            >
-              📎
-            </button>
-            <textarea
-              value={draft}
-              onChange={(event) => {
-                setDraft(event.target.value);
-                notifyTyping();
-              }}
-              placeholder={t("inputPlaceholder")}
-              rows={2}
-              maxLength={2000}
-              className="min-h-[3rem] flex-1 resize-y rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-rose-700"
+            <input
+              ref={cameraInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              capture="environment"
+              className="hidden"
+              onChange={(event) => void handleAttachment(event)}
             />
+            <div className="flex min-h-12 min-w-0 flex-1 items-end rounded-[28px] border border-zinc-200 bg-zinc-100 px-1 py-1">
+              <EmojiPickerButton disabled={sending} onSelect={insertEmoji} />
+              <textarea
+                ref={textareaRef}
+                value={draft}
+                onChange={(event) => {
+                  setDraft(event.target.value);
+                  notifyTyping();
+                }}
+                placeholder={t("inputPlaceholder")}
+                rows={1}
+                maxLength={2000}
+                className="max-h-32 min-h-10 flex-1 resize-none bg-transparent px-1 py-2 text-sm text-zinc-900 outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={sending}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-zinc-600 hover:bg-zinc-200/80 disabled:opacity-60"
+                title={t("attachFile")}
+                aria-label={t("attachFile")}
+              >
+                <ChatPaperclipIcon />
+              </button>
+              <button
+                type="button"
+                onClick={handleTakePhoto}
+                disabled={sending}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-zinc-600 hover:bg-zinc-200/80 disabled:opacity-60"
+                title={t("takePhoto")}
+                aria-label={t("takePhoto")}
+              >
+                <ChatCameraIcon />
+              </button>
+            </div>
             <button
               type="submit"
               disabled={sending || !draft.trim()}
-              className="self-end rounded-lg bg-rose-800 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-900 disabled:opacity-60"
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-rose-800 text-white hover:bg-rose-900 disabled:opacity-60"
+              title={sending ? t("sending") : t("send")}
+              aria-label={sending ? t("sending") : t("send")}
             >
-              {sending ? t("sending") : t("send")}
+              <ChatSendIcon />
             </button>
           </div>
           )}
+          {cameraOpen ? (
+            <WebcamCaptureModal
+              title={t("takePhoto")}
+              facingMode="environment"
+              onCancel={() => setCameraOpen(false)}
+              onCapture={(file) => {
+                setCameraOpen(false);
+                void sendFile(file);
+              }}
+            />
+          ) : null}
           {!viewerIsPaused ? (
             <p className="mt-2 text-xs text-zinc-500">{t("attachmentHint")}</p>
           ) : null}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import {
   ActivityIndicator,
@@ -19,7 +19,15 @@ import { VerificationFeedbackPanel } from "../../components/VerificationFeedback
 import { EmptyState, ErrorState } from "../../components/ScreenState";
 import { ProfileListSkeleton } from "../../components/Skeleton";
 import { tDiscoveryList, tProfileMedia } from "../../i18n/messages";
+import { useIsPaidMember } from "../../hooks/use-is-paid-member";
 import { getApiErrorMessage } from "../../lib/api-error";
+import {
+  animateDiscoveryListShift,
+  consumeDiscoveryProfilesLeft,
+  discoveryLeftMemory,
+  rememberSkippedDiscoveryIds,
+  resetDiscoveryQueueSkips,
+} from "../../lib/discovery-queue";
 import {
   countActiveFilters,
   EMPTY_DISCOVERY_FILTERS,
@@ -47,6 +55,7 @@ const PAGE_SIZE = 20;
 export default function DiscoveryListScreen({ navigation }: DiscoveryListScreenProps) {
   const session = useAuthStore((s) => s.session);
   const locale = useLocaleStore((s) => s.locale);
+  const isPaid = useIsPaidMember();
   const copy = tDiscoveryList(locale);
   const mediaCopy = tProfileMedia(locale);
   const [items, setItems] = useState<DiscoveryListItem[]>([]);
@@ -69,12 +78,12 @@ export default function DiscoveryListScreen({ navigation }: DiscoveryListScreenP
   const activeFilterCount = countActiveFilters(appliedFilters);
   const filterLabels = discoveryFilterLabels(copy);
   const isProfilePaused = Boolean(session?.isPaused);
-
-  useFocusEffect(
-    useCallback(() => {
-      void syncVerification(true);
-    }, [syncVerification]),
-  );
+  const pageRef = useRef(1);
+  const hasMoreRef = useRef(false);
+  const filtersRef = useRef(appliedFilters);
+  const itemsRef = useRef(items);
+  filtersRef.current = appliedFilters;
+  itemsRef.current = items;
 
   useEffect(() => {
     void getDropdowns(locale).then(setDropdowns);
@@ -91,21 +100,25 @@ export default function DiscoveryListScreen({ navigation }: DiscoveryListScreenP
           forceFresh: mode === "refresh",
         });
         let nextItems = Array.isArray(result.items) ? result.items : [];
+        if (mode !== "more") {
+          resetDiscoveryQueueSkips();
+        }
+        const skipped = discoveryLeftMemory.skippedIdsRef;
+        nextItems = nextItems.filter((item) => !skipped.has(item.profileId));
 
         if (nextItems.length === 0 && mode !== "more" && filters.profileCode) {
           const match = await findDiscoveryProfileByCode(filters.profileCode);
-          if (match) nextItems = [match];
+          if (match && !skipped.has(match.profileId)) nextItems = [match];
         }
 
         setTotal(result.total > 0 ? result.total : nextItems.length);
         setPage(nextPage);
-        // An older API omits the flag, and stopping is the better guess: the
-        // alternative is the endless scroll of repeats this replaced.
-        setHasMore(Boolean(result.hasMore));
+        pageRef.current = nextPage;
+        const more = Boolean(result.hasMore);
+        setHasMore(more);
+        hasMoreRef.current = more;
         setItems((current) => {
           if (mode !== "more") return nextItems;
-          // The ranked pool is rebuilt once its cache expires, so a slow
-          // scroller can be offered someone they already hold.
           const seen = new Set(current.map((item) => item.profileId));
           return [...current, ...nextItems.filter((item) => !seen.has(item.profileId))];
         });
@@ -123,6 +136,46 @@ export default function DiscoveryListScreen({ navigation }: DiscoveryListScreenP
   useEffect(() => {
     void loadPage(1, "initial", appliedFilters);
   }, [appliedFilters, loadPage]);
+
+  const leaveProfiles = useCallback(
+    (profileIds: string[], decrementTotal: boolean) => {
+      if (profileIds.length === 0) return;
+      const leave = new Set(profileIds);
+      const current = itemsRef.current;
+      const next = current.filter((item) => !leave.has(item.profileId));
+      const removed = current.length - next.length;
+      if (removed === 0) return;
+
+      rememberSkippedDiscoveryIds(profileIds);
+      animateDiscoveryListShift();
+      setItems(next);
+      itemsRef.current = next;
+      if (decrementTotal) {
+        setTotal((total) => Math.max(0, total - removed));
+      }
+      if (next.length < PAGE_SIZE && hasMoreRef.current) {
+        void loadPage(pageRef.current + 1, "more", filtersRef.current);
+      }
+    },
+    [loadPage],
+  );
+
+  const handleLeaveProfile = useCallback(
+    (profileId: string, reason: "pass" | "interest") => {
+      leaveProfiles([profileId], reason === "interest");
+    },
+    [leaveProfiles],
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      void syncVerification(true);
+      const left = consumeDiscoveryProfilesLeft();
+      if (left.length > 0) {
+        leaveProfiles(left, true);
+      }
+    }, [leaveProfiles, syncVerification]),
+  );
 
   const openFilters = useCallback(() => {
     setDraftFilters({ ...appliedFilters });
@@ -220,6 +273,9 @@ export default function DiscoveryListScreen({ navigation }: DiscoveryListScreenP
 
       <View style={styles.summaryBlock}>
         <Text style={styles.summary}>{summaryText}</Text>
+        {items.length > 0 ? (
+          <Text style={styles.queueHint}>{copy.queueHint}</Text>
+        ) : null}
         {activeFilterCount > 0 ? (
           <>
             <Text style={styles.filtersSummary}>{copy.filtersAppliedSummary}</Text>
@@ -271,6 +327,9 @@ export default function DiscoveryListScreen({ navigation }: DiscoveryListScreenP
           <DiscoveryProfileCard
             item={item}
             bookmarkedLabel={copy.saved}
+            isPaid={isPaid}
+            onLeave={handleLeaveProfile}
+            onActionError={setError}
             onPress={() =>
               navigation.navigate("DiscoveryProfile", {
                 profileId: item.profileId,
@@ -340,6 +399,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
     color: colors.zinc600,
+  },
+  queueHint: {
+    marginTop: 4,
+    fontSize: 12,
+    color: colors.zinc500,
   },
   filtersSummary: {
     marginTop: 8,

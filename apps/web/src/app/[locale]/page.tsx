@@ -37,7 +37,7 @@ async function fetchServerDropdowns(locale: string): Promise<DropdownMap> {
 async function fetchMembershipTariffs(): Promise<MembershipTariff[]> {
   try {
     const res = await fetchWithTimeout(`${getApiBaseUrl()}/membership/tariffs`, {
-      next: { revalidate: 3600 },
+      next: { revalidate: 60 },
     });
     return await readJsonResponse<MembershipTariff[]>(res);
   } catch {

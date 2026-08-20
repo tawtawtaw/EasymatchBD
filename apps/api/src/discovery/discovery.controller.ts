@@ -378,6 +378,11 @@ export class DiscoveryController {
     return this.videoCalls.listCallAlerts(user.id);
   }
 
+  @Get('calls/log')
+  listCallLog(@CurrentUser() user: AuthUser) {
+    return this.videoCalls.listCallLog(user.id);
+  }
+
   @Get('calls/livekit-status')
   getLiveKitStatus() {
     return this.videoCalls.getLiveKitStatus();

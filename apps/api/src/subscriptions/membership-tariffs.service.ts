@@ -7,6 +7,7 @@ import { Prisma, SubscriptionPlan } from '@prisma/client';
 import {
   PAID_MEMBERSHIP_TARIFF_PLANS,
   SubscriptionPlan as SharedSubscriptionPlan,
+  tariffCalendarDate,
 } from '@easymatch/shared';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -56,6 +57,11 @@ export type MembershipTariffUpdate = {
   sortOrder: number;
   descriptionEn?: string | null;
   descriptionBn?: string | null;
+  discountPriceBdt?: number | null;
+  discountStartsAt?: string | null;
+  discountEndsAt?: string | null;
+  discountLabelEn?: string | null;
+  discountLabelBn?: string | null;
 };
 
 type MembershipTariffDto = {
@@ -70,6 +76,11 @@ type MembershipTariffDto = {
   sortOrder: number;
   descriptionEn: string | null;
   descriptionBn: string | null;
+  discountPriceBdt: string | null;
+  discountStartsAt: string | null;
+  discountEndsAt: string | null;
+  discountLabelEn: string | null;
+  discountLabelBn: string | null;
   updatedAt: string;
 };
 
@@ -143,6 +154,8 @@ export class MembershipTariffsService {
         );
       }
 
+      const discount = this.normalizeDiscount(plan, update);
+
       const existing = await this.prisma.membershipTariff.findUnique({
         where: { plan },
       });
@@ -162,6 +175,11 @@ export class MembershipTariffsService {
           sortOrder: update.sortOrder,
           descriptionEn: update.descriptionEn?.trim() || null,
           descriptionBn: update.descriptionBn?.trim() || null,
+          discountPriceBdt: discount.price,
+          discountStartsAt: discount.startsAt,
+          discountEndsAt: discount.endsAt,
+          discountLabelEn: discount.labelEn,
+          discountLabelBn: discount.labelBn,
         },
       });
     }
@@ -236,8 +254,62 @@ export class MembershipTariffsService {
       sortOrder: tariff.sortOrder,
       descriptionEn: tariff.descriptionEn,
       descriptionBn: tariff.descriptionBn,
+      discountPriceBdt: null,
+      discountStartsAt: null,
+      discountEndsAt: null,
+      discountLabelEn: null,
+      discountLabelBn: null,
       updatedAt,
     }));
+  }
+
+  private normalizeDiscount(
+    plan: SubscriptionPlan,
+    update: MembershipTariffUpdate,
+  ): {
+    price: Prisma.Decimal | null;
+    startsAt: Date | null;
+    endsAt: Date | null;
+    labelEn: string | null;
+    labelBn: string | null;
+  } {
+    const empty = {
+      price: null,
+      startsAt: null,
+      endsAt: null,
+      labelEn: null,
+      labelBn: null,
+    };
+    if (update.discountPriceBdt == null) {
+      return empty;
+    }
+
+    if (update.discountPriceBdt >= update.priceBdt) {
+      throw new BadRequestException(
+        `Discount price must be lower than the regular price for ${plan}`,
+      );
+    }
+
+    const endsOn = tariffCalendarDate(update.discountEndsAt);
+    if (!endsOn) {
+      throw new BadRequestException(
+        `Discount end date is required when a sale price is set for ${plan}`,
+      );
+    }
+    const startsOn = tariffCalendarDate(update.discountStartsAt);
+    if (startsOn && startsOn > endsOn) {
+      throw new BadRequestException(
+        `Discount start date must be on or before the end date for ${plan}`,
+      );
+    }
+
+    return {
+      price: new Prisma.Decimal(update.discountPriceBdt),
+      startsAt: startsOn ? new Date(`${startsOn}T00:00:00.000Z`) : null,
+      endsAt: new Date(`${endsOn}T00:00:00.000Z`),
+      labelEn: update.discountLabelEn?.trim() || null,
+      labelBn: update.discountLabelBn?.trim() || null,
+    };
   }
 
   private toDto(row: {
@@ -252,6 +324,11 @@ export class MembershipTariffsService {
     sortOrder: number;
     descriptionEn: string | null;
     descriptionBn: string | null;
+    discountPriceBdt: Prisma.Decimal | null;
+    discountStartsAt: Date | null;
+    discountEndsAt: Date | null;
+    discountLabelEn: string | null;
+    discountLabelBn: string | null;
     updatedAt: Date;
   }): MembershipTariffDto {
     return {
@@ -266,6 +343,13 @@ export class MembershipTariffsService {
       sortOrder: row.sortOrder,
       descriptionEn: row.descriptionEn,
       descriptionBn: row.descriptionBn,
+      discountPriceBdt: row.discountPriceBdt?.toFixed(2) ?? null,
+      discountStartsAt: row.discountStartsAt
+        ? row.discountStartsAt.toISOString()
+        : null,
+      discountEndsAt: row.discountEndsAt ? row.discountEndsAt.toISOString() : null,
+      discountLabelEn: row.discountLabelEn,
+      discountLabelBn: row.discountLabelBn,
       updatedAt: row.updatedAt.toISOString(),
     };
   }
