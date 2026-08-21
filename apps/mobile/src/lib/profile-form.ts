@@ -8,6 +8,7 @@ import {
   displayDateToIso,
   isoDateToDisplay,
   isDivorcedMaritalStatus,
+  memberAgeError,
   requiresChildrenCountMaritalStatus,
   sanitizeChildrenCountInput,
   CHILDREN_COUNT_MAX,
@@ -23,6 +24,8 @@ import { getWeightInputError } from "./weight-validation";
 export type PersonalFormValidationMessages = {
   dateOfBirthRequired: string;
   dateOfBirthInvalid: string;
+  dateOfBirthTooYoung: string;
+  dateOfBirthTooOld: string;
   prayerPracticeRequired: string;
   introductionRequired: string;
   childrenCountRequired: string;
@@ -164,6 +167,14 @@ export function validatePersonalForm(
   }
   if (!isValidDisplayDate(form.dateOfBirth)) {
     return messages.dateOfBirthInvalid;
+  }
+  const isoDob = displayDateToIso(form.dateOfBirth.trim());
+  if (isoDob) {
+    const ageError = memberAgeError(isoDob, form.gender);
+    if (ageError === "too_young") return messages.dateOfBirthTooYoung;
+    if (ageError === "too_old" || ageError === "invalid") {
+      return messages.dateOfBirthTooOld;
+    }
   }
   if (!isRequiredValueFilled(form.maritalStatus)) {
     return requiredField(messages, messages.maritalStatus);

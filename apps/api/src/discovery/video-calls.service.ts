@@ -2,15 +2,22 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
+  OnModuleDestroy,
+  OnModuleInit,
 } from '@nestjs/common';
 import {
   MIN_VIDEO_CALL_PRIVACY_LEVEL,
   resolveVisibleFullName,
+  VIDEO_CALL_EMPTY_ROOM_GRACE_MS,
+  VIDEO_CALL_MAX_DURATION_MS,
   VIDEO_CALL_OVERDUE_GRACE_MS,
   VIDEO_CALL_REMINDER_WINDOW_MS,
   canJoinScheduledVideoCall,
   isInVideoCallReminderWindow,
+  isVideoCallPastMaxDuration,
+  videoCallLiveKitTtlSeconds,
 } from '@easymatch/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { PrivacyFieldsService } from '../privacy/privacy-fields.service';
@@ -63,9 +70,25 @@ type VideoCallAlert = {
   partnerName: string | null;
 };
 
+type CallWithConnectionMembers = {
+  id: string;
+  connectionId: string;
+  initiatorId: string;
+  status: VideoCallStatus;
+  startedAt: Date | null;
+  createdAt: Date;
+  connection?: {
+    userLowId: string;
+    userHighId: string;
+  };
+};
+
 @Injectable()
-export class VideoCallsService {
-  private overdueSweepAt = 0;
+export class VideoCallsService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(VideoCallsService.name);
+  private staleSweepAt = 0;
+  private staleSweepRunning = false;
+  private staleSweepTimer: ReturnType<typeof setInterval> | null = null;
   private static readonly OVERDUE_SWEEP_INTERVAL_MS = 60_000;
   private readonly callAlertsCache = new Map<
     string,
@@ -103,6 +126,20 @@ export class VideoCallsService {
     private readonly pushNotifications: PushNotificationService,
     private readonly profilePause: ProfilePauseService,
   ) {}
+
+  onModuleInit() {
+    this.staleSweepTimer = setInterval(() => {
+      void this.sweepStaleCalls();
+    }, VideoCallsService.OVERDUE_SWEEP_INTERVAL_MS);
+    void this.sweepStaleCalls();
+  }
+
+  onModuleDestroy() {
+    if (this.staleSweepTimer) {
+      clearInterval(this.staleSweepTimer);
+      this.staleSweepTimer = null;
+    }
+  }
 
   private async requirePaid(userId: string) {
     await this.subscriptionAccess.assertPaidMember(userId);
@@ -212,6 +249,18 @@ export class VideoCallsService {
     }
 
     const call = await this.getCallForUser(userId, callId);
+    if (
+      call.status === 'active' &&
+      isVideoCallPastMaxDuration(call.startedAt ?? call.createdAt)
+    ) {
+      const completed = await this.completeActiveCall(call, 'duration_cap');
+      const value = serializeCall(completed, userId);
+      this.callSnapshotCache.set(cacheKey, {
+        expiresAt: Date.now() + VideoCallsService.CALL_SNAPSHOT_CACHE_TTL_MS,
+        value,
+      });
+      return value;
+    }
     const value = serializeCall(call, userId);
     const ttl =
       call.status === 'ringing'
@@ -235,6 +284,8 @@ export class VideoCallsService {
       userId,
       connectionId,
     );
+
+    await this.releaseStaleCallOnConnection(connectionId);
 
     const existingActive = await this.prisma.videoCall.findFirst({
       where: {
@@ -712,12 +763,28 @@ export class VideoCallsService {
     return storeAlerts(sortedAlerts);
   }
 
-  private async sweepOverdueScheduledCalls(now: number) {
-    if (now - this.overdueSweepAt < VideoCallsService.OVERDUE_SWEEP_INTERVAL_MS) {
+  async sweepStaleCalls(now = Date.now()) {
+    if (this.staleSweepRunning) return;
+    if (now - this.staleSweepAt < VideoCallsService.OVERDUE_SWEEP_INTERVAL_MS) {
       return;
     }
 
-    this.overdueSweepAt = now;
+    this.staleSweepAt = now;
+    this.staleSweepRunning = true;
+    try {
+      await this.sweepOverdueScheduledCalls(now);
+      await this.sweepExpiredActiveCalls(now);
+      await this.sweepEmptyActiveCalls(now);
+    } catch (err) {
+      this.logger.warn(
+        `Video call stale sweep failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    } finally {
+      this.staleSweepRunning = false;
+    }
+  }
+
+  private async sweepOverdueScheduledCalls(now: number) {
     await this.prisma.videoCall.updateMany({
       where: {
         status: 'scheduled',
@@ -730,6 +797,166 @@ export class VideoCallsService {
         endedAt: new Date(),
       },
     });
+  }
+
+  private async sweepExpiredActiveCalls(now: number) {
+    const cutoff = new Date(now - VIDEO_CALL_MAX_DURATION_MS);
+    const expired = await this.prisma.videoCall.findMany({
+      where: {
+        status: 'active',
+        OR: [
+          { startedAt: { lte: cutoff } },
+          { startedAt: null, createdAt: { lte: cutoff } },
+        ],
+      },
+      select: {
+        id: true,
+        connectionId: true,
+        initiatorId: true,
+        status: true,
+        startedAt: true,
+        createdAt: true,
+        connection: { select: { userLowId: true, userHighId: true } },
+      },
+    });
+
+    for (const call of expired) {
+      if (isVideoCallPastMaxDuration(call.startedAt ?? call.createdAt, now)) {
+        await this.completeActiveCall(call, 'duration_cap');
+      }
+    }
+  }
+
+  private async sweepEmptyActiveCalls(now: number) {
+    if (!this.livekit.isConfigured()) return;
+
+    const cutoff = new Date(now - VIDEO_CALL_EMPTY_ROOM_GRACE_MS);
+    const candidates = await this.prisma.videoCall.findMany({
+      where: {
+        status: 'active',
+        OR: [
+          { startedAt: { lte: cutoff } },
+          { startedAt: null, createdAt: { lte: cutoff } },
+        ],
+      },
+      select: {
+        id: true,
+        connectionId: true,
+        initiatorId: true,
+        status: true,
+        startedAt: true,
+        createdAt: true,
+        connection: { select: { userLowId: true, userHighId: true } },
+      },
+    });
+    if (candidates.length === 0) return;
+
+    const existingRooms = await this.livekit.listExistingCallRoomNames();
+    if (!existingRooms) return;
+
+    for (const call of candidates) {
+      if (existingRooms.has(this.livekit.roomName(call.id))) {
+        continue;
+      }
+      await this.completeActiveCall(call, 'empty_room');
+    }
+  }
+
+  private async releaseStaleCallOnConnection(connectionId: string) {
+    const existing = await this.prisma.videoCall.findFirst({
+      where: {
+        connectionId,
+        status: { in: ['ringing', 'active'] },
+      },
+      select: {
+        id: true,
+        connectionId: true,
+        initiatorId: true,
+        status: true,
+        startedAt: true,
+        createdAt: true,
+        connection: { select: { userLowId: true, userHighId: true } },
+      },
+    });
+    if (!existing || existing.status !== 'active') return;
+
+    if (isVideoCallPastMaxDuration(existing.startedAt ?? existing.createdAt)) {
+      await this.completeActiveCall(existing, 'duration_cap');
+      return;
+    }
+
+    const started = existing.startedAt ?? existing.createdAt;
+    if (started.getTime() > Date.now() - VIDEO_CALL_EMPTY_ROOM_GRACE_MS) {
+      return;
+    }
+    if (!this.livekit.isConfigured()) return;
+
+    const rooms = await this.livekit.listExistingCallRoomNames();
+    if (!rooms) return;
+    if (rooms.has(this.livekit.roomName(existing.id))) return;
+    await this.completeActiveCall(existing, 'empty_room');
+  }
+
+  private async completeActiveCall(
+    call: CallWithConnectionMembers,
+    reason: 'duration_cap' | 'empty_room',
+  ) {
+    const updated = await this.prisma.videoCall.updateMany({
+      where: { id: call.id, status: { in: ['ringing', 'active'] } },
+      data: {
+        status: 'completed',
+        endedAt: new Date(),
+      },
+    });
+    if (updated.count === 0) {
+      const current = await this.prisma.videoCall.findUniqueOrThrow({
+        where: { id: call.id },
+      });
+      return current;
+    }
+
+    await this.expireCallGuests(call.id);
+    void this.livekit.deleteRoom(call.id);
+    const extraUserIds = call.connection
+      ? [call.connection.userLowId, call.connection.userHighId]
+      : [];
+    this.invalidateCallCaches(
+      call.initiatorId,
+      call.connectionId,
+      call.id,
+      extraUserIds,
+    );
+    this.logger.log(
+      `Ended video call ${call.id} (${reason === 'duration_cap' ? '60-minute limit' : 'empty room'})`,
+    );
+
+    return this.prisma.videoCall.findUniqueOrThrow({ where: { id: call.id } });
+  }
+
+  async prepareLiveKitJoin(call: {
+    id: string;
+    status: VideoCallStatus;
+    startedAt: Date | null;
+    createdAt: Date;
+    connectionId: string;
+    initiatorId: string;
+    connection?: { userLowId: string; userHighId: string };
+  }) {
+    if (call.status !== 'active') {
+      throw new BadRequestException('Call must be active to join the room');
+    }
+
+    if (isVideoCallPastMaxDuration(call.startedAt ?? call.createdAt)) {
+      await this.completeActiveCall(call, 'duration_cap');
+      throw new BadRequestException(
+        'This call has reached the 60-minute limit',
+      );
+    }
+
+    await this.livekit.ensureCallRoom(call.id);
+    return {
+      ttlSeconds: videoCallLiveKitTtlSeconds(call.startedAt ?? call.createdAt),
+    };
   }
 
   async acceptCall(userId: string, callId: string) {
@@ -868,6 +1095,8 @@ export class VideoCallsService {
       );
     }
 
+    await this.releaseStaleCallOnConnection(call.connectionId);
+
     const existingActive = await this.prisma.videoCall.findFirst({
       where: {
         connectionId: call.connectionId,
@@ -910,6 +1139,7 @@ export class VideoCallsService {
     });
 
     await this.expireCallGuests(callId);
+    void this.livekit.deleteRoom(callId);
 
     this.invalidateCallCaches(userId, call.connectionId, callId);
     return serializeCall(updated, userId);

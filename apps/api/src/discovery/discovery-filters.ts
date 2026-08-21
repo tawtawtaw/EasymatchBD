@@ -1,6 +1,16 @@
 import type { Prisma } from '@prisma/client';
 import { InterestStatus } from '@prisma/client';
-import { getOppositeGender, isValidProfileCode, normalizeProfileCode } from '@easymatch/shared';
+import {
+  FEMALE_GENDER_VALUE,
+  getOppositeGender,
+  isValidProfileCode,
+  LEGAL_MARRIAGE_AGE_FEMALE,
+  LEGAL_MARRIAGE_AGE_MALE,
+  MALE_GENDER_VALUE,
+  minMarriageAgeForGender,
+  normalizeProfileCode,
+  PROFILE_AGE_MAX,
+} from '@easymatch/shared';
 
 export type DiscoveryFilterInput = {
   profileCode?: string;
@@ -42,6 +52,59 @@ function yearsAgo(years: number): Date {
   return date;
 }
 
+function listedGenderOf(
+  where: Prisma.ProfileWhereInput,
+  filters: DiscoveryFilterInput,
+): string | undefined {
+  if (typeof where.gender === 'string') return where.gender;
+  return filters.gender;
+}
+
+function applyLegalAndRequestedAgeFilter(
+  where: Prisma.ProfileWhereInput,
+  filters: DiscoveryFilterInput,
+) {
+  const listedGender = listedGenderOf(where, filters);
+  const userMax = filters.ageMax;
+
+  if (listedGender === MALE_GENDER_VALUE || listedGender === FEMALE_GENDER_VALUE) {
+    const legalMin = minMarriageAgeForGender(listedGender);
+    const effectiveMin = Math.max(filters.ageMin ?? legalMin, legalMin);
+    const dateOfBirth: Prisma.DateTimeFilter = { lte: yearsAgo(effectiveMin) };
+    if (userMax != null) dateOfBirth.gte = yearsAgo(userMax);
+    where.dateOfBirth = dateOfBirth;
+    return;
+  }
+
+  const clauses: Prisma.ProfileWhereInput[] = [
+    {
+      OR: [
+        {
+          gender: FEMALE_GENDER_VALUE,
+          dateOfBirth: { lte: yearsAgo(LEGAL_MARRIAGE_AGE_FEMALE) },
+        },
+        {
+          gender: MALE_GENDER_VALUE,
+          dateOfBirth: { lte: yearsAgo(LEGAL_MARRIAGE_AGE_MALE) },
+        },
+      ],
+    },
+  ];
+  const requested: Prisma.DateTimeFilter = {};
+  if (filters.ageMin != null) requested.lte = yearsAgo(filters.ageMin);
+  if (userMax != null) requested.gte = yearsAgo(userMax);
+  if (Object.keys(requested).length > 0) {
+    clauses.push({ dateOfBirth: requested });
+  }
+
+  const existingAnd = where.AND
+    ? Array.isArray(where.AND)
+      ? where.AND
+      : [where.AND]
+    : [];
+  where.AND = [...existingAnd, ...clauses];
+}
+
 export function parseDiscoveryFilters(
   query: Record<string, string | undefined>,
 ): DiscoveryFilterInput {
@@ -70,8 +133,16 @@ export function parseDiscoveryFilters(
     if (value) filters[key] = value;
   }
 
-  filters.ageMin = parseIntInRange(query.ageMin, 18, 80);
-  filters.ageMax = parseIntInRange(query.ageMax, 18, 80);
+  filters.ageMin = parseIntInRange(
+    query.ageMin,
+    LEGAL_MARRIAGE_AGE_FEMALE,
+    PROFILE_AGE_MAX,
+  );
+  filters.ageMax = parseIntInRange(
+    query.ageMax,
+    LEGAL_MARRIAGE_AGE_FEMALE,
+    PROFILE_AGE_MAX,
+  );
   filters.heightMinCm = parseIntInRange(query.heightMinCm, 100, 250);
   filters.heightMaxCm = parseIntInRange(query.heightMaxCm, 100, 250);
   filters.weightMinKg = parseIntInRange(query.weightMinKg, 30, 200);
@@ -147,10 +218,7 @@ export function buildDiscoveryProfileWhere(
     where.hasDisability = filters.hasDisability;
   }
 
-  const dateOfBirth: Prisma.DateTimeFilter = {};
-  if (filters.ageMin != null) dateOfBirth.lte = yearsAgo(filters.ageMin);
-  if (filters.ageMax != null) dateOfBirth.gte = yearsAgo(filters.ageMax);
-  if (Object.keys(dateOfBirth).length > 0) where.dateOfBirth = dateOfBirth;
+  applyLegalAndRequestedAgeFilter(where, filters);
 
   const heightCm: Prisma.IntFilter = {};
   if (filters.heightMinCm != null) heightCm.gte = filters.heightMinCm;
@@ -203,10 +271,7 @@ export function buildPublicBrowseProfileWhere(
     where.hasDisability = filters.hasDisability;
   }
 
-  const dateOfBirth: Prisma.DateTimeFilter = {};
-  if (filters.ageMin != null) dateOfBirth.lte = yearsAgo(filters.ageMin);
-  if (filters.ageMax != null) dateOfBirth.gte = yearsAgo(filters.ageMax);
-  if (Object.keys(dateOfBirth).length > 0) where.dateOfBirth = dateOfBirth;
+  applyLegalAndRequestedAgeFilter(where, filters);
 
   const heightCm: Prisma.IntFilter = {};
   if (filters.heightMinCm != null) heightCm.gte = filters.heightMinCm;

@@ -35,6 +35,7 @@ export type GlobalCallSession = {
     token: string;
     sessionKey: number;
   };
+  startedAt?: string | null;
 };
 
 type GlobalCallSessionContextValue = {

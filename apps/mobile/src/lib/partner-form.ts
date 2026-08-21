@@ -1,6 +1,8 @@
 import {
   cmToFeetInches,
+  minMarriageAgeForPartnerPreference,
   normalizeHijabPreference,
+  PROFILE_AGE_MAX,
   showBeardPreferenceField,
   showHijabPreferenceField,
   showPrayerPreferenceField,
@@ -80,17 +82,30 @@ export function validatePartnerForm(
     weightInvalid: string;
     weightRange: string;
   },
+  memberGender?: string | null,
 ): string | null {
+  const minAge = minMarriageAgeForPartnerPreference(memberGender);
+  const ageRange = messages.ageRange
+    .replace("{min}", String(minAge))
+    .replace("{max}", String(PROFILE_AGE_MAX));
   if (!form.ageMin.trim()) return messages.ageMinRequired;
-  const ageMinError = getAgeInputError(form.ageMin, {
-    invalid: messages.ageInvalid,
-    range: messages.ageRange,
-  });
+  const ageMinError = getAgeInputError(
+    form.ageMin,
+    {
+      invalid: messages.ageInvalid,
+      range: ageRange,
+    },
+    { min: minAge },
+  );
   if (ageMinError) return ageMinError;
-  const ageMaxError = getAgeInputError(form.ageMax, {
-    invalid: messages.ageInvalid,
-    range: messages.ageRange,
-  });
+  const ageMaxError = getAgeInputError(
+    form.ageMax,
+    {
+      invalid: messages.ageInvalid,
+      range: ageRange,
+    },
+    { min: minAge },
+  );
   if (ageMaxError) return ageMaxError;
   const weightMinError = getWeightInputError(form.weightMinKg, {
     invalid: messages.weightInvalid,

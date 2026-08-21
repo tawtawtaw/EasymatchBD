@@ -122,10 +122,16 @@ export function AdminHomeDashboard() {
       icon: "💰",
     },
     {
-      href: "/admin",
+      href: "/admin?tab=tariffs",
       title: t("actions.tariffs"),
       desc: t("actions.tariffsDesc"),
       icon: "💳",
+    },
+    {
+      href: "/admin?tab=banner",
+      title: t("actions.banner"),
+      desc: t("actions.bannerDesc"),
+      icon: "📢",
     },
     {
       href: "/verification",

@@ -14,6 +14,9 @@ import {
   isOnBehalfProfile,
   isValidDisplayDate,
   displayDateToIso,
+  isValidPreferenceAge,
+  memberAgeError,
+  minMarriageAgeForPartnerPreference,
   NID_DOCUMENT_SUBJECTS,
   ON_BEHALF_RELATIONS,
   PROFILE_CREATION_MODES,
@@ -287,8 +290,28 @@ export class ProfilesService {
       data.fullName = dto.fullName;
     }
 
+    const nextGender = dto.gender !== undefined ? dto.gender : profile.gender;
+    const nextDateOfBirth =
+      dto.dateOfBirth !== undefined
+        ? this.parseBirthDate(dto.dateOfBirth)
+        : profile.dateOfBirth;
+
+    if (nextDateOfBirth) {
+      const ageError = memberAgeError(nextDateOfBirth, nextGender);
+      if (ageError === 'too_young') {
+        throw new BadRequestException(
+          'Under Bangladesh marriage law, women must be at least 18 and men at least 21.',
+        );
+      }
+      if (ageError === 'too_old' || ageError === 'invalid') {
+        throw new BadRequestException(
+          'Date of birth must be a valid date for someone aged 80 or under.',
+        );
+      }
+    }
+
     if (dto.dateOfBirth !== undefined) {
-      data.dateOfBirth = this.parseBirthDate(dto.dateOfBirth);
+      data.dateOfBirth = nextDateOfBirth;
     }
 
     if (dto.heightUnit !== undefined) {
@@ -685,6 +708,24 @@ export class ProfilesService {
 
   async updatePartner(userId: string, dto: UpdatePartnerDto) {
     const profile = await this.ensureProfile(userId);
+    const partnerAgeMin = minMarriageAgeForPartnerPreference(profile.gender);
+
+    if (
+      dto.ageMin !== undefined &&
+      !isValidPreferenceAge(dto.ageMin, profile.gender)
+    ) {
+      throw new BadRequestException(
+        `Minimum partner age must be between ${partnerAgeMin} and 80.`,
+      );
+    }
+    if (
+      dto.ageMax !== undefined &&
+      !isValidPreferenceAge(dto.ageMax, profile.gender)
+    ) {
+      throw new BadRequestException(
+        `Maximum partner age must be between ${partnerAgeMin} and 80.`,
+      );
+    }
 
     if (
       dto.ageMin !== undefined &&

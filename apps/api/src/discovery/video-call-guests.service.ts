@@ -382,6 +382,8 @@ export class VideoCallGuestsService {
       throw new BadRequestException('Call must be active to join the room');
     }
 
+    const join = await this.videoCalls.prepareLiveKitJoin(call);
+
     const profile = await this.prisma.profile.findUnique({
       where: { userId },
       select: { fullName: true },
@@ -391,6 +393,7 @@ export class VideoCallGuestsService {
       callId: call.id,
       identity: userId,
       name: profile?.fullName?.trim() || 'Member',
+      ttlSeconds: join.ttlSeconds,
     });
 
     return {
@@ -410,6 +413,9 @@ export class VideoCallGuestsService {
             id: true,
             status: true,
             connectionId: true,
+            initiatorId: true,
+            startedAt: true,
+            createdAt: true,
           },
         },
       },
@@ -468,6 +474,15 @@ export class VideoCallGuestsService {
       );
     }
 
+    const join = await this.videoCalls.prepareLiveKitJoin({
+      id: guest.videoCall.id,
+      status: guest.videoCall.status,
+      startedAt: guest.videoCall.startedAt,
+      createdAt: guest.videoCall.createdAt,
+      connectionId: guest.videoCall.connectionId,
+      initiatorId: guest.videoCall.initiatorId,
+    });
+
     if (guest.status === 'approved') {
       await this.prisma.videoCallGuest.update({
         where: { id: guest.id },
@@ -479,6 +494,7 @@ export class VideoCallGuestsService {
       callId: guest.videoCall.id,
       identity: `guest-${guest.id}`,
       name: guest.guestName,
+      ttlSeconds: join.ttlSeconds,
     });
 
     return {

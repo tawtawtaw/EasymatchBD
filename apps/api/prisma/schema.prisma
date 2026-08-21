@@ -945,6 +945,19 @@ model MemberComplaintDiaryEntry {
   @@index([complaintId, createdAt(sort: Desc)])
 }
 
+model MarketingBanner {
+  id        String    @id @default("singleton")
+  enabled   Boolean   @default(false)
+  messageEn String    @default("")
+  messageBn String?
+  labelEn   String?
+  labelBn   String?
+  href      String?
+  startsAt  DateTime?
+  endsAt    DateTime?
+  updatedAt DateTime  @updatedAt
+}
+
 model TermsSettings {
   id                   String    @id @default("singleton")
   version              String

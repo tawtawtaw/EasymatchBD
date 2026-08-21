@@ -24,6 +24,7 @@ import {
 } from "@/components/GlobalLiveKitCallHost";
 import { LiveKitVideoCallRoom } from "@/components/LiveKitVideoCallRoom";
 import { VideoCallGuestPanel } from "@/components/VideoCallGuestPanel";
+import { VideoCallDurationWarning } from "@/components/VideoCallDurationWarning";
 import {
   phaseFromCallStatus,
   useGlobalCallSession,
@@ -36,6 +37,7 @@ import {
   shouldEndCallAfterLiveKitDisconnect,
   VIDEO_CALL_MAX_RECONNECT_ATTEMPTS,
 } from "@/lib/video-call-disconnect";
+import { useVideoCallDurationLimit } from "@/hooks/use-video-call-duration-limit";
 
 type VideoCallRoomProps = {
   connectionId: string;
@@ -97,6 +99,7 @@ export function VideoCallRoom({
   const [joiningCall, setJoiningCall] = useState(autoJoin);
   const [callUiEnded, setCallUiEnded] = useState(false);
   const persistActiveCallRef = useRef(false);
+  const handleEndRef = useRef<() => void>(() => {});
   const livekitSnapshotRef = useRef({
     url: null as string | null,
     token: null as string | null,
@@ -230,7 +233,10 @@ export function VideoCallRoom({
 
   useEffect(() => {
     persistActiveCallRef.current = call?.status === "active";
-  }, [call?.status]);
+    if (call?.startedAt) {
+      patchCallSession({ startedAt: call.startedAt });
+    }
+  }, [call?.status, call?.startedAt, patchCallSession]);
 
   useEffect(() => {
     if (!call) return;
@@ -239,6 +245,7 @@ export function VideoCallRoom({
       connectionId,
       phase: phaseFromCallStatus(call.status, call.isInitiator),
       joining: joiningCall,
+      startedAt: call.startedAt,
     });
   }, [call, callId, connectionId, joiningCall, patchCallSession]);
 
@@ -692,7 +699,15 @@ export function VideoCallRoom({
     }
   }
 
+  handleEndRef.current = () => {
+    void handleEnd();
+  };
+
   function handleLiveKitDisconnected(reason?: DisconnectReason) {
+    if (reason === DisconnectReason.ROOM_DELETED) {
+      void handleEnd();
+      return;
+    }
     if (endingIntentionallyRef.current || call?.status !== "active") {
       return;
     }
@@ -755,6 +770,13 @@ export function VideoCallRoom({
     callUiEnded ||
     (call &&
       ["completed", "cancelled", "declined", "missed"].includes(call.status));
+
+  const durationLimit = useVideoCallDurationLimit(
+    call?.status === "active" && !ended ? call.startedAt : null,
+    () => {
+      handleEndRef.current();
+    },
+  );
 
   const useLiveKit =
     call?.status === "active" &&
@@ -851,6 +873,12 @@ export function VideoCallRoom({
         <p className="mx-4 mt-3 rounded-lg bg-amber-900/50 px-3 py-2 text-sm text-amber-100">
           {t("connectionLost")}
         </p>
+      ) : null}
+      {durationLimit.showWarning && durationLimit.remainingMs != null ? (
+        <VideoCallDurationWarning
+          remainingMs={durationLimit.remainingMs}
+          compact={nativeShell}
+        />
       ) : null}
 
       {!call ? (
@@ -996,9 +1024,15 @@ export function VideoCallRoom({
                     notifyMobileVideoCallState("active");
                   }
                 }}
-                onDisconnected={
-                  nativeShell ? undefined : handleLiveKitDisconnected
-                }
+                onDisconnected={(reason) => {
+                  if (reason === DisconnectReason.ROOM_DELETED) {
+                    void handleEnd();
+                    return;
+                  }
+                  if (!nativeShell) {
+                    handleLiveKitDisconnected(reason);
+                  }
+                }}
                 onMediaDeviceError={(_source, error) => {
                   if (nativeShell) {
                     setMediaError(error.message);

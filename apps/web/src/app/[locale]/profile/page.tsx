@@ -8,6 +8,8 @@ import {
   HAS_BEARD_VALUES,
   HIJAB_PRACTICE_VALUES,
   HIJAB_PREFERENCE_VALUES,
+  memberAgeError,
+  minMarriageAgeForPartnerPreference,
   normalizeHijabPreference,
   isIslamReligion,
   isStaffRole,
@@ -335,6 +337,14 @@ export default function ProfilePage() {
 
   function getTabValidationError(): string | null {
     if (tab === "personal") {
+      const isoDob = displayDateToIso(personal.dateOfBirth);
+      if (isoDob) {
+        const ageError = memberAgeError(isoDob, personal.gender);
+        if (ageError === "too_young") return te("dateOfBirthTooYoung");
+        if (ageError === "too_old" || ageError === "invalid") {
+          return te("dateOfBirthTooOld");
+        }
+      }
       if (
         isIslamReligion(personal.religion) &&
         !personal.prayerPractice.trim()
@@ -361,9 +371,10 @@ export default function ProfilePage() {
       });
     }
     if (tab === "partner") {
+      const partnerMin = minMarriageAgeForPartnerPreference(personal.gender);
       if (
-        !isAgeInputValid(partner.ageMin) ||
-        !isAgeInputValid(partner.ageMax) ||
+        !isAgeInputValid(partner.ageMin, { min: partnerMin }) ||
+        !isAgeInputValid(partner.ageMax, { min: partnerMin }) ||
         !isWeightInputValid(partner.weightMinKg) ||
         !isWeightInputValid(partner.weightMaxKg)
       ) {
@@ -1802,11 +1813,13 @@ export default function ProfilePage() {
                 required
                 label={tf("ageMin")}
                 value={partner.ageMin}
+                minAge={minMarriageAgeForPartnerPreference(personal.gender)}
                 onChange={(ageMin) => setPartner({ ...partner, ageMin })}
               />
               <AgeField
                 label={tf("ageMax")}
                 value={partner.ageMax}
+                minAge={minMarriageAgeForPartnerPreference(personal.gender)}
                 onChange={(ageMax) => setPartner({ ...partner, ageMax })}
               />
               <HeightRangeField

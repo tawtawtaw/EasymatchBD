@@ -108,6 +108,8 @@ export default function EditPersonalScreen({ navigation }: EditPersonalScreenPro
     const validationError = validatePersonalForm(form, {
       dateOfBirthRequired: copy.dateOfBirthRequired,
       dateOfBirthInvalid: copy.dateOfBirthInvalid,
+      dateOfBirthTooYoung: copy.dateOfBirthTooYoung,
+      dateOfBirthTooOld: copy.dateOfBirthTooOld,
       prayerPracticeRequired: copy.prayerPracticeRequired,
       introductionRequired: copy.introductionRequired,
       childrenCountRequired: copy.childrenCountRequired,
@@ -164,6 +166,8 @@ export default function EditPersonalScreen({ navigation }: EditPersonalScreenPro
     copy.cityTown,
     copy.dateOfBirthInvalid,
     copy.dateOfBirthRequired,
+    copy.dateOfBirthTooOld,
+    copy.dateOfBirthTooYoung,
     copy.district,
     copy.division,
     copy.educationMedium,

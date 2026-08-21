@@ -13,20 +13,22 @@ import { Transform } from 'class-transformer';
 import {
   BEARD_PREFERENCE_VALUES,
   HIJAB_PREFERENCE_VALUES,
+  LEGAL_MARRIAGE_AGE_FEMALE,
   PRAYER_PREFERENCE_VALUES,
+  PROFILE_AGE_MAX,
 } from '@easymatch/shared';
 
 export class UpdatePartnerDto {
   @IsOptional()
   @IsInt()
-  @Min(18)
-  @Max(80)
+  @Min(LEGAL_MARRIAGE_AGE_FEMALE)
+  @Max(PROFILE_AGE_MAX)
   ageMin?: number;
 
   @IsOptional()
   @IsInt()
-  @Min(18)
-  @Max(80)
+  @Min(LEGAL_MARRIAGE_AGE_FEMALE)
+  @Max(PROFILE_AGE_MAX)
   ageMax?: number;
 
   @IsOptional()

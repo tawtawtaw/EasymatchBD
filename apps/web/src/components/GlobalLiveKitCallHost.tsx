@@ -12,11 +12,13 @@ import {
   VIDEO_CALL_MAX_RECONNECT_ATTEMPTS,
 } from "@/lib/video-call-disconnect";
 import { LiveKitVideoCallRoom } from "@/components/LiveKitVideoCallRoom";
+import { VideoCallDurationWarning } from "@/components/VideoCallDurationWarning";
 import {
   isVideoCallPath,
   useGlobalCallSession,
 } from "@/components/GlobalCallSessionProvider";
 import { useMemberAlerts } from "@/components/MemberAlertsProvider";
+import { useVideoCallDurationLimit } from "@/hooks/use-video-call-duration-limit";
 
 export const CALL_VIDEO_SLOT_ID = "easymatch-call-video-slot";
 
@@ -186,6 +188,15 @@ export function GlobalLiveKitCallHost() {
     }
   }, [clearCallSession, ending, refresh, session]);
 
+  const durationLimit = useVideoCallDurationLimit(
+    session?.phase === "active" || session?.phase === "connecting"
+      ? session.startedAt
+      : null,
+    () => {
+      void handleEnd();
+    },
+  );
+
   if (!showMedia || !session || !livekit || PAGE_OWNS_CALL_UI.test(pathname)) {
     return null;
   }
@@ -229,6 +240,14 @@ export function GlobalLiveKitCallHost() {
           </Link>
         </div>
       ) : null}
+      {!expandedOnCallPage &&
+      durationLimit.showWarning &&
+      durationLimit.remainingMs != null ? (
+        <VideoCallDurationWarning
+          remainingMs={durationLimit.remainingMs}
+          compact
+        />
+      ) : null}
       <div
         className={
           expandedOnCallPage
@@ -246,6 +265,10 @@ export function GlobalLiveKitCallHost() {
           onEndCall={() => void handleEnd()}
           onDisconnected={(reason) => {
             if (reason === DisconnectReason.CLIENT_INITIATED) {
+              return;
+            }
+            if (reason === DisconnectReason.ROOM_DELETED) {
+              void handleEnd();
               return;
             }
             handleUnexpectedDisconnect(reason);

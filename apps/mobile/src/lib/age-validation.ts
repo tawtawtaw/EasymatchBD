@@ -1,18 +1,27 @@
+import {
+  LEGAL_MARRIAGE_AGE_FEMALE,
+  PROFILE_AGE_MAX,
+} from "@easymatch/shared";
+
 const AGE_REGEX = /^\d+$/;
-export const AGE_MIN = 18;
-export const AGE_MAX = 80;
 
 export function getAgeInputError(
   value: string,
   messages: { invalid: string; range: string },
+  bounds?: { min?: number; max?: number },
 ): string | null {
   if (value === "") return null;
   if (!AGE_REGEX.test(value)) return messages.invalid;
   const age = Number(value);
-  if (age < AGE_MIN || age > AGE_MAX) return messages.range;
+  const min = bounds?.min ?? LEGAL_MARRIAGE_AGE_FEMALE;
+  const max = bounds?.max ?? PROFILE_AGE_MAX;
+  if (age < min || age > max) return messages.range;
   return null;
 }
 
-export function isAgeInputValid(value: string): boolean {
-  return getAgeInputError(value, { invalid: "x", range: "x" }) === null;
+export function isAgeInputValid(
+  value: string,
+  bounds?: { min?: number; max?: number },
+): boolean {
+  return getAgeInputError(value, { invalid: "x", range: "x" }, bounds) === null;
 }

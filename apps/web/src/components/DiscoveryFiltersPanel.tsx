@@ -6,6 +6,8 @@ import {
   formatHeightFromCm,
   getFeetOptions,
   getInchesOptions,
+  minMarriageAgeForGender,
+  PROFILE_AGE_MAX,
 } from "@easymatch/shared";
 import { useTranslations } from "next-intl";
 import { DistrictSelectField } from "@/components/DistrictFields";
@@ -247,6 +249,7 @@ export function DiscoveryFiltersPanel({
   const tc = useTranslations("common");
   const activeCount = countActiveFilters(applied);
   const draftCount = countActiveFilters(draft);
+  const ageFilterMin = minMarriageAgeForGender(draft.gender);
 
   return (
     <section className="mb-6 rounded-xl border border-zinc-200 bg-white shadow-sm">
@@ -465,15 +468,15 @@ export function DiscoveryFiltersPanel({
                 label={t("filterAgeMin")}
                 value={draft.ageMin ?? ""}
                 onChange={(ageMin) => onDraftChange(setField(draft, "ageMin", ageMin))}
-                min={18}
-                max={80}
+                min={ageFilterMin}
+                max={PROFILE_AGE_MAX}
               />
               <FilterNumber
                 label={t("filterAgeMax")}
                 value={draft.ageMax ?? ""}
                 onChange={(ageMax) => onDraftChange(setField(draft, "ageMax", ageMax))}
-                min={18}
-                max={80}
+                min={ageFilterMin}
+                max={PROFILE_AGE_MAX}
               />
               <FilterHeight
                 label={t("filterHeightMin")}

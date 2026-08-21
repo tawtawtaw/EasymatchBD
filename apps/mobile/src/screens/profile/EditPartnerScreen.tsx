@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text } from "react-native";
 import {
   BEARD_PREFERENCE_VALUES,
   HIJAB_PREFERENCE_VALUES,
+  minMarriageAgeForPartnerPreference,
   PRAYER_PREFERENCE_VALUES,
   showBeardPreferenceField,
   showHijabPreferenceField,
@@ -120,13 +121,17 @@ export default function EditPartnerScreen({ navigation }: EditPartnerScreenProps
 
   const save = useCallback(async () => {
     if (!form || !personalProfile) return;
-    const validationError = validatePartnerForm(form, {
-      ageMinRequired: copy.ageMinRequired,
-      ageInvalid: copy.ageInvalid,
-      ageRange: copy.ageRange,
-      weightInvalid: copy.weightInvalid,
-      weightRange: copy.weightRange,
-    });
+    const validationError = validatePartnerForm(
+      form,
+      {
+        ageMinRequired: copy.ageMinRequired,
+        ageInvalid: copy.ageInvalid,
+        ageRange: copy.ageRange,
+        weightInvalid: copy.weightInvalid,
+        weightRange: copy.weightRange,
+      },
+      personalProfile.gender,
+    );
     if (validationError) {
       setError(validationError);
       setMessage(null);
@@ -193,6 +198,9 @@ export default function EditPartnerScreen({ navigation }: EditPartnerScreenProps
   const patch = (partial: Partial<PartnerFormState>) => setForm((c) => (c ? { ...c, ...partial } : c));
   const personalReligion = personalProfile.religion ?? "";
   const personalGender = personalProfile.gender ?? "";
+  const partnerAgeHint = copy.ageRange
+    .replace("{min}", String(minMarriageAgeForPartnerPreference(personalGender)))
+    .replace("{max}", "80");
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -205,12 +213,14 @@ export default function EditPartnerScreen({ navigation }: EditPartnerScreenProps
         onChange={(v) => patch({ ageMin: v })}
         keyboardType="number-pad"
         required
+        hint={partnerAgeHint}
       />
       <FormTextField
         label={copy.ageMax}
         value={form.ageMax}
         onChange={(v) => patch({ ageMax: v })}
         keyboardType="number-pad"
+        hint={partnerAgeHint}
       />
       <FormHeightField
         label={copy.heightMin}

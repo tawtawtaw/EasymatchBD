@@ -2,6 +2,7 @@ import {
   EASYMATCH_API_URL,
   canAccessAdminProfiles,
   isSuperAdminRole as isSuperAdminRoleShared,
+  type MarketingBannerConfig,
 } from "@easymatch/shared";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? EASYMATCH_API_URL;
@@ -247,4 +248,32 @@ export async function updateAdminConsultantTariffs(
     body: JSON.stringify({ tariffs }),
   });
   return parseResponse<ConsultantTariffConfig[]>(res);
+}
+
+export async function getAdminMarketingBanner(token: string) {
+  const res = await fetch(`${API_URL}/admin/marketing-banner`, {
+    headers: authHeaders(token),
+  });
+  return parseResponse<MarketingBannerConfig>(res);
+}
+
+export async function updateAdminMarketingBanner(
+  token: string,
+  payload: {
+    enabled: boolean;
+    messageEn: string;
+    messageBn?: string | null;
+    labelEn?: string | null;
+    labelBn?: string | null;
+    href?: string | null;
+    startsAt?: string | null;
+    endsAt?: string | null;
+  },
+) {
+  const res = await fetch(`${API_URL}/admin/marketing-banner`, {
+    method: "PUT",
+    headers: authHeaders(token),
+    body: JSON.stringify(payload),
+  });
+  return parseResponse<MarketingBannerConfig>(res);
 }

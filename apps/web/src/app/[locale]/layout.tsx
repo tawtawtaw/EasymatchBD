@@ -4,6 +4,10 @@ import { Noto_Sans_Bengali } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages, getTranslations, setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
+import {
+  marketingBannerLabel,
+  marketingBannerMessage,
+} from "@easymatch/shared";
 import { routing, type Locale } from "@/i18n/routing";
 import { FeatureCommandPaletteProvider } from "@/components/FeatureCommandPalette";
 import { AuthSessionProvider } from "@/components/AuthSessionProvider";
@@ -11,6 +15,7 @@ import { StaffAlertsProvider } from "@/components/StaffAlertsProvider";
 import { MemberAlertsProvider } from "@/components/MemberAlertsProvider";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
+import { MarketingBannerBar } from "@/components/MarketingBannerBar";
 import { VideoCallAlertsBanner } from "@/components/VideoCallAlertsBanner";
 import { ConnectionEndedAlertsBanner } from "@/components/ConnectionEndedAlertsBanner";
 import { GlobalCallSessionProvider } from "@/components/GlobalCallSessionProvider";
@@ -19,6 +24,7 @@ import { ChunkLoadRecovery } from "@/components/ChunkLoadRecovery";
 import { WhatsAppSupport } from "@/components/WhatsAppSupport";
 import { LocaleShell } from "@/components/LocaleShell";
 import { DocumentLocale } from "@/components/DocumentLocale";
+import { fetchPublicMarketingBanner } from "@/lib/marketing-banner";
 
 const geistSans = Geist({
   subsets: ["latin"],
@@ -66,7 +72,11 @@ export default async function LocaleLayout({
   }
 
   setRequestLocale(locale);
-  const messages = await getMessages();
+  const [messages, banner, tBanner] = await Promise.all([
+    getMessages(),
+    fetchPublicMarketingBanner(),
+    getTranslations("marketingBanner"),
+  ]);
 
   const bodyFont =
     locale === "bn" ? notoBengali.className : geistSans.className;
@@ -88,6 +98,14 @@ export default async function LocaleLayout({
                   <LocaleShell
                     header={
                       <>
+                        {banner ? (
+                          <MarketingBannerBar
+                            message={marketingBannerMessage(banner, locale)}
+                            label={marketingBannerLabel(banner, locale)}
+                            href={banner.href}
+                            learnMore={tBanner("learnMore")}
+                          />
+                        ) : null}
                         <SiteHeader />
                         <ConnectionEndedAlertsBanner />
                         <VideoCallAlertsBanner variant="global" />

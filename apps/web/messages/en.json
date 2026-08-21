@@ -32,6 +32,9 @@
     "markAllRead": "Mark all read",
     "noNotifications": "No notifications yet"
   },
+  "marketingBanner": {
+    "learnMore": "Learn more"
+  },
   "terms": {
     "brand": "EasymatchBD",
     "pageTitle": "Terms and Conditions",
@@ -1002,7 +1005,9 @@
       "childrenCountMax": "Number of children cannot be more than 20.",
       "smokingHabitRequired": "Smoking habit is required for male profiles.",
       "invalidAge": "Age must be a whole number or left empty.",
-      "ageRange": "Age must be between 18 and 80.",
+      "ageRange": "Age must be between {min} and {max}.",
+      "dateOfBirthTooYoung": "Under Bangladesh marriage law, women must be at least 18 and men at least 21.",
+      "dateOfBirthTooOld": "Members cannot be older than 80.",
       "fixPartnerFields": "Please fix partner expectation fields before saving.",
       "expectedKabinAmountInvalid": "Expected kabin amounts must be whole numbers between 0 and 10,000,000 BDT.",
       "expectedKabinAmountRange": "Lowest expected kabin amount cannot be greater than highest expected.",
@@ -1382,6 +1387,8 @@
       "profilesDesc": "Search and review member profiles",
       "tariffs": "Membership tariffs",
       "tariffsDesc": "Set paid plan prices and durations",
+      "banner": "Campaign banner",
+      "bannerDesc": "Homepage announcement text for offers and campaigns",
       "payments": "Payment dashboard",
       "paymentsDesc": "View all successful SSLCommerz payments with reference IDs",
       "verification": "Verification queue",
@@ -1610,6 +1617,7 @@
       "dropdowns": "Dropdown options",
       "privacy": "Privacy & sharing",
       "legal": "Terms & Conditions",
+      "banner": "Homepage banner",
       "tariffs": "Membership tariffs",
       "consultantTariffs": "Consultant tariffs",
       "payments": "Payments",
@@ -1620,6 +1628,27 @@
       "complaints": "Member complaints",
       "consultantCases": "Consultant cases",
       "auditLog": "Activity log"
+    },
+    "banner": {
+      "title": "Campaign banner",
+      "hint": "Shows a short announcement at the top of every public page. This is display text only — set membership or consultant prices separately on the tariff tabs.",
+      "enabled": "Show banner",
+      "messageEn": "Message (English)",
+      "messageBn": "Message (Bangla)",
+      "labelEn": "Short label (English, optional)",
+      "labelBn": "Short label (Bangla, optional)",
+      "href": "Link (optional)",
+      "hrefHint": "Internal path only, for example /membership. Leave blank for text with no link.",
+      "startsAt": "Show from (optional)",
+      "endsAt": "Show until (optional)",
+      "datesHint": "Dates use the Bangladesh calendar. Leave both empty to show whenever the banner is turned on.",
+      "preview": "Preview",
+      "previewHidden": "The banner is off, missing English text, or outside its date window, so visitors will not see it.",
+      "learnMore": "Learn more",
+      "save": "Save banner",
+      "saved": "Banner saved.",
+      "loadError": "Could not load the banner.",
+      "saveError": "Could not save the banner."
     },
     "tariffs": {
       "title": "Membership plan tariffs",
@@ -2733,6 +2762,7 @@
     "joiningScheduled": "Joining…",
     "connectionLost": "Connection interrupted — reconnecting. Use End call if you want to leave.",
     "nativeShellConnectionLost": "Connection unstable. Wait a moment, then tap the mic button if you have no audio.",
+    "durationWarning": "This call will end in {time} minutes.",
     "cancelCall": "Cancel call",
     "endCall": "End call",
     "mediaPermissionDenied": "Camera and microphone access is required for video calls.",

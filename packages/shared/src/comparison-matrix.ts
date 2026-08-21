@@ -1,4 +1,9 @@
 import {
+  ageFromDateOfBirth,
+  minMarriageAgeForGender,
+  PROFILE_AGE_MAX,
+} from './age';
+import {
   formatHeightFromCm,
   formatHeightRangeFromCm,
 } from './height';
@@ -19,24 +24,7 @@ import {
   preferredReligionPreferenceText,
 } from './partner-religion-preference';
 
-export function ageFromDateOfBirth(
-  dateOfBirth: Date | string,
-): number | null {
-  const birth =
-    typeof dateOfBirth === 'string' ? new Date(dateOfBirth) : dateOfBirth;
-  if (Number.isNaN(birth.getTime())) return null;
-
-  const today = new Date();
-  let age = today.getFullYear() - birth.getFullYear();
-  const monthDiff = today.getMonth() - birth.getMonth();
-  if (
-    monthDiff < 0 ||
-    (monthDiff === 0 && today.getDate() < birth.getDate())
-  ) {
-    age -= 1;
-  }
-  return age;
-}
+export { ageFromDateOfBirth } from './age';
 
 export type ComparisonStatus =
   | 'match'
@@ -234,8 +222,8 @@ function buildRows(ctx: CriterionContext): ComparisonRow[] {
       const preferenceText = formatRange(prefs?.ageMin, prefs?.ageMax, 'years');
       const matches =
         age != null &&
-        age >= (prefs?.ageMin ?? 18) &&
-        age <= (prefs?.ageMax ?? 80);
+        age >= (prefs?.ageMin ?? minMarriageAgeForGender(c.attributes.gender)) &&
+        age <= (prefs?.ageMax ?? PROFILE_AGE_MAX);
       return { hasPreference, preferenceText, attributeText, matches, applicable: true };
     }),
   );
