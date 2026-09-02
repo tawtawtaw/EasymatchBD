@@ -41,8 +41,9 @@ Those files run monorepo-aware build scripts that:
 |--------|--------|
 | **Root Directory** | *(blank)* |
 | **Build Command** | `node scripts/railway-web-build.mjs` |
-| **Start Command** | `npm run start -w @easymatch/web` |
+| **Start Command** | `HOSTNAME=0.0.0.0 npm run start -w @easymatch/web` |
 | **Watch Paths** | `/apps/web/**`, `/packages/shared/**` |
+| **Healthcheck** | `/api/health` (Next.js, not the API) |
 
 ## Web: API URL
 
