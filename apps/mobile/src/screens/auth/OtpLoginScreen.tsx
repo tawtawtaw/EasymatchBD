@@ -15,6 +15,7 @@ import { LanguageToggle } from "../../components/LanguageToggle";
 import { tAuthLogin } from "../../i18n/messages";
 import { getApiErrorMessage } from "../../lib/api-error";
 import { isValidBangladeshPhone } from "../../lib/phone";
+import { startAndroidSmsOtpCapture } from "../../lib/android-sms-otp";
 import { sendOtp, tryTrustedDeviceSignIn } from "../../services/auth";
 import { useAuthStore } from "../../store/authStore";
 import { useLocaleStore } from "../../store/localeStore";
@@ -52,6 +53,7 @@ export default function OtpLoginScreen({ navigation }: OtpLoginScreenProps) {
         return;
       }
 
+      await startAndroidSmsOtpCapture();
       const result = await sendOtp(phone.trim());
       navigation.navigate("OtpVerify", {
         phone: result.phone,

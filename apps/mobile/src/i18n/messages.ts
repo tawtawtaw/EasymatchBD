@@ -304,7 +304,7 @@ const authVerify = {
   en: {
     back: "← Change number",
     title: "Enter verification code",
-    hint: "Code sent to {phone}",
+    hint: "Code sent to {phone}. On Android, tap Allow if asked to read the SMS.",
     devOtp: "Dev OTP",
     rememberDevice: "Remember this device",
     verify: "Verify & sign in",
@@ -314,7 +314,7 @@ const authVerify = {
   bn: {
     back: "← নম্বর পরিবর্তন",
     title: "যাচাইকরণ কোড লিখুন",
-    hint: "কোড পাঠানো হয়েছে {phone}",
+    hint: "কোড পাঠানো হয়েছে {phone}। অ্যান্ড্রয়েডে SMS পড়তে Allow চাপুন।",
     devOtp: "Dev OTP",
     rememberDevice: "এই ডিভাইস মনে রাখুন",
     verify: "যাচাই করে সাইন ইন",

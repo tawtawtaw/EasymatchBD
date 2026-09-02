@@ -2,7 +2,6 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useLayoutEffect, useMemo, useState } from "react";
 import {
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -20,6 +19,7 @@ import {
   showSmokingHabitField,
 } from "@easymatch/shared";
 import { AddressFields, FormCheckbox } from "../../components/form/AddressFields";
+import { FormKeyboardScrollView } from "../../components/form/FormKeyboardScrollView";
 import { FormSectionTitle, FormSelectField, FormTextField, FormHeightField, FormDateOfBirthField } from "../../components/form/FormFields";
 import { ErrorState, LoadingState } from "../../components/ScreenState";
 import { personalFieldLabel, tProfileEditor } from "../../i18n/messages";
@@ -219,7 +219,7 @@ export default function EditPersonalScreen({ navigation }: EditPersonalScreenPro
   const nameLocked = Boolean(profile?.nidVerifiedAt);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <FormKeyboardScrollView style={styles.container} contentContainerStyle={styles.content}>
       {message ? <Text style={styles.success}>{message}</Text> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -582,13 +582,13 @@ export default function EditPersonalScreen({ navigation }: EditPersonalScreenPro
       >
         <Text style={styles.saveButtonText}>{saving ? copy.saving : copy.save}</Text>
       </Pressable>
-    </ScrollView>
+    </FormKeyboardScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.rose50 },
-  content: { padding: 16, paddingBottom: 32 },
+  content: { padding: 16, paddingBottom: 48 },
   headerButton: {
     marginRight: 4,
     paddingHorizontal: 8,

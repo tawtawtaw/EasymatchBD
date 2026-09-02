@@ -17,6 +17,7 @@ import {
   getInchesOptions,
 } from "@easymatch/shared";
 import { colors } from "../../theme/colors";
+import { useFormKeyboardFieldFocus } from "./FormKeyboardScrollView";
 
 type Option = { value: string; label: string };
 
@@ -41,6 +42,7 @@ export function FormTextField({
   keyboardType?: "default" | "numeric" | "number-pad";
   hint?: string;
 }) {
+  const ensureVisible = useFormKeyboardFieldFocus();
   return (
     <View style={styles.field}>
       <Text style={styles.label}>
@@ -56,6 +58,7 @@ export function FormTextField({
         editable={!disabled}
         multiline={multiline}
         keyboardType={keyboardType}
+        onFocus={() => ensureVisible?.()}
       />
       {hint ? <Text style={styles.hint}>{hint}</Text> : null}
     </View>
@@ -79,6 +82,7 @@ export function FormDateOfBirthField({
   disabled?: boolean;
   hint?: string;
 }) {
+  const ensureVisible = useFormKeyboardFieldFocus();
   return (
     <View style={styles.field}>
       <Text style={styles.label}>
@@ -94,6 +98,7 @@ export function FormDateOfBirthField({
         editable={!disabled}
         keyboardType="number-pad"
         maxLength={DISPLAY_DATE_MAX_LENGTH}
+        onFocus={() => ensureVisible?.()}
       />
       {hint ? <Text style={styles.hint}>{hint}</Text> : null}
     </View>
@@ -123,6 +128,7 @@ export function FormSelectField({
   otherLabel?: string;
   customPlaceholder?: string;
 }) {
+  const ensureVisible = useFormKeyboardFieldFocus();
   const hasOtherOption = options.some((option) => option.value === "other");
   const isCustomText = Boolean(value) && !options.some((option) => option.value === value);
   const [customMode, setCustomMode] = useState(
@@ -180,6 +186,7 @@ export function FormSelectField({
           placeholder={customPlaceholder}
           placeholderTextColor={colors.zinc500}
           editable={!disabled}
+          onFocus={() => ensureVisible?.()}
         />
       ) : null}
 

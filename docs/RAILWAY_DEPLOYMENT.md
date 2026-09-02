@@ -90,7 +90,12 @@ If the button is missing on production, check Railway → **web** → **Variable
 - `JWT_SECRET`, `JWT_EXPIRES_IN`
 - `CORS_ORIGIN` — web URL(s), comma-separated
 - `WEB_PUBLIC_URL` — public web URL
-- `EXPOSE_OTP_IN_RESPONSE=true` — **staging only** until SMS is integrated; shows OTP on the login page
+- Real SMS (RTCom) on live:
+  - `SMS_PROVIDER=rtcom`
+  - `SMS_RTCOM_ACODE`, `SMS_RTCOM_API_KEY`, `SMS_RTCOM_SENDER_ID`
+  - `EXPOSE_OTP_IN_RESPONSE=false` — hide on-screen OTP once SMS is live
+  - Do not set `SMS_ANDROID_APP_HASH` unless the approved SMS template includes it
+- `EXPOSE_OTP_IN_RESPONSE=true` — only while `SMS_PROVIDER=console`; shows OTP on the login page
 
 ### Supabase on Railway — use Supavisor (recommended)
 

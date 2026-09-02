@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -13,6 +13,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { AuthScreenHeader } from "../../components/AuthScreenHeader";
 import { LanguageToggle } from "../../components/LanguageToggle";
 import { tAuthVerify } from "../../i18n/messages";
+import {
+  startAndroidSmsOtpCapture,
+  stopAndroidSmsOtpCapture,
+  subscribeAndroidSmsOtp,
+} from "../../lib/android-sms-otp";
 import { getApiErrorMessage } from "../../lib/api-error";
 import type { OtpVerifyScreenProps } from "../../navigation/types";
 import { verifyOtp } from "../../services/auth";
@@ -29,6 +34,18 @@ export default function OtpVerifyScreen({ navigation, route }: OtpVerifyScreenPr
   const [rememberDevice, setRememberDevice] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void startAndroidSmsOtpCapture();
+    const unsubscribe = subscribeAndroidSmsOtp((otp) => {
+      setCode(otp);
+      setError(null);
+    });
+    return () => {
+      unsubscribe();
+      stopAndroidSmsOtpCapture();
+    };
+  }, []);
 
   async function handleVerify() {
     if (code.trim().length !== 6) {
@@ -79,6 +96,11 @@ export default function OtpVerifyScreen({ navigation, route }: OtpVerifyScreenPr
             placeholder="123456"
             keyboardType="number-pad"
             maxLength={6}
+            autoComplete="sms-otp"
+            textContentType="oneTimeCode"
+            importantForAutofill="yes"
+            autoFocus
+            autoCorrect={false}
             style={styles.input}
             editable={!loading}
           />

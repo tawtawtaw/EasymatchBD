@@ -305,6 +305,8 @@ export default function AuthPage() {
                   pattern="[0-9]{6}"
                   maxLength={6}
                   required
+                  autoComplete="one-time-code"
+                  autoCorrect="off"
                   placeholder="123456"
                   value={code}
                   onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}

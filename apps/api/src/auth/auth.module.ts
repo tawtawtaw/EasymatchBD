@@ -11,7 +11,7 @@ import { AuthService } from './auth.service';
 import { RoleAssignmentService } from './role-assignment.service';
 import { AuthUserCacheService } from './auth-user-cache.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
-import { ConsoleSmsProvider } from './sms/console-sms.provider';
+import { createSmsProvider } from './sms/create-sms-provider';
 import { SMS_PROVIDER } from './sms/sms.provider';
 
 @Module({
@@ -40,7 +40,8 @@ import { SMS_PROVIDER } from './sms/sms.provider';
     JwtStrategy,
     {
       provide: SMS_PROVIDER,
-      useClass: ConsoleSmsProvider,
+      inject: [ConfigService],
+      useFactory: createSmsProvider,
     },
   ],
   exports: [AuthService, AuthUserCacheService, JwtModule],

@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { colors } from "../../theme/colors";
+import { useFormKeyboardFieldFocus } from "./FormKeyboardScrollView";
 
 type Option = { value: string; label: string; parentValue?: string | null };
 
@@ -41,6 +42,7 @@ export function FormMultiSelectField({
   clearLabel?: string;
   selectedCountLabel?: string;
 }) {
+  const ensureVisible = useFormKeyboardFieldFocus();
   const [open, setOpen] = useState(false);
   const [customValue, setCustomValue] = useState("");
 
@@ -101,6 +103,7 @@ export function FormMultiSelectField({
             onChangeText={setCustomValue}
             placeholder={customPlaceholder}
             placeholderTextColor={colors.zinc500}
+            onFocus={() => ensureVisible?.()}
           />
           <Pressable
             style={[styles.addBtn, !customValue.trim() && styles.addBtnDisabled]}

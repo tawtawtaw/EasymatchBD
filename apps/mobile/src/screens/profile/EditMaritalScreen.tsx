@@ -12,8 +12,9 @@ import {
   showLivingArrangementsOtherField,
 } from "@easymatch/shared";
 import { useCallback, useLayoutEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text } from "react-native";
+import { Pressable, StyleSheet, Text } from "react-native";
 import { FormSelectField, FormTextField } from "../../components/form/FormFields";
+import { FormKeyboardScrollView } from "../../components/form/FormKeyboardScrollView";
 import { ErrorState, LoadingState } from "../../components/ScreenState";
 import { tProfileMarital } from "../../i18n/messages";
 import { getApiErrorMessage } from "../../lib/api-error";
@@ -146,7 +147,7 @@ export default function EditMaritalScreen({ navigation }: EditMaritalScreenProps
   if (error && !gender) return <ErrorState message={error} onRetry={() => void load()} />;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <FormKeyboardScrollView style={styles.container} contentContainerStyle={styles.content}>
       {message ? <Text style={styles.success}>{message}</Text> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -252,13 +253,13 @@ export default function EditMaritalScreen({ navigation }: EditMaritalScreenProps
       >
         <Text style={styles.saveBtnText}>{saving ? copy.saving : copy.save}</Text>
       </Pressable>
-    </ScrollView>
+    </FormKeyboardScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.rose50 },
-  content: { padding: 16, gap: 12, paddingBottom: 32 },
+  content: { padding: 16, gap: 12, paddingBottom: 48 },
   headerBtn: { marginRight: 8, padding: 4 },
   headerBtnText: { color: colors.white, fontWeight: "700" },
   success: {

@@ -1,6 +1,6 @@
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useLayoutEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text } from "react-native";
+import { Pressable, StyleSheet, Text } from "react-native";
 import {
   BEARD_PREFERENCE_VALUES,
   HIJAB_PREFERENCE_VALUES,
@@ -15,6 +15,7 @@ import {
   FormMultiSelectField,
 } from "../../components/form/FormMultiSelectField";
 import { FormSelectField, FormTextField, FormHeightField } from "../../components/form/FormFields";
+import { FormKeyboardScrollView } from "../../components/form/FormKeyboardScrollView";
 import { ErrorState, LoadingState } from "../../components/ScreenState";
 import { personalFieldLabel, tProfilePartner } from "../../i18n/messages";
 import { getApiErrorMessage } from "../../lib/api-error";
@@ -203,7 +204,7 @@ export default function EditPartnerScreen({ navigation }: EditPartnerScreenProps
     .replace("{max}", "80");
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <FormKeyboardScrollView style={styles.container} contentContainerStyle={styles.content}>
       {message ? <Text style={styles.success}>{message}</Text> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -339,13 +340,13 @@ export default function EditPartnerScreen({ navigation }: EditPartnerScreenProps
       <Pressable style={[styles.saveBtn, saving && styles.disabled]} onPress={() => void save()} disabled={saving}>
         <Text style={styles.saveBtnText}>{saving ? copy.saving : copy.save}</Text>
       </Pressable>
-    </ScrollView>
+    </FormKeyboardScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.rose50 },
-  content: { padding: 16, paddingBottom: 32 },
+  content: { padding: 16, paddingBottom: 48 },
   headerBtn: { marginRight: 8, padding: 4 },
   headerBtnText: { color: colors.white, fontWeight: "700" },
   success: { marginBottom: 12, padding: 12, borderRadius: 12, backgroundColor: "#ecfdf5", color: colors.emerald600, fontSize: 13, fontWeight: "600" },

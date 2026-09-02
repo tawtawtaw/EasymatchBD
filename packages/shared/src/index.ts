@@ -7,6 +7,7 @@ export * from './membership-tariffs';
 export * from './membership-service-packages';
 export * from './consultant-tariffs';
 export * from './phone';
+export * from './otp-sms';
 export * from './email';
 export * from './dropdown-categories';
 export * from './height';
