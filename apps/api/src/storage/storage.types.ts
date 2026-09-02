@@ -20,4 +20,5 @@ export interface StorageBackend {
   delete(storageKey: string): Promise<void> | void;
   exists(storageKey: string): Promise<boolean> | boolean;
   createReadStream(storageKey: string): Promise<Readable> | Readable;
+  deletePrefix(prefix: string): Promise<void> | void;
 }

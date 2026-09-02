@@ -23,6 +23,7 @@ import {
   UserRole,
 } from '@easymatch/shared';
 import { hashPassword, verifyPassword } from './password.util';
+import { RELEASED_MEMBER_IDENTITY } from './released-member-identity';
 import { createHash, randomBytes } from 'crypto';
 import { DropdownsService } from '../dropdowns/dropdowns.service';
 import { MediaService } from '../profiles/media.service';
@@ -199,8 +200,14 @@ export class AuthService {
     await this.enforceRateLimit(phone);
 
     const code = this.generateOtp();
-    await this.redis.set(`${OTP_KEY_PREFIX}${phone}`, code, this.otpTtlSeconds);
-    await this.sms.sendOtp(phone, code);
+    const otpKey = `${OTP_KEY_PREFIX}${phone}`;
+    await this.redis.set(otpKey, code, this.otpTtlSeconds);
+    try {
+      await this.sms.sendOtp(phone, code);
+    } catch (err) {
+      await this.redis.del(otpKey);
+      throw err;
+    }
 
     const response: Record<string, unknown> = {
       message: 'OTP sent successfully',
@@ -251,9 +258,18 @@ export class AuthService {
 
     const existing = await this.prisma.user.findUnique({
       where: { phone },
-      select: { id: true },
+      select: { id: true, isActive: true, role: true },
     });
-    const isNewUser = !existing;
+
+    if (existing && !existing.isActive && !isStaffRole(existing.role)) {
+      await this.prisma.user.update({
+        where: { id: existing.id },
+        data: RELEASED_MEMBER_IDENTITY,
+      });
+      this.authUserCache.invalidate(existing.id);
+    }
+
+    const isNewUser = !existing || (!existing.isActive && !isStaffRole(existing.role));
 
     const user = await this.prisma.user.upsert({
       where: { phone },

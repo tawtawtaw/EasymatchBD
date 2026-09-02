@@ -2,7 +2,9 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import {
   InterestStatus,
@@ -10,21 +12,31 @@ import {
   Prisma,
   ProfileDeletionRequestStatus,
   ProfileDeletionTargetKind,
+  UserRole as PrismaUserRole,
 } from '@prisma/client';
-import { isStaffRole } from '@easymatch/shared';
+import { isStaffRole, STAFF_ROLES } from '@easymatch/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { StaffNotificationService } from '../staff/staff-notification.service';
 import { AuthUserCacheService } from '../auth/auth-user-cache.service';
+import { RELEASED_MEMBER_IDENTITY } from '../auth/released-member-identity';
+
+const STAFF_ROLE_VALUES = [...STAFF_ROLES] as PrismaUserRole[];
 
 @Injectable()
-export class AdminProfileDeletionsService {
+export class AdminProfileDeletionsService implements OnModuleInit {
+  private readonly logger = new Logger(AdminProfileDeletionsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
     private readonly staffNotifications: StaffNotificationService,
     private readonly authUserCache: AuthUserCacheService,
   ) {}
+
+  async onModuleInit() {
+    await this.releaseInactiveMemberIdentities();
+  }
 
   async createRequest(
     requestedById: string,
@@ -117,6 +129,8 @@ export class AdminProfileDeletionsService {
     const request = await this.getPendingRequest(requestId);
     this.assertDifferentReviewer(request.requestedById, reviewerId);
 
+    await this.purgeMemberStorage(request.targetUserId);
+
     await this.prisma.$transaction(async (tx) => {
       await this.deactivateUserAccount(tx, request.targetUserId);
       await tx.profileDeletionRequest.update({
@@ -192,11 +206,8 @@ export class AdminProfileDeletionsService {
     return request;
   }
 
-  private async deactivateUserAccount(
-    tx: Prisma.TransactionClient,
-    targetUserId: string,
-  ) {
-    const user = await tx.user.findUnique({
+  private async purgeMemberStorage(targetUserId: string) {
+    const user = await this.prisma.user.findUnique({
       where: { id: targetUserId },
       include: {
         profile: {
@@ -208,16 +219,58 @@ export class AdminProfileDeletionsService {
     if (!user) {
       throw new NotFoundException('Profile not found');
     }
-
     if (isStaffRole(user.role)) {
       throw new BadRequestException('Staff accounts cannot be deactivated');
     }
 
-    for (const photo of user.profile?.photos ?? []) {
-      await this.storage.delete(photo.storageKey);
+    const keys = [
+      ...(user.profile?.photos ?? []).map((photo) => photo.storageKey),
+      ...(user.profile?.nidDocuments ?? []).map((document) => document.storageKey),
+    ];
+
+    const messageAttachments = await this.prisma.connectionMessage.findMany({
+      where: {
+        senderId: targetUserId,
+        attachmentStorageKey: { not: null },
+      },
+      select: { attachmentStorageKey: true },
+    });
+    for (const message of messageAttachments) {
+      if (message.attachmentStorageKey) {
+        keys.push(message.attachmentStorageKey);
+      }
     }
-    for (const document of user.profile?.nidDocuments ?? []) {
-      await this.storage.delete(document.storageKey);
+
+    await Promise.allSettled(
+      keys.flatMap((key) => [
+        this.storage.deleteDerivedPhotos(key),
+        this.storage.delete(key),
+      ]),
+    );
+
+    await this.storage.deleteUserFiles(targetUserId);
+    this.logger.log(
+      `Removed storage for deleted member ${targetUserId} (${keys.length} known keys plus user prefix)`,
+    );
+  }
+
+  private async deactivateUserAccount(
+    tx: Prisma.TransactionClient,
+    targetUserId: string,
+  ) {
+    const user = await tx.user.findUnique({
+      where: { id: targetUserId },
+      include: {
+        profile: { select: { id: true } },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Profile not found');
+    }
+
+    if (isStaffRole(user.role)) {
+      throw new BadRequestException('Staff accounts cannot be deactivated');
     }
 
     await tx.interest.updateMany({
@@ -232,12 +285,34 @@ export class AdminProfileDeletionsService {
       await this.clearProfileVerificationPending(tx, user.profile.id);
     }
 
+    await tx.userPushToken.deleteMany({ where: { userId: targetUserId } });
+
     await tx.user.update({
       where: { id: targetUserId },
-      data: { isActive: false },
+      data: {
+        isActive: false,
+        ...RELEASED_MEMBER_IDENTITY,
+      },
     });
 
     this.authUserCache.invalidate(targetUserId);
+  }
+
+  private async releaseInactiveMemberIdentities() {
+    const result = await this.prisma.user.updateMany({
+      where: {
+        isActive: false,
+        role: { notIn: STAFF_ROLE_VALUES },
+        OR: [{ phone: { not: null } }, { email: { not: null } }],
+      },
+      data: RELEASED_MEMBER_IDENTITY,
+    });
+
+    if (result.count > 0) {
+      this.logger.log(
+        `Released phone/email on ${result.count} inactive member account(s) so those numbers can register again`,
+      );
+    }
   }
 
   private async cancelStalePendingDeletionRequests() {

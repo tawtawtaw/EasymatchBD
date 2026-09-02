@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { Readable } from 'stream';
 import { createSupabaseServerClient } from './supabase-client';
-import { buildStorageKey, normalizeStorageKey } from './storage.utils';
+import { buildStorageKey, normalizeStorageKey, userStoragePrefix } from './storage.utils';
 import type { StorageBackend, StorageCategory } from './storage.types';
 
 export type SupabaseStorageConfig = {
@@ -77,6 +77,64 @@ export class SupabaseStorageBackend implements StorageBackend {
     }
   }
 
+  async deletePrefix(prefix: string): Promise<void> {
+    const root = userStoragePrefix(prefix);
+    const keys = await this.listObjectKeys(root);
+    const batchSize = 100;
+    for (let i = 0; i < keys.length; i += batchSize) {
+      const batch = keys.slice(i, i + batchSize);
+      const { error } = await this.client.storage
+        .from(this.config.bucket)
+        .remove(batch);
+      if (error) {
+        throw new Error(`Supabase prefix delete failed: ${error.message}`);
+      }
+    }
+  }
+
+  private async listObjectKeys(folder: string): Promise<string[]> {
+    const keys: string[] = [];
+    const queue = [folder];
+
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      let offset = 0;
+      const limit = 1000;
+
+      while (true) {
+        const { data, error } = await this.client.storage
+          .from(this.config.bucket)
+          .list(current, { limit, offset });
+        if (error) {
+          throw new Error(`Supabase list failed: ${error.message}`);
+        }
+        const entries = data ?? [];
+        if (entries.length === 0) {
+          break;
+        }
+
+        for (const entry of entries) {
+          if (!entry.name || entry.name === '.' || entry.name === '..') {
+            continue;
+          }
+          const path = `${current}/${entry.name}`;
+          if (isStorageFolder(entry)) {
+            queue.push(path);
+          } else {
+            keys.push(path);
+          }
+        }
+
+        if (entries.length < limit) {
+          break;
+        }
+        offset += limit;
+      }
+    }
+
+    return keys;
+  }
+
   async exists(storageKey: string): Promise<boolean> {
     const normalized = normalizeStorageKey(storageKey);
     const { folder, name } = splitStorageKey(normalized);
@@ -116,6 +174,16 @@ function splitStorageKey(storageKey: string): { folder: string; name: string } {
     folder: storageKey.slice(0, idx),
     name: storageKey.slice(idx + 1),
   };
+}
+
+function isStorageFolder(entry: {
+  id?: string | null;
+  metadata?: { size?: number } | null;
+}): boolean {
+  if (entry.metadata && typeof entry.metadata.size === 'number') {
+    return false;
+  }
+  return entry.id == null;
 }
 
 export function resolveSupabaseSecretKey(

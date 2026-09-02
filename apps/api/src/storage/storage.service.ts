@@ -101,6 +101,14 @@ export class StorageService implements OnModuleInit {
     await this.primary.delete(storageKey);
   }
 
+  async deleteUserFiles(userId: string): Promise<void> {
+    this.logger.log(`Deleting all stored files for user ${userId}`);
+    await this.primary.deletePrefix(userId);
+    if (this.localFallback) {
+      await this.localFallback.deletePrefix(userId);
+    }
+  }
+
   async exists(storageKey: string): Promise<boolean> {
     if (await this.primary.exists(storageKey)) {
       return true;

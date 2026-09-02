@@ -3,11 +3,12 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  rmSync,
   unlinkSync,
   writeFileSync,
 } from 'fs';
 import { dirname, isAbsolute, join } from 'path';
-import { buildStorageKey, normalizeStorageKey } from './storage.utils';
+import { buildStorageKey, normalizeStorageKey, userStoragePrefix } from './storage.utils';
 import type { StorageBackend, StorageCategory } from './storage.types';
 
 export class LocalStorageBackend implements StorageBackend {
@@ -61,6 +62,13 @@ export class LocalStorageBackend implements StorageBackend {
 
   createReadStream(storageKey: string) {
     return createReadStream(this.resolvePath(storageKey));
+  }
+
+  deletePrefix(prefix: string): void {
+    const root = this.resolvePath(userStoragePrefix(prefix));
+    if (existsSync(root)) {
+      rmSync(root, { recursive: true, force: true });
+    }
   }
 
   resolvePath(storageKey: string): string {

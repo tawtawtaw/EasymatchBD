@@ -78,3 +78,11 @@ export function derivedPhotoStorageKey(
   const base = name.replace(/\.[^.]+$/, '');
   return `${dir}${base}.${variant}.jpg`;
 }
+
+export function userStoragePrefix(userId: string): string {
+  const id = userId.trim();
+  if (!id || id.includes('/') || id.includes('\\') || id.includes('..')) {
+    throw new Error('Invalid user storage prefix');
+  }
+  return id;
+}
