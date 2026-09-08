@@ -134,43 +134,48 @@ export function PublicMarketingHome({
   return (
     <div className="overflow-hidden">
       {/* Hero */}
-      <section id="hero" className="relative bg-gradient-to-br from-rose-700 via-rose-600 to-amber-500 text-white">
+      <section id="hero" className="relative overflow-hidden bg-gradient-to-br from-rose-700 via-rose-600 to-amber-500 text-white">
         <div className="absolute inset-0 opacity-20">
           <div className="absolute -left-16 top-10 h-56 w-56 rounded-full bg-white/30 blur-3xl" />
           <div className="absolute bottom-0 right-0 h-72 w-72 rounded-full bg-emerald-300/40 blur-3xl" />
         </div>
-        <div className="relative mx-auto grid max-w-6xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-2 lg:items-center lg:py-24">
-          <div className="space-y-5">
+        <div className="relative grid gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[max(1.5rem,calc((100vw-72rem)/2))_minmax(0,36rem)_minmax(0,1fr)] lg:items-stretch lg:gap-8 lg:px-0 lg:py-0">
+          <div className="hidden lg:block" aria-hidden />
+          <div className="space-y-3 lg:py-10">
             <p className="inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide">
               {t("kicker")}
             </p>
-            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
+            <h1 className="text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
               {t("headline")}
             </h1>
-            <p className="max-w-xl text-lg text-rose-50/95">{t("subheadline")}</p>
-            <div className="flex flex-wrap gap-3">
-              <Link
-                href="/browse"
-                className="inline-flex rounded-full bg-white px-6 py-3 text-sm font-semibold text-rose-800 hover:bg-rose-50"
-              >
-                {t("browseCta")}
-              </Link>
-              <Link
-                href="/auth"
-                className="inline-flex rounded-full border border-white/70 px-6 py-3 text-sm font-semibold text-white hover:bg-white/10"
-              >
-                {t("joinCta")}
-              </Link>
+            <p className="max-w-xl text-base text-rose-50/95 sm:text-lg">{t("subheadline")}</p>
+            <div className="flex flex-col gap-4 pt-1 sm:flex-row sm:items-start sm:gap-6">
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  href="/browse"
+                  className="inline-flex rounded-full bg-white px-6 py-3 text-sm font-semibold text-rose-800 hover:bg-rose-50"
+                >
+                  {t("browseCta")}
+                </Link>
+                <Link
+                  href="/auth"
+                  className="inline-flex rounded-full border border-white/70 px-6 py-3 text-sm font-semibold text-white hover:bg-white/10"
+                >
+                  {t("joinCta")}
+                </Link>
+              </div>
+              <AppDownloadPromo
+                variant="hero"
+                initialRelease={appRelease}
+                initialQrDataUrl={appQrDataUrl}
+              />
             </div>
-            <AppDownloadPromo
-              variant="hero"
-              initialRelease={appRelease}
-              initialQrDataUrl={appQrDataUrl}
-            />
           </div>
-          <div className="relative">
-            <div className="absolute -right-4 -top-4 h-full w-full rounded-3xl bg-emerald-400/30 blur-2xl" />
-            <CouplesPhotoCarousel variant="hero" />
+          <div className="relative min-h-[18rem] lg:min-h-0">
+            <div className="absolute -right-3 -top-3 h-full w-full rounded-3xl bg-emerald-400/30 blur-2xl lg:hidden" />
+            <div className="h-full lg:absolute lg:inset-0">
+              <CouplesPhotoCarousel variant="hero" />
+            </div>
           </div>
         </div>
       </section>

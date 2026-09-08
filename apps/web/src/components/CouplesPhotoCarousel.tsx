@@ -57,7 +57,7 @@ export function CouplesPhotoCarousel({
 
   const carousel = (
     <div
-      className={isHero ? "relative w-full" : "relative mx-auto mt-10 max-w-4xl"}
+      className={isHero ? "relative h-full w-full" : "relative mx-auto mt-10 max-w-4xl"}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocusCapture={() => setPaused(true)}
@@ -70,20 +70,24 @@ export function CouplesPhotoCarousel({
       <div
         className={
           isHero
-            ? "overflow-hidden rounded-2xl border border-white/60 bg-white/90 shadow-xl backdrop-blur"
+            ? "h-full overflow-hidden rounded-2xl border border-white/60 bg-white/90 shadow-xl backdrop-blur lg:rounded-none lg:rounded-l-2xl lg:border-0 lg:shadow-none"
             : "overflow-hidden rounded-3xl border border-rose-100 bg-white shadow-lg shadow-rose-100/60"
         }
       >
         <div
-          className="flex transition-transform duration-700 ease-out motion-reduce:transition-none"
+          className={
+            isHero
+              ? "flex h-full transition-transform duration-700 ease-out motion-reduce:transition-none"
+              : "flex transition-transform duration-700 ease-out motion-reduce:transition-none"
+          }
           style={{ transform: `translateX(-${activeIndex * 100}%)` }}
         >
           {slides.map((slide) => (
-            <figure key={slide.id} className="relative min-w-full">
+            <figure key={slide.id} className={isHero ? "relative h-full min-w-full" : "relative min-w-full"}>
               <div
                 className={
                   isHero
-                    ? "relative aspect-[4/3] w-full bg-gradient-to-br from-rose-100 via-rose-50 to-amber-50"
+                    ? "relative aspect-[4/3] h-full min-h-[18rem] w-full bg-gradient-to-br from-rose-100 via-rose-50 to-amber-50 lg:aspect-auto lg:min-h-full"
                     : "relative aspect-[16/10] w-full bg-gradient-to-br from-rose-100 via-rose-50 to-amber-50 sm:aspect-[16/9]"
                 }
               >
@@ -91,7 +95,7 @@ export function CouplesPhotoCarousel({
                 <img
                   src={slide.imageSrc}
                   alt={galleryMessage(slide.altKey, "slide1Alt")}
-                  className="h-full w-full object-cover"
+                  className="h-full w-full object-cover object-top"
                   loading={isHero ? "eager" : "lazy"}
                   decoding="async"
                 />
@@ -152,7 +156,7 @@ export function CouplesPhotoCarousel({
           <div
             className={
               isHero
-                ? "absolute inset-x-0 bottom-14 flex items-center justify-center gap-1.5"
+                ? "absolute inset-x-0 bottom-3 flex items-center justify-center gap-1.5"
                 : "mt-4 flex items-center justify-center gap-2"
             }
             role="tablist"
@@ -191,7 +195,7 @@ export function CouplesPhotoCarousel({
       <div
         id="couple-gallery"
         aria-label={t("title")}
-        className="w-full"
+        className="h-full w-full"
       >
         {carousel}
       </div>

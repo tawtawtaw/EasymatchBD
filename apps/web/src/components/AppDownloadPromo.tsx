@@ -25,15 +25,15 @@ function QrBlock({
     <div
       className={
         tone === "hero"
-          ? "hidden rounded-2xl bg-white/15 p-3 lg:block"
+          ? "hidden max-w-xs items-center gap-3 rounded-xl bg-white px-3 py-2.5 shadow-lg ring-1 ring-white/70 lg:flex"
           : "hidden rounded-2xl border border-rose-100 bg-rose-50 p-4 lg:block"
       }
     >
-      <AppDownloadQr dataUrl={dataUrl} label={label} />
+      <AppDownloadQr dataUrl={dataUrl} label={label} size={tone === "hero" ? 112 : 220} />
       <p
         className={
           tone === "hero"
-            ? "mt-2 max-w-[220px] text-center text-xs text-rose-50"
+            ? "w-28 text-left text-xs font-medium leading-snug text-rose-900"
             : "mt-3 max-w-[220px] text-center text-sm text-zinc-600"
         }
       >
