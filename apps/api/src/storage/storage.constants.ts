@@ -1,5 +1,7 @@
 export const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 export const MAX_NID_BYTES = 5 * 1024 * 1024;
+export const MAX_APK_BYTES = 200 * 1024 * 1024;
+export const APP_RELEASE_STORAGE_PREFIX = 'app-releases/';
 export const MAX_GALLERY_PHOTOS = 4;
 
 export const ALLOWED_PHOTO_MIME_TYPES = new Set([

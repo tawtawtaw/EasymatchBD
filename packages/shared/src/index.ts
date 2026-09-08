@@ -38,6 +38,7 @@ export * from './video-call-scheduling';
 export * from './video-call-duration';
 export * from './video-call-log';
 export * from './marketing-banner';
+export * from './app-release';
 export * from './connection-messages';
 export * from './profile-gallery-slots';
 export * from './photo-variants';

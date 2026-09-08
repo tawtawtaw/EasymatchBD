@@ -12,6 +12,7 @@ import { RedisModule } from './redis/redis.module';
 import { StorageModule } from './storage/storage.module';
 import { LegalModule } from './legal/legal.module';
 import { MarketingModule } from './marketing/marketing.module';
+import { AppReleaseModule } from './app-release/app-release.module';
 import { AdminModule } from './admin/admin.module';
 import { VerificationModule } from './verification/verification.module';
 import { DiscoveryModule } from './discovery/discovery.module';
@@ -50,6 +51,7 @@ import { StaffModule } from './staff/staff.module';
     ComplaintsModule,
     LegalModule,
     MarketingModule,
+    AppReleaseModule,
     HealthModule,
   ],
   controllers: [AppController],

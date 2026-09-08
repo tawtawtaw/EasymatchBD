@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/commo
 import { PrismaClient } from '@prisma/client';
 import { ensureConnectionEndedSchema } from './ensure-connection-ended-schema';
 import { ensureMarketingBannerSchema } from './ensure-marketing-banner-schema';
+import { ensureAndroidAppReleaseSchema } from './ensure-android-app-release-schema';
 import { ensureMembershipTariffDiscountSchema } from './ensure-membership-tariff-discount-schema';
 
 @Injectable()
@@ -22,6 +23,7 @@ export class PrismaService
     if (connected) {
       await ensureMembershipTariffDiscountSchema(this, this.logger);
       await ensureMarketingBannerSchema(this, this.logger);
+      await ensureAndroidAppReleaseSchema(this, this.logger);
       if (process.env.NODE_ENV === 'production') {
         await ensureConnectionEndedSchema(this, this.logger);
       }

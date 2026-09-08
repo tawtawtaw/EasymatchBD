@@ -47,7 +47,7 @@ const nextConfig: NextConfig = {
     : {}),
   experimental: {
     preloadEntriesOnStart: false,
-    proxyClientMaxBodySize: "10mb",
+    proxyClientMaxBodySize: "200mb",
   },
   typescript: {
     // Pre-existing strict TS issues; dev uses `next dev` without blocking on these.
@@ -57,20 +57,17 @@ const nextConfig: NextConfig = {
   allowedDevOrigins,
   async rewrites() {
     const configured = process.env.NEXT_PUBLIC_API_URL?.trim();
-    if (configured) {
-      const apiBase = configured.replace(/\/$/, "");
-      // Proxy same-origin /api/v1 → API (OTP login, SSLCommerz callbacks, builds without baked-in URL).
-      return [
-        {
-          source: "/api/v1/:path*",
-          destination: `${apiBase}/:path*`,
-        },
-      ];
-    }
+    const apiBase = configured
+      ? configured.replace(/\/$/, "")
+      : `http://127.0.0.1:${LOCAL_API_PORT}/api/v1`;
     return [
       {
+        source: "/download/android.apk",
+        destination: `${apiBase}/public/app/android.apk`,
+      },
+      {
         source: "/api/v1/:path*",
-        destination: `http://127.0.0.1:${LOCAL_API_PORT}/api/v1/:path*`,
+        destination: `${apiBase}/:path*`,
       },
     ];
   },

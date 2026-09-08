@@ -15,6 +15,7 @@ import { AdminPaymentsPanel } from "@/components/AdminPaymentsPanel";
 import { AdminTariffsPanel } from "@/components/AdminTariffsPanel";
 import { AdminConsultantTariffsPanel } from "@/components/AdminConsultantTariffsPanel";
 import { AdminMarketingBannerPanel } from "@/components/AdminMarketingBannerPanel";
+import { AdminAppReleasePanel } from "@/components/AdminAppReleasePanel";
 import {
   createDropdownOption,
   deleteDropdownOption,
@@ -31,6 +32,7 @@ type AdminTab =
   | "privacy"
   | "legal"
   | "banner"
+  | "appDownload"
   | "tariffs"
   | "consultantTariffs"
   | "payments"
@@ -125,6 +127,7 @@ export default function AdminPage() {
       "privacy",
       "legal",
       "banner",
+      "appDownload",
       "tariffs",
       "consultantTariffs",
       "payments",
@@ -301,6 +304,7 @@ export default function AdminPage() {
                   "privacy",
                   "legal",
                   "banner",
+                  "appDownload",
                   "tariffs",
                   "consultantTariffs",
                   "payments",
@@ -352,6 +356,8 @@ export default function AdminPage() {
           <AdminLegalPanel onError={setError} onMessage={setMessage} />
         ) : activeTab === "banner" ? (
           <AdminMarketingBannerPanel onError={setError} onMessage={setMessage} />
+        ) : activeTab === "appDownload" ? (
+          <AdminAppReleasePanel onError={setError} onMessage={setMessage} />
         ) : activeTab === "privacy" ? (
           <AdminPrivacyFieldsPanel onError={setError} onMessage={setMessage} />
         ) : activeTab === "tariffs" ? (

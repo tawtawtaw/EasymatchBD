@@ -6,6 +6,7 @@ import MembershipCheckoutScreen from "../screens/membership/MembershipCheckoutSc
 import ConsultantCheckoutScreen from "../screens/consultant/ConsultantCheckoutScreen";
 import ConsultantCaseScreen from "../screens/consultant/ConsultantCaseScreen";
 import VideoCallRoomScreen from "../screens/messages/VideoCallRoomScreen";
+import { AppUpdatePrompt } from "../components/AppUpdatePrompt";
 import { MainAppShell } from "../components/MainAppShell";
 import { PushNotificationHost } from "../components/PushNotificationHost";
 import { useAuthStore } from "../store/authStore";
@@ -135,6 +136,7 @@ export function AppNavigator() {
       onStateChange={(state) => publishActiveRoute(state)}
     >
       <PushNotificationHost />
+      {user ? <AppUpdatePrompt /> : null}
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {user ? (
           needsOnboarding ? (

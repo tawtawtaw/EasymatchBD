@@ -3,7 +3,14 @@ import { connection } from "next/server";
 import { setRequestLocale } from "next-intl/server";
 import type { DropdownMap } from "@/lib/api";
 import { getApiBaseUrl } from "@/lib/api-base-url";
+import { headers } from "next/headers";
 import { PublicMarketingHome } from "@/components/PublicMarketingHome";
+import {
+  buildDownloadPageUrl,
+  getPublicAndroidAppRelease,
+  originFromRequestHeaders,
+} from "@/lib/app-release";
+import { toQrDataUrl } from "@/lib/app-release-qr";
 import { getPublicPlatformStats, listPublicProfiles } from "@/lib/public-browse";
 import { readJsonResponse } from "@/lib/parse-response";
 
@@ -84,11 +91,18 @@ export default async function HomePage({
   // Skip build-time API pre-render — Railway build cannot reliably reach the live API.
   await connection();
 
-  const [dropdowns, featured, tariffs] = await Promise.all([
+  const headerList = await headers();
+  const [dropdowns, featured, tariffs, appRelease] = await Promise.all([
     fetchServerDropdowns(locale),
     fetchFeaturedProfiles(),
     fetchMembershipTariffs(),
+    getPublicAndroidAppRelease(),
   ]);
+  const appDownloadPageUrl = buildDownloadPageUrl(
+    originFromRequestHeaders(headerList),
+    locale,
+  );
+  const appQrDataUrl = await toQrDataUrl(appDownloadPageUrl);
 
   return (
     <PublicMarketingHome
@@ -96,6 +110,8 @@ export default async function HomePage({
       featuredProfiles={featured.items}
       verifiedProfileCount={featured.verifiedProfileCount}
       tariffs={tariffs}
+      appRelease={appRelease}
+      appQrDataUrl={appQrDataUrl}
     />
   );
 }

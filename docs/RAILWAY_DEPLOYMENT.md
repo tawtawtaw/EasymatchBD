@@ -179,7 +179,16 @@ SUPABASE_SECRET_KEY=sb_secret_...
 SUPABASE_STORAGE_BUCKET=profile-media
 ```
 
-3. Redeploy API. Startup log should show: `Storage backend: supabase (bucket=profile-media)`.
+3. Create a second **private** bucket `app-releases` for Android APKs. Do **not** raise the photo bucket to 150 MB.
+   - File size limit: **200 MB**
+   - Allowed MIME types: `application/vnd.android.package-archive`, `application/octet-stream`, `application/zip`
+4. **API variables** (add this next to the photo bucket):
+
+```env
+SUPABASE_APP_RELEASE_BUCKET=app-releases
+```
+
+5. Redeploy API. Startup log should show: `Storage backend: supabase (bucket=profile-media, app-releases=app-releases)`.
 
 The Railway volume / `UPLOAD_DIR` is optional when using Supabase. Existing files on disk are still readable as a fallback until you re-upload.
 

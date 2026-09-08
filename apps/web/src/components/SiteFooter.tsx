@@ -114,6 +114,9 @@ export async function SiteFooter() {
                 <Link href="/membership" className={linkClass}>
                   {t("membershipPlans")}
                 </Link>
+                <Link href="/download" className={`${linkClass} lg:hidden`}>
+                  {t("getTheApp")}
+                </Link>
                 <Link href="/#success-stories" className={linkClass}>
                   {t("successStories")}
                 </Link>

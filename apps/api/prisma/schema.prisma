@@ -129,6 +129,7 @@ model User {
   pushTokens                     UserPushToken[]
   staffNotificationsTargeted     StaffNotification[]     @relation("StaffNotificationTarget")
   staffNotificationReads       StaffNotificationRead[]
+  androidAppReleasesPublished  AndroidAppRelease[]
 }
 
 model StaffNotification {
@@ -956,6 +957,23 @@ model MarketingBanner {
   startsAt  DateTime?
   endsAt    DateTime?
   updatedAt DateTime  @updatedAt
+}
+
+model AndroidAppRelease {
+  id            String   @id @default(cuid())
+  versionCode   Int      @unique
+  versionName   String
+  storageKey    String
+  fileName      String
+  fileSizeBytes Int
+  mimeType      String
+  isCurrent     Boolean  @default(false)
+  publishedById String?
+  publishedBy   User?    @relation(fields: [publishedById], references: [id], onDelete: SetNull)
+  publishedAt   DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  @@index([isCurrent])
 }
 
 model TermsSettings {

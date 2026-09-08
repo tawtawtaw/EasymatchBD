@@ -7,6 +7,7 @@ import {
 } from './local-storage.backend';
 import { resolveStorageConfig } from './storage.config';
 import { SupabaseStorageBackend } from './supabase-storage.backend';
+import { APP_RELEASE_STORAGE_PREFIX } from './storage.constants';
 import type { StorageCategory } from './storage.types';
 import { derivedPhotoStorageKey } from './storage.utils';
 
@@ -14,6 +15,7 @@ import { derivedPhotoStorageKey } from './storage.utils';
 export class StorageService implements OnModuleInit {
   private readonly logger = new Logger(StorageService.name);
   private primary!: LocalStorageBackend | SupabaseStorageBackend;
+  private appRelease!: LocalStorageBackend | SupabaseStorageBackend;
   private localFallback: LocalStorageBackend | null = null;
   private activeBackend: 'local' | 'supabase' = 'local';
 
@@ -22,6 +24,7 @@ export class StorageService implements OnModuleInit {
       this.config.get<string>('UPLOAD_DIR'),
     );
     this.primary = new LocalStorageBackend(uploadRoot);
+    this.appRelease = this.primary;
   }
 
   onModuleInit(): void {
@@ -33,6 +36,7 @@ export class StorageService implements OnModuleInit {
 
     if (resolved.backend !== 'supabase') {
       this.primary = local;
+      this.appRelease = local;
       this.activeBackend = 'local';
       if (resolved.missingSupabase.length > 0) {
         const requested = this.config.get<string>('STORAGE_BACKEND')?.trim();
@@ -56,9 +60,26 @@ export class StorageService implements OnModuleInit {
       secretKey,
       bucket: resolved.bucket!,
     });
+    const appReleaseBucket =
+      this.config.get<string>('SUPABASE_APP_RELEASE_BUCKET')?.trim() || null;
+    if (appReleaseBucket && appReleaseBucket !== resolved.bucket) {
+      this.appRelease = new SupabaseStorageBackend({
+        url,
+        secretKey,
+        bucket: appReleaseBucket,
+      });
+      this.logger.log(
+        `Storage backend: supabase (bucket=${resolved.bucket}, app-releases=${appReleaseBucket})`,
+      );
+    } else {
+      this.appRelease = this.primary;
+      this.logger.warn(
+        'SUPABASE_APP_RELEASE_BUCKET is unset. APK uploads use the photo bucket and will fail the 5 MB / image MIME limits. Create a private app-releases bucket (200 MB) and set the variable.',
+      );
+      this.logger.log(`Storage backend: supabase (bucket=${resolved.bucket})`);
+    }
     this.localFallback = local;
     this.activeBackend = 'supabase';
-    this.logger.log(`Storage backend: supabase (bucket=${resolved.bucket})`);
   }
 
   async save(
@@ -84,21 +105,22 @@ export class StorageService implements OnModuleInit {
     buffer: Buffer,
     mimeType: string,
   ): Promise<void> {
-    await this.primary.saveAt(storageKey, buffer, mimeType);
+    await this.storeFor(storageKey).saveAt(storageKey, buffer, mimeType);
   }
 
   async readBuffer(storageKey: string): Promise<Buffer> {
-    if (await this.primary.exists(storageKey)) {
-      return await this.primary.readBuffer(storageKey);
+    const store = this.storeFor(storageKey);
+    if (await store.exists(storageKey)) {
+      return await store.readBuffer(storageKey);
     }
     if (this.localFallback && (await this.localFallback.exists(storageKey))) {
       return this.localFallback.readBuffer(storageKey);
     }
-    return await this.primary.readBuffer(storageKey);
+    return await store.readBuffer(storageKey);
   }
 
   async delete(storageKey: string): Promise<void> {
-    await this.primary.delete(storageKey);
+    await this.storeFor(storageKey).delete(storageKey);
   }
 
   async deleteUserFiles(userId: string): Promise<void> {
@@ -110,20 +132,27 @@ export class StorageService implements OnModuleInit {
   }
 
   async exists(storageKey: string): Promise<boolean> {
-    if (await this.primary.exists(storageKey)) {
+    if (await this.storeFor(storageKey).exists(storageKey)) {
       return true;
     }
     return this.localFallback?.exists(storageKey) ?? false;
   }
 
   async createReadStream(storageKey: string): Promise<Readable> {
-    if (await this.primary.exists(storageKey)) {
-      return await this.primary.createReadStream(storageKey);
+    const store = this.storeFor(storageKey);
+    if (await store.exists(storageKey)) {
+      return await store.createReadStream(storageKey);
     }
     if (this.localFallback?.exists(storageKey)) {
       return this.localFallback.createReadStream(storageKey);
     }
-    return await this.primary.createReadStream(storageKey);
+    return await store.createReadStream(storageKey);
+  }
+
+  private storeFor(storageKey: string) {
+    return storageKey.startsWith(APP_RELEASE_STORAGE_PREFIX)
+      ? this.appRelease
+      : this.primary;
   }
 
   async deleteDerivedPhotos(originalKey: string): Promise<void> {

@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
 import { BrowseNavLink } from "@/components/BrowseNavLink";
+import { DownloadAppNavLink } from "@/components/DownloadAppNavLink";
 import { AdminNavLink } from "@/components/AdminNavLink";
 import { AuthNavLinks } from "@/components/AuthNavLinks";
 import { ConnectionsNavLink } from "@/components/ConnectionsNavLink";
@@ -42,6 +43,7 @@ function HeaderNavItems({
       ) : null}
       <AuthNavLinks layout={layout} onNavigate={onNavigate} />
       <BrowseNavLink layout={layout} onNavigate={onNavigate} />
+      <DownloadAppNavLink layout={layout} onNavigate={onNavigate} />
       <DiscoveryNavLink layout={layout} onNavigate={onNavigate} />
       <ConnectionsNavLink layout={layout} onNavigate={onNavigate} />
       <MembershipNavLink layout={layout} onNavigate={onNavigate} />

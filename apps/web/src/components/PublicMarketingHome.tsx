@@ -7,11 +7,13 @@ import type { MembershipTariff } from "@easymatch/shared";
 import { PublicBrowseProfileCard } from "@/components/PublicBrowseProfileCard";
 import { CouplesPhotoCarousel } from "@/components/CouplesPhotoCarousel";
 import { MembershipPlanCard } from "@/components/MembershipPlanCard";
+import { AppDownloadPromo } from "@/components/AppDownloadPromo";
 import { HOME_GALLERY_SLIDES } from "@/content/home-gallery-slides";
 import {
   HOME_MARKETING_IMAGES,
   HOME_TESTIMONIAL_IMAGES,
 } from "@/content/home-marketing-images";
+import type { PublicAndroidAppRelease } from "@easymatch/shared";
 import type { DropdownMap } from "@/lib/api";
 import {
   getPublicPlatformStats,
@@ -23,6 +25,8 @@ type PublicMarketingHomeProps = {
   featuredProfiles: PublicBrowseListItem[];
   verifiedProfileCount: number;
   tariffs: MembershipTariff[];
+  appRelease?: PublicAndroidAppRelease;
+  appQrDataUrl?: string | null;
 };
 
 export function PublicMarketingHome({
@@ -30,6 +34,8 @@ export function PublicMarketingHome({
   featuredProfiles,
   verifiedProfileCount,
   tariffs,
+  appRelease,
+  appQrDataUrl,
 }: PublicMarketingHomeProps) {
   const t = useTranslations("publicHome");
   const locale = useLocale();
@@ -156,6 +162,11 @@ export function PublicMarketingHome({
                 {t("joinCta")}
               </Link>
             </div>
+            <AppDownloadPromo
+              variant="hero"
+              initialRelease={appRelease}
+              initialQrDataUrl={appQrDataUrl}
+            />
           </div>
           <div className="relative">
             <div className="absolute -right-4 -top-4 h-full w-full rounded-3xl bg-emerald-400/30 blur-2xl" />

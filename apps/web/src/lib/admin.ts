@@ -277,3 +277,48 @@ export async function updateAdminMarketingBanner(
   });
   return parseResponse<MarketingBannerConfig>(res);
 }
+
+export type AdminAndroidAppReleaseStatus = {
+  current: {
+    id: string;
+    versionCode: number;
+    versionName: string;
+    fileName: string;
+    fileSizeBytes: number;
+    isCurrent: boolean;
+    publishedAt: string;
+  } | null;
+  nextVersionCode: number;
+  history: Array<{
+    id: string;
+    versionCode: number;
+    versionName: string;
+    fileName: string;
+    fileSizeBytes: number;
+    isCurrent: boolean;
+    publishedAt: string;
+  }>;
+};
+
+export async function getAdminAppRelease(token: string) {
+  const res = await fetch(`${API_URL}/admin/app-release`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return parseResponse<AdminAndroidAppReleaseStatus>(res);
+}
+
+export async function publishAdminAppRelease(
+  token: string,
+  payload: { versionCode: string; versionName: string; file: File },
+) {
+  const body = new FormData();
+  body.append("versionCode", payload.versionCode);
+  body.append("versionName", payload.versionName);
+  body.append("file", payload.file);
+  const res = await fetch(`${API_URL}/admin/app-release`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body,
+  });
+  return parseResponse<AdminAndroidAppReleaseStatus>(res);
+}
