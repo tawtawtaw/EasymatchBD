@@ -171,9 +171,8 @@ export function PublicMarketingHome({
               />
             </div>
           </div>
-          <div className="relative min-h-[18rem] lg:min-h-0">
-            <div className="absolute -right-3 -top-3 h-full w-full rounded-3xl bg-emerald-400/30 blur-2xl lg:hidden" />
-            <div className="h-full lg:absolute lg:inset-0">
+          <div className="relative w-full min-h-[18rem] overflow-hidden lg:min-h-0">
+            <div className="w-full lg:absolute lg:inset-0 lg:h-full">
               <CouplesPhotoCarousel variant="hero" />
             </div>
           </div>

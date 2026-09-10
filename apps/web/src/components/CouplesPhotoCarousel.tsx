@@ -57,7 +57,7 @@ export function CouplesPhotoCarousel({
 
   const carousel = (
     <div
-      className={isHero ? "relative h-full w-full" : "relative mx-auto mt-10 max-w-4xl"}
+      className={isHero ? "relative w-full overflow-hidden lg:h-full" : "relative mx-auto mt-10 max-w-4xl"}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocusCapture={() => setPaused(true)}
@@ -70,24 +70,24 @@ export function CouplesPhotoCarousel({
       <div
         className={
           isHero
-            ? "h-full overflow-hidden rounded-2xl border border-white/60 bg-white/90 shadow-xl backdrop-blur lg:rounded-none lg:rounded-l-2xl lg:border-0 lg:shadow-none"
+            ? "overflow-hidden rounded-2xl border border-white/60 bg-white/90 shadow-xl backdrop-blur lg:h-full lg:rounded-none lg:rounded-l-2xl lg:border-0 lg:shadow-none"
             : "overflow-hidden rounded-3xl border border-rose-100 bg-white shadow-lg shadow-rose-100/60"
         }
       >
         <div
           className={
             isHero
-              ? "flex h-full transition-transform duration-700 ease-out motion-reduce:transition-none"
+              ? "flex w-full transition-transform duration-700 ease-out motion-reduce:transition-none lg:h-full"
               : "flex transition-transform duration-700 ease-out motion-reduce:transition-none"
           }
           style={{ transform: `translateX(-${activeIndex * 100}%)` }}
         >
           {slides.map((slide) => (
-            <figure key={slide.id} className={isHero ? "relative h-full min-w-full" : "relative min-w-full"}>
+            <figure key={slide.id} className={isHero ? "relative w-full min-w-full shrink-0 lg:h-full" : "relative min-w-full"}>
               <div
                 className={
                   isHero
-                    ? "relative aspect-[4/3] h-full min-h-[18rem] w-full bg-gradient-to-br from-rose-100 via-rose-50 to-amber-50 lg:aspect-auto lg:min-h-full"
+                    ? "relative aspect-[4/3] w-full bg-gradient-to-br from-rose-100 via-rose-50 to-amber-50 lg:aspect-auto lg:h-full lg:min-h-full"
                     : "relative aspect-[16/10] w-full bg-gradient-to-br from-rose-100 via-rose-50 to-amber-50 sm:aspect-[16/9]"
                 }
               >
@@ -95,7 +95,7 @@ export function CouplesPhotoCarousel({
                 <img
                   src={slide.imageSrc}
                   alt={galleryMessage(slide.altKey, "slide1Alt")}
-                  className="h-full w-full object-cover object-top"
+                  className="h-full w-full object-cover max-lg:object-center lg:object-top"
                   loading={isHero ? "eager" : "lazy"}
                   decoding="async"
                 />
@@ -195,7 +195,7 @@ export function CouplesPhotoCarousel({
       <div
         id="couple-gallery"
         aria-label={t("title")}
-        className="h-full w-full"
+        className="w-full overflow-hidden lg:h-full"
       >
         {carousel}
       </div>
