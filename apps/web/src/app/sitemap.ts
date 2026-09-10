@@ -2,8 +2,11 @@ import type { MetadataRoute } from "next";
 import { routing } from "@/i18n/routing";
 import { SITE_URL } from "@/lib/site-url";
 
-/** Public marketing and legal pages only — not signed-in or admin routes. */
-const PUBLIC_PATHS: { path: string; changeFrequency: MetadataRoute.Sitemap[number]["changeFrequency"]; priority: number }[] = [
+const PUBLIC_PATHS: {
+  path: string;
+  changeFrequency: MetadataRoute.Sitemap[number]["changeFrequency"];
+  priority: number;
+}[] = [
   { path: "", changeFrequency: "weekly", priority: 1 },
   { path: "/browse", changeFrequency: "daily", priority: 0.9 },
   { path: "/membership", changeFrequency: "weekly", priority: 0.8 },
@@ -19,27 +22,15 @@ const PUBLIC_PATHS: { path: string; changeFrequency: MetadataRoute.Sitemap[numbe
   { path: "/service-delivery", changeFrequency: "yearly", priority: 0.4 },
 ];
 
-function localizedUrl(locale: string, path: string): string {
-  return `${SITE_URL}/${locale}${path}`;
-}
-
 export default function sitemap(): MetadataRoute.Sitemap {
-  const lastModified = new Date();
+  const lastModified = new Date("2026-09-10");
 
-  return PUBLIC_PATHS.map(({ path, changeFrequency, priority }) => {
-    const languages: Record<string, string> = {
-      "x-default": localizedUrl(routing.defaultLocale, path),
-    };
-    for (const locale of routing.locales) {
-      languages[locale] = localizedUrl(locale, path);
-    }
-
-    return {
-      url: localizedUrl(routing.defaultLocale, path),
+  return PUBLIC_PATHS.flatMap(({ path, changeFrequency, priority }) =>
+    routing.locales.map((locale) => ({
+      url: `${SITE_URL}/${locale}${path}`,
       lastModified,
       changeFrequency,
       priority,
-      alternates: { languages },
-    };
-  });
+    })),
+  );
 }
