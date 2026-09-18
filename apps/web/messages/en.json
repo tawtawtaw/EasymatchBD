@@ -3200,6 +3200,11 @@
       "downloadFailed": "Could not generate the PDF. Please try again."
     }
   },
+  "notFound": {
+    "title": "Page not found",
+    "body": "This page does not exist or is no longer available.",
+    "home": "Back to home"
+  },
   "metadata": {
     "title": "EasymatchBD — Trusted Matrimonial Matchmaking",
     "description": "Secure matrimonial platform for Bangladesh with progressive privacy and verified profiles."

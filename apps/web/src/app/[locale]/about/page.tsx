@@ -1,6 +1,9 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { MarketingInfoPage } from "@/components/MarketingInfoPage";
 import { ABOUT_COMPANY, phoneTelHref } from "@/lib/about-company";
+import { generatePublicMetadata } from "@/lib/seo";
+
+export const generateMetadata = generatePublicMetadata("/about");
 
 export default async function AboutPage({
   params,

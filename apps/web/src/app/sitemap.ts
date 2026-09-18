@@ -23,7 +23,7 @@ const PUBLIC_PATHS: {
 ];
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const lastModified = new Date("2026-09-10");
+  const lastModified = new Date("2026-09-18");
 
   return PUBLIC_PATHS.flatMap(({ path, changeFrequency, priority }) =>
     routing.locales.map((locale) => ({

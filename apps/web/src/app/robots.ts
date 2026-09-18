@@ -1,25 +1,10 @@
 import type { MetadataRoute } from "next";
 import { routing } from "@/i18n/routing";
 import { SITE_URL } from "@/lib/site-url";
-
-const PRIVATE_PREFIXES = [
-  "/admin",
-  "/auth",
-  "/profile",
-  "/discovery",
-  "/connections",
-  "/messages",
-  "/video-calls",
-  "/video",
-  "/verification",
-  "/consultant",
-  "/complaints",
-  "/home",
-  "/mobile",
-];
+import { SEO_PRIVATE_PREFIXES } from "@/lib/seo";
 
 export default function robots(): MetadataRoute.Robots {
-  const disallow = PRIVATE_PREFIXES.flatMap((prefix) =>
+  const disallow = SEO_PRIVATE_PREFIXES.flatMap((prefix) =>
     routing.locales.map((locale) => `/${locale}${prefix}`),
   );
 

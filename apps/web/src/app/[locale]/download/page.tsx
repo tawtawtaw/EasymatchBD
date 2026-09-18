@@ -9,6 +9,9 @@ import {
   originFromRequestHeaders,
 } from "@/lib/app-release";
 import { toQrDataUrl } from "@/lib/app-release-qr";
+import { generatePublicMetadata } from "@/lib/seo";
+
+export const generateMetadata = generatePublicMetadata("/download");
 
 export const dynamic = "force-dynamic";
 

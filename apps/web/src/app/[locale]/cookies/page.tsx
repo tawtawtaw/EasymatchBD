@@ -1,5 +1,8 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { MarketingInfoPage } from "@/components/MarketingInfoPage";
+import { generatePublicMetadata } from "@/lib/seo";
+
+export const generateMetadata = generatePublicMetadata("/cookies");
 
 export default async function CookiesPage({
   params,

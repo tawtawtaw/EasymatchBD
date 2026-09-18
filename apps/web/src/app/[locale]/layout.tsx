@@ -25,6 +25,9 @@ import { WhatsAppSupport } from "@/components/WhatsAppSupport";
 import { LocaleShell } from "@/components/LocaleShell";
 import { DocumentLocale } from "@/components/DocumentLocale";
 import { fetchPublicMarketingBanner } from "@/lib/marketing-banner";
+import { headers } from "next/headers";
+import { localeSeoMetadata } from "@/lib/seo";
+import { SITE_URL } from "@/lib/site-url";
 
 const geistSans = Geist({
   subsets: ["latin"],
@@ -51,11 +54,22 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "metadata" });
+  const pathname = (await headers()).get("x-pathname")?.trim();
 
-  return {
+  if (!pathname) {
+    return {
+      metadataBase: new URL(SITE_URL),
+      title: t("title"),
+      description: t("description"),
+    };
+  }
+
+  return localeSeoMetadata({
+    locale,
+    pathname,
     title: t("title"),
     description: t("description"),
-  };
+  });
 }
 
 export default async function LocaleLayout({

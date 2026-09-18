@@ -1,70 +1,51 @@
-"use client";
-
-import { useCallback, useEffect, useState } from "react";
-import { useLocale, useTranslations } from "next-intl";
-import { useParams } from "next/navigation";
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Link } from "@/i18n/routing";
 import { DiscoveryFieldSection } from "@/components/DiscoveryFieldSection";
 import { VerificationBadge } from "@/components/VerificationBadge";
-import { DropdownMap, getDropdowns } from "@/lib/api";
-import { useMounted } from "@/hooks/use-mounted";
 import {
   displayPublicName,
+  getPublicDropdowns,
   getPublicProfile,
-  type PublicBrowseProfile,
 } from "@/lib/public-browse";
+import { publicPathMetadata } from "@/lib/seo";
 
-export default function PublicBrowseProfilePage() {
-  const params = useParams<{ profileCode: string }>();
-  const profileCode = params.profileCode;
-  const locale = useLocale();
-  const t = useTranslations("publicBrowse");
-  const mounted = useMounted();
-  const [profile, setProfile] = useState<PublicBrowseProfile | null>(null);
-  const [dropdowns, setDropdowns] = useState<DropdownMap>({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [data, dd] = await Promise.all([
-        getPublicProfile(profileCode),
-        getDropdowns(locale),
-      ]);
-      setProfile(data);
-      setDropdowns(dd);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t("error"));
-      setProfile(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [profileCode, locale, t]);
-
-  useEffect(() => {
-    if (!mounted) return;
-    void load();
-  }, [mounted, load]);
-
-  if (!mounted || loading) {
-    return (
-      <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
-        <p className="text-zinc-600">{t("loading")}</p>
-      </main>
-    );
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string; profileCode: string }>;
+}): Promise<Metadata> {
+  const { locale, profileCode } = await params;
+  const profile = await getPublicProfile(profileCode);
+  if (!profile) {
+    return { robots: { index: false, follow: false } };
   }
+  const name = displayPublicName(profile.personal);
+  const title = name
+    ? `${name} | EasymatchBD`
+    : `Profile ${profile.profileCode} | EasymatchBD`;
+  return {
+    ...publicPathMetadata(locale, `/browse/${profile.profileCode}`),
+    title,
+  };
+}
+
+export default async function PublicBrowseProfilePage({
+  params,
+}: {
+  params: Promise<{ locale: string; profileCode: string }>;
+}) {
+  const { locale, profileCode } = await params;
+  setRequestLocale(locale);
+  const t = await getTranslations("publicBrowse");
+  const [profile, dropdowns] = await Promise.all([
+    getPublicProfile(profileCode),
+    getPublicDropdowns(locale),
+  ]);
 
   if (!profile) {
-    return (
-      <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
-        <Link href="/browse" className="text-sm font-medium text-rose-800">
-          {t("backToBrowse")}
-        </Link>
-        <p className="mt-4 text-zinc-600">{error ?? t("notFound")}</p>
-      </main>
-    );
+    notFound();
   }
 
   const name = displayPublicName(profile.personal);

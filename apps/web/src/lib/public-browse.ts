@@ -1,6 +1,6 @@
 import { PUBLIC_BROWSE_DEFAULT_LIMIT } from "@easymatch/shared";
+import { dedupeRequest, type DropdownMap } from "@/lib/api";
 import type { DiscoveryFilters } from "@/lib/discovery";
-import { dedupeRequest } from "@/lib/api";
 import { getApiBaseUrl } from "@/lib/api-base-url";
 import { readJsonResponse } from "@/lib/parse-response";
 
@@ -118,13 +118,26 @@ export async function listPublicProfiles(
   return readJsonResponse(res);
 }
 
+export async function getPublicDropdowns(locale: string): Promise<DropdownMap> {
+  try {
+    const res = await fetchPublicApi(
+      `${getApiBaseUrl()}/profiles/dropdowns?locale=${encodeURIComponent(locale)}`,
+      { revalidate: 3600 },
+    );
+    return await readJsonResponse<DropdownMap>(res);
+  } catch {
+    return {};
+  }
+}
+
 export async function getPublicProfile(
   profileCode: string,
-): Promise<PublicBrowseProfile> {
+): Promise<PublicBrowseProfile | null> {
   const res = await fetch(
     `${getApiBaseUrl()}/public/profiles/${encodeURIComponent(profileCode)}`,
     { next: { revalidate: 30 } },
   );
+  if (res.status === 404) return null;
   return readJsonResponse(res);
 }
 

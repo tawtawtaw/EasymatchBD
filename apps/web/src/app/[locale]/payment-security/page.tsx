@@ -1,5 +1,8 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { MarketingInfoPage } from "@/components/MarketingInfoPage";
+import { generatePublicMetadata } from "@/lib/seo";
+
+export const generateMetadata = generatePublicMetadata("/payment-security");
 
 const SECTION_KEYS = [
   "gateway",

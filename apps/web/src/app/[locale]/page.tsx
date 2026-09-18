@@ -13,6 +13,9 @@ import {
 import { toQrDataUrl } from "@/lib/app-release-qr";
 import { getPublicPlatformStats, listPublicProfiles } from "@/lib/public-browse";
 import { readJsonResponse } from "@/lib/parse-response";
+import { generatePublicMetadata } from "@/lib/seo";
+
+export const generateMetadata = generatePublicMetadata("");
 
 const BUILD_FETCH_TIMEOUT_MS = 15_000;
 

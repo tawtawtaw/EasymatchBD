@@ -12,6 +12,9 @@ import {
 } from "@/lib/site-social";
 import { ABOUT_COMPANY, phoneTelHref } from "@/lib/about-company";
 import { buildWhatsAppChatUrl, normalizeWhatsAppPhoneDigits } from "@/lib/whatsapp-support";
+import { generatePublicMetadata } from "@/lib/seo";
+
+export const generateMetadata = generatePublicMetadata("/contact");
 
 export default async function ContactPage({
   params,
