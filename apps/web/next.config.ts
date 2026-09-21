@@ -34,9 +34,18 @@ const whatsappSupportNumber =
   process.env.WHATSAPP_SUPPORT_NUMBER?.trim() ||
   process.env.NEXT_PUBLIC_WHATSAPP_SUPPORT_NUMBER?.trim();
 
+const repoRoot = path.join(__dirname, "../../");
+const isNextDev = process.argv.includes("dev");
+
 const nextConfig: NextConfig = {
   output: "standalone",
-  outputFileTracingRoot: path.join(__dirname, "../../"),
+  // Standalone Railway builds must trace workspace packages from the repo root.
+  outputFileTracingRoot: repoRoot,
+  // `next dev` + a repo-wide Turbopack root watches api/mobile/image trees and
+  // eventually OOMs (~7GB). Pin the web app in development only.
+  turbopack: {
+    root: isNextDev ? __dirname : repoRoot,
+  },
   transpilePackages: ["@easymatch/shared"],
   ...(whatsappSupportNumber
     ? {
@@ -55,6 +64,25 @@ const nextConfig: NextConfig = {
   },
   // HMR + dev assets when using ngrok (hostname only — see normalizeAllowedDevOriginHost).
   allowedDevOrigins,
+  async redirects() {
+    // Consolidate www → apex so Google does not pick a different host canonical
+    // than the user-declared tags / sitemap (https://easymatchbd.com).
+    const wwwToApex = { type: "host" as const, value: "www.easymatchbd.com" };
+    return [
+      {
+        source: "/",
+        has: [wwwToApex],
+        destination: "https://easymatchbd.com/",
+        permanent: true,
+      },
+      {
+        source: "/:path*",
+        has: [wwwToApex],
+        destination: "https://easymatchbd.com/:path*",
+        permanent: true,
+      },
+    ];
+  },
   async rewrites() {
     const configured = process.env.NEXT_PUBLIC_API_URL?.trim();
     const apiBase = configured
