@@ -56,6 +56,8 @@ export async function generateMetadata({
   const t = await getTranslations({ locale, namespace: "metadata" });
   const pathname = (await headers()).get("x-pathname")?.trim();
 
+  // Default / private-route fallback. Public pages set absolute titles via
+  // `generatePublicMetadata`.
   if (!pathname) {
     return {
       metadataBase: new URL(SITE_URL),

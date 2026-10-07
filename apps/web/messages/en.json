@@ -3207,6 +3207,64 @@
   },
   "metadata": {
     "title": "EasymatchBD — Trusted Matrimonial Matchmaking",
-    "description": "Secure matrimonial platform for Bangladesh with progressive privacy and verified profiles."
+    "description": "Secure matrimonial platform for Bangladesh with progressive privacy and verified profiles.",
+    "brand": "EasymatchBD",
+    "profileUntitled": "Profile {code} | EasymatchBD",
+    "profileTitled": "{name} | EasymatchBD",
+    "profileDescription": "View verified biodata for profile {code} on EasymatchBD — privacy-first matrimonial matchmaking in Bangladesh.",
+    "pages": {
+      "home": {
+        "title": "EasymatchBD — Trusted Matrimonial Matchmaking in Bangladesh",
+        "description": "Find a serious match with verified biodata, progressive privacy, and family values. Browse anonymously on EasymatchBD."
+      },
+      "browse": {
+        "title": "Browse Verified Biodata | EasymatchBD",
+        "description": "Search verified matrimonial biodata in Bangladesh. Filter by district, education, and more — photos stay private until you connect."
+      },
+      "membership": {
+        "title": "Membership Plans & Pricing | EasymatchBD",
+        "description": "See EasymatchBD membership plans. Paid membership unlocks interest, messaging, and connection features for serious matchmaking."
+      },
+      "download": {
+        "title": "Download the Android App | EasymatchBD",
+        "description": "Install the EasymatchBD Android app. Scan the QR code on desktop or download the APK on your phone."
+      },
+      "about": {
+        "title": "About Us | EasymatchBD",
+        "description": "Learn about EasymatchBD — a DNCC-licensed marriage media service focused on verification, privacy, and family-friendly matchmaking in Bangladesh."
+      },
+      "contact": {
+        "title": "Contact Us | EasymatchBD",
+        "description": "Contact EasymatchBD support for membership, verification, or account help. We're here for members and families in Bangladesh."
+      },
+      "privacy": {
+        "title": "Privacy Policy | EasymatchBD",
+        "description": "Read how EasymatchBD collects, uses, and protects your personal data, photos, and progressive privacy levels."
+      },
+      "privacyFields": {
+        "title": "Privacy Field Levels Explained | EasymatchBD",
+        "description": "See which biodata fields appear at each EasymatchBD privacy level — from public browse to family contact exchange."
+      },
+      "terms": {
+        "title": "Terms and Conditions | EasymatchBD",
+        "description": "Read the EasymatchBD terms and conditions for using our matrimonial platform and related services."
+      },
+      "cookies": {
+        "title": "Cookies Policy | EasymatchBD",
+        "description": "Learn how EasymatchBD uses cookies and similar storage for sign-in, language preferences, and essential site functions."
+      },
+      "refund": {
+        "title": "Refund & Cancellation Policy | EasymatchBD",
+        "description": "Understand EasymatchBD refund and cancellation rules for membership and related paid services."
+      },
+      "paymentSecurity": {
+        "title": "Payment Security Policy | EasymatchBD",
+        "description": "How EasymatchBD handles payments securely through approved gateways — encryption, what we store, and how to get help."
+      },
+      "serviceDelivery": {
+        "title": "Service Delivery Timeline | EasymatchBD",
+        "description": "See when EasymatchBD membership and digital services activate after a successful payment."
+      }
+    }
   }
 }

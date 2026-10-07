@@ -17,18 +17,24 @@ export async function generateMetadata({
   params: Promise<{ locale: string; profileCode: string }>;
 }): Promise<Metadata> {
   const { locale, profileCode } = await params;
-  const profile = await getPublicProfile(profileCode);
+  const [profile, t] = await Promise.all([
+    getPublicProfile(profileCode),
+    getTranslations({ locale, namespace: "metadata" }),
+  ]);
   if (!profile) {
     return { robots: { index: false, follow: false } };
   }
   const name = displayPublicName(profile.personal);
   const title = name
-    ? `${name} | EasymatchBD`
-    : `Profile ${profile.profileCode} | EasymatchBD`;
-  return {
-    ...publicPathMetadata(locale, `/browse/${profile.profileCode}`),
+    ? t("profileTitled", { name })
+    : t("profileUntitled", { code: profile.profileCode });
+  const description = t("profileDescription", {
+    code: profile.profileCode,
+  });
+  return publicPathMetadata(locale, `/browse/${profile.profileCode}`, {
     title,
-  };
+    description,
+  });
 }
 
 export default async function PublicBrowseProfilePage({
