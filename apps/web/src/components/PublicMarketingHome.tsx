@@ -9,10 +9,7 @@ import { CouplesPhotoCarousel } from "@/components/CouplesPhotoCarousel";
 import { MembershipPlanCard } from "@/components/MembershipPlanCard";
 import { AppDownloadPromo } from "@/components/AppDownloadPromo";
 import { HOME_GALLERY_SLIDES } from "@/content/home-gallery-slides";
-import {
-  HOME_MARKETING_IMAGES,
-  HOME_TESTIMONIAL_IMAGES,
-} from "@/content/home-marketing-images";
+import { HOME_TESTIMONIAL_IMAGES } from "@/content/home-marketing-images";
 import type { PublicAndroidAppRelease } from "@easymatch/shared";
 import type { DropdownMap } from "@/lib/api";
 import {
@@ -85,9 +82,10 @@ export function PublicMarketingHome({
     "connectFamilies",
   ] as const;
 
-  const steps = stepKeys.map((key) => ({
+  const steps = stepKeys.map((key, index) => ({
     title: t(`steps.${key}.title`),
     body: t(`steps.${key}.body`),
+    iconSrc: `/home/icons/how-${index + 1}.png`,
   }));
 
   const trustKeys = [
@@ -122,6 +120,7 @@ export function PublicMarketingHome({
     level,
     label: t(`privacyLevels.items.${level}.label`),
     body: t(`privacyLevels.items.${level}.body`),
+    iconSrc: `/home/icons/privacy-${level}.png`,
   }));
 
   const stories = ["one", "two", "three"] as const;
@@ -218,104 +217,6 @@ export function PublicMarketingHome({
         </div>
       </section>
 
-      {/* How It Works */}
-      <section id="how-it-works" className="bg-zinc-50 py-16">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <h2 className="text-center text-3xl font-bold text-zinc-900">{t("howTitle")}</h2>
-          <p className="mx-auto mt-3 max-w-2xl text-center text-zinc-600">{t("howSubtitle")}</p>
-
-          <div className="mx-auto mt-10 flex max-w-xl flex-col">
-            {steps.map((step, index) => (
-              <div key={step.title}>
-                <article className="flex gap-4 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-700 text-sm font-bold text-white">
-                    {index + 1}
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-zinc-900">{step.title}</h3>
-                    <p className="mt-1.5 text-sm leading-relaxed text-zinc-600">{step.body}</p>
-                  </div>
-                </article>
-                {index < steps.length - 1 ? (
-                  <div className="flex justify-center py-3 text-xl font-light text-rose-400" aria-hidden>
-                    ↓
-                  </div>
-                ) : null}
-              </div>
-            ))}
-          </div>
-          <div className="mx-auto mt-10 max-w-4xl overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-lg">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={HOME_MARKETING_IMAGES.howItWorks.src}
-              alt={t(`marketingImages.${HOME_MARKETING_IMAGES.howItWorks.altKey}`)}
-              className="h-auto w-full"
-              loading="lazy"
-              decoding="async"
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* How Privacy Works */}
-      <section id="privacy-levels" className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold text-zinc-900">{t("privacyLevels.title")}</h2>
-          <p className="mt-3 text-zinc-600">{t("privacyLevels.subtitle")}</p>
-        </div>
-        <div className="mx-auto mt-10 flex max-w-xl flex-col">
-          {privacyLevels.map((item, index) => (
-            <div key={item.level}>
-              <article className="flex gap-4 rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50/80 to-white p-5 shadow-sm">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-700 text-sm font-bold text-white">
-                  {item.level}
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">
-                    {t("privacyLevels.levelLabel", { level: item.level })}
-                  </p>
-                  <h3 className="mt-1 font-semibold text-zinc-900">{item.label}</h3>
-                  <p className="mt-1.5 text-sm leading-relaxed text-zinc-600">{item.body}</p>
-                </div>
-              </article>
-              {index < privacyLevels.length - 1 ? (
-                <div className="flex justify-center py-3 text-xl font-light text-emerald-400" aria-hidden>
-                  ↓
-                </div>
-              ) : null}
-            </div>
-          ))}
-        </div>
-        <div className="mt-10 text-center">
-          <Link
-            href="/privacy/fields"
-            className="inline-flex rounded-full border border-emerald-300 bg-white px-6 py-3 text-sm font-semibold text-emerald-900 shadow-sm transition hover:border-emerald-400 hover:bg-emerald-50"
-          >
-            {t("privacyLevels.fieldGuideCta")}
-          </Link>
-        </div>
-        <div className="mx-auto mt-10 grid max-w-5xl gap-5">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={HOME_MARKETING_IMAGES.privacyWorks.src}
-            alt={t(`marketingImages.${HOME_MARKETING_IMAGES.privacyWorks.altKey}`)}
-            className="h-auto w-full rounded-3xl border border-emerald-100 bg-white shadow-lg"
-            loading="lazy"
-            decoding="async"
-          />
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={HOME_MARKETING_IMAGES.privacyBangali.src}
-            alt={t(`marketingImages.${HOME_MARKETING_IMAGES.privacyBangali.altKey}`)}
-            className="h-auto w-full rounded-3xl border border-emerald-100 bg-white shadow-lg"
-            loading="lazy"
-            decoding="async"
-          />
-        </div>
-      </section>
-
-      <CouplesPhotoCarousel variant="section" slides={HOME_GALLERY_SLIDES} />
-
       {/* Featured Verified Profiles */}
       <section id="featured-profiles" className="bg-gradient-to-b from-rose-50/80 to-white py-16">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
@@ -348,6 +249,108 @@ export function PublicMarketingHome({
           )}
         </div>
       </section>
+
+      {/* How It Works */}
+      <section id="how-it-works" className="bg-zinc-50 py-16">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <h2 className="text-center text-3xl font-bold text-zinc-900">{t("howTitle")}</h2>
+          <p className="mx-auto mt-3 max-w-2xl text-center text-zinc-600">{t("howSubtitle")}</p>
+
+          <div className="mt-10 grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(220px,300px)] lg:gap-0">
+            <div className="mx-auto flex w-full max-w-xl flex-col lg:mx-0 lg:max-w-none lg:pr-8">
+              {steps.map((step, index) => (
+                <div key={step.title}>
+                  <article className="flex gap-4 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={step.iconSrc}
+                      alt=""
+                      className="h-12 w-12 shrink-0 object-contain"
+                    />
+                    <div>
+                      <h3 className="font-semibold text-zinc-900">{step.title}</h3>
+                      <p className="mt-1.5 text-sm leading-relaxed text-zinc-600">{step.body}</p>
+                    </div>
+                  </article>
+                  {index < steps.length - 1 ? (
+                    <div className="flex justify-center py-3 text-xl font-light text-rose-400" aria-hidden>
+                      ↓
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+            <aside className="overflow-hidden rounded-3xl border border-zinc-200 bg-white p-3 shadow-lg lg:sticky lg:top-24 lg:rounded-none lg:border-y-0 lg:border-r-0 lg:bg-transparent lg:p-0 lg:pl-8 lg:shadow-none">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/home/couples/hero-1.webp"
+                alt={t("coupleGallery.slide1Alt")}
+                className="h-auto w-full rounded-2xl object-cover"
+                loading="lazy"
+                decoding="async"
+              />
+            </aside>
+          </div>
+        </div>
+      </section>
+
+      {/* How Privacy Works */}
+      <section id="privacy-levels" className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+        <div className="mx-auto max-w-2xl text-center">
+          <h2 className="text-3xl font-bold text-zinc-900">{t("privacyLevels.title")}</h2>
+          <p className="mt-3 text-zinc-600">{t("privacyLevels.subtitle")}</p>
+        </div>
+        <div className="mt-10 grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(220px,300px)] lg:gap-0">
+          <div>
+            <div className="mx-auto flex w-full max-w-xl flex-col lg:mx-0 lg:max-w-none lg:pr-8">
+              {privacyLevels.map((item, index) => (
+                <div key={item.level}>
+                  <article className="flex gap-4 rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50/80 to-white p-5 shadow-sm">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={item.iconSrc}
+                      alt=""
+                      className="h-12 w-12 shrink-0 object-contain"
+                    />
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">
+                        {t("privacyLevels.levelLabel", { level: item.level })}
+                      </p>
+                      <h3 className="mt-1 font-semibold text-zinc-900">{item.label}</h3>
+                      <p className="mt-1.5 text-sm leading-relaxed text-zinc-600">{item.body}</p>
+                    </div>
+                  </article>
+                  {index < privacyLevels.length - 1 ? (
+                    <div className="flex justify-center py-3 text-xl font-light text-emerald-400" aria-hidden>
+                      ↓
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+            <div className="mt-8 text-center lg:pr-8 lg:text-left">
+              <Link
+                href="/privacy/fields"
+                className="inline-flex rounded-full border border-emerald-300 bg-white px-6 py-3 text-sm font-semibold text-emerald-900 shadow-sm transition hover:border-emerald-400 hover:bg-emerald-50"
+              >
+                {t("privacyLevels.fieldGuideCta")}
+              </Link>
+            </div>
+          </div>
+          <aside className="overflow-hidden rounded-3xl border border-emerald-100 bg-white p-3 shadow-lg lg:sticky lg:top-24 lg:rounded-none lg:border-y-0 lg:border-r-0 lg:bg-transparent lg:p-0 lg:pl-8 lg:shadow-none">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/home/couples/hero-2.webp"
+              alt={t("coupleGallery.slide2Alt")}
+              className="h-auto w-full rounded-2xl object-cover"
+              loading="lazy"
+              decoding="async"
+            />
+          </aside>
+        </div>
+      </section>
+
+      <CouplesPhotoCarousel variant="section" slides={HOME_GALLERY_SLIDES} />
 
       {/* Success Stories */}
       <section id="success-stories" className="mx-auto max-w-6xl px-4 py-16 sm:px-6">

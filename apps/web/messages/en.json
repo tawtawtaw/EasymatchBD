@@ -59,7 +59,7 @@
     "updatedNotice": "Our Terms and Conditions have been updated (previous version: {previous}, current: {current}). Please read the new terms and accept again to continue."
   },
   "footer": {
-    "tagline": "Verified matrimonial matches for Bangladeshi families — with privacy at every step.",
+    "tagline": "Verified matrimonial matches for Bangladeshi families — with privacy at every step. EasyMatchBD is a trusted Bangladeshi matrimonial platform built around privacy, safety, and family values. Our key features include mobile OTP verification, manual biodata review, privacy-protected profiles, progressive information sharing, and report and block controls to support a secure and trustworthy matrimonial experience",
     "followUs": "Follow us",
     "company": "Company",
     "platform": "Platform",
@@ -100,7 +100,7 @@
     "installHint": "Android may ask you to allow installs from this browser. After you update, open the new APK to replace the old app — your login stays on the device.",
     "unavailable": "The Android app is not published yet. Check back shortly.",
     "qrLabel": "QR code to open the EasymatchBD Android download page",
-    "qrHint": "Scan with your phone camera to open the download page.",
+    "qrHint": "Scan with your phone camera to download the App.",
     "backHome": "← Back to home"
   },
   "aboutPage": {
@@ -466,7 +466,7 @@
   },
   "publicHome": {
     "kicker": "Bangladesh matrimonial platform",
-    "headline": "Find a serious match with trust, privacy, and family values",
+    "headline": "Your Trusted Bangladesh Matrimonial Platform for Serious Matches, Privacy & Family Values ",
     "subheadline": "Browse verified biodata anonymously. Photos and contact details stay protected until you connect through mutual interest.",
     "browseCta": "Browse biodata",
     "joinCta": "Create free profile",
@@ -581,7 +581,13 @@
       "slide4Alt": "EasymatchBD couple celebration photo",
       "slide4Caption": "Beautiful beginnings for families who chose a thoughtful search.",
       "slide5Alt": "EasymatchBD wedding celebration image",
-      "slide5Caption": "Two families united through trust, privacy, and shared values."
+      "slide5Caption": "Two families united through trust, privacy, and shared values.",
+      "howItWorksAlt": "Infographic explaining how EasymatchBD works",
+      "howItWorksCaption": "How EasymatchBD works, from registration to connecting families.",
+      "privacyWorksAlt": "Infographic explaining privacy levels on EasymatchBD",
+      "privacyWorksCaption": "How privacy works, step by step.",
+      "privacyBangaliAlt": "Privacy guide for EasymatchBD in Bengali",
+      "privacyBangaliCaption": "Privacy guide in Bangla."
     },
     "marketingImages": {
       "howItWorksAlt": "Infographic explaining how EasymatchBD works",
@@ -3207,7 +3213,7 @@
   },
   "metadata": {
     "title": "EasymatchBD — Trusted Matrimonial Matchmaking",
-    "description": "Secure matrimonial platform for Bangladesh with progressive privacy and verified profiles.",
+    "description": "Discover the trusted Bangladesh matrimonial platform for verified biodata, private browsing, and secure connections built around family values.",
     "brand": "EasymatchBD",
     "profileUntitled": "Profile {code} | EasymatchBD",
     "profileTitled": "{name} | EasymatchBD",

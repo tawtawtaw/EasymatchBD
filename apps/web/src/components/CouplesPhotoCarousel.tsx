@@ -82,11 +82,15 @@ export function CouplesPhotoCarousel({
           }
           style={{ transform: `translateX(-${activeIndex * 100}%)` }}
         >
-          {slides.map((slide) => (
+          {slides.map((slide) => {
+            const contain = slide.fit === "contain";
+            return (
             <figure key={slide.id} className={isHero ? "relative w-full min-w-full shrink-0 lg:h-full" : "relative min-w-full"}>
               <div
                 className={
-                  isHero
+                  contain
+                    ? "relative w-full bg-white"
+                    : isHero
                     ? "relative aspect-[4/3] w-full bg-gradient-to-br from-rose-100 via-rose-50 to-amber-50 lg:aspect-auto lg:h-full lg:min-h-full"
                     : "relative aspect-[16/10] w-full bg-gradient-to-br from-rose-100 via-rose-50 to-amber-50 sm:aspect-[16/9]"
                 }
@@ -95,10 +99,19 @@ export function CouplesPhotoCarousel({
                 <img
                   src={slide.imageSrc}
                   alt={galleryMessage(slide.altKey, "slide1Alt")}
-                  className="h-full w-full object-cover max-lg:object-center lg:object-top"
+                  className={
+                    contain
+                      ? "h-auto max-h-[720px] w-full object-contain"
+                      : "h-full w-full object-cover max-lg:object-center lg:object-top"
+                  }
                   loading={isHero ? "eager" : "lazy"}
                   decoding="async"
                 />
+                {contain ? (
+                  <figcaption className="px-5 py-4 text-center text-sm font-medium text-zinc-700">
+                    {galleryMessage(slide.captionKey, "slide1Caption")}
+                  </figcaption>
+                ) : (
                 <div
                   className={
                     isHero
@@ -116,9 +129,11 @@ export function CouplesPhotoCarousel({
                     {galleryMessage(slide.captionKey, "slide1Caption")}
                   </figcaption>
                 </div>
+                )}
               </div>
             </figure>
-          ))}
+            );
+          })}
         </div>
       </div>
 
