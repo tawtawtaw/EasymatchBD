@@ -18,6 +18,7 @@ import { createProfileDeletionRequest, listProfileDeletionRequests } from "@/lib
 import { AdminMemberMembershipControls } from "@/components/AdminMemberMembershipControls";
 import {
   fetchVerificationBlob,
+  officerNidUrl,
   officerPhotoUrl,
   type VerificationSubmission,
 } from "@/lib/verification";
@@ -617,6 +618,111 @@ export function AdminProfilesPanel({
                 </div>
               </section>
             ) : null}
+
+            {(["creator", "member"] as const)
+              .filter((subject) =>
+                subject === "creator"
+                  ? memberDetail.creationMode === "on_behalf"
+                  : true,
+              )
+              .map((subject) => {
+                const docs = memberDetail.nidDocuments.filter(
+                  (doc) => doc.subject === subject,
+                );
+                const verifiedAt =
+                  subject === "creator"
+                    ? memberDetail.creatorNidVerifiedAt
+                    : memberDetail.nidVerifiedAt;
+                const sectionTitle =
+                  subject === "creator"
+                    ? tv("creatorNidSection")
+                    : tv("nidSection");
+                const optional =
+                  subject === "member" &&
+                  memberDetail.creationMode === "on_behalf";
+                const authToken =
+                  localStorage.getItem(AUTH_TOKEN_KEY) ?? "";
+
+                return (
+                  <section key={subject}>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <h3 className="text-sm font-bold uppercase tracking-wide text-zinc-600">
+                        {sectionTitle}
+                        {optional ? (
+                          <span className="ml-2 text-xs font-normal normal-case text-zinc-500">
+                            ({tv("optional")})
+                          </span>
+                        ) : null}
+                      </h3>
+                      {verifiedAt ? (
+                        <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">
+                          {tv("nidVerified")}
+                        </span>
+                      ) : null}
+                    </div>
+
+                    {docs.length === 0 ? (
+                      <p className="mt-2 text-sm text-zinc-600">{tv("noNid")}</p>
+                    ) : (
+                      <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                        {docs.map((doc) => (
+                          <div
+                            key={doc.id}
+                            className="rounded-xl border border-zinc-200 p-3"
+                          >
+                            <p className="mb-2 text-sm font-semibold text-zinc-900">
+                              {doc.side === "front"
+                                ? tv("nidFront")
+                                : tv("nidBack")}
+                            </p>
+                            {doc.mimeType.startsWith("image/") ? (
+                              <AuthenticatedBlobImage
+                                token={authToken}
+                                path={officerNidUrl(
+                                  memberDetail.profileId,
+                                  doc.side,
+                                  subject,
+                                )}
+                                alt={doc.side}
+                                fetchBlob={fetchVerificationBlob}
+                                className="mb-2 h-40 w-full rounded-lg border border-zinc-200 bg-white object-contain"
+                              />
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const blob = await fetchVerificationBlob(
+                                    authToken,
+                                    officerNidUrl(
+                                      memberDetail.profileId,
+                                      doc.side,
+                                      subject,
+                                    ),
+                                  );
+                                  const url = URL.createObjectURL(blob);
+                                  window.open(url, "_blank");
+                                  setTimeout(
+                                    () => URL.revokeObjectURL(url),
+                                    60_000,
+                                  );
+                                }}
+                                className="text-sm font-medium text-rose-700 hover:underline"
+                              >
+                                {tv("viewPdf")}
+                              </button>
+                            )}
+                            <span
+                              className={`inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${statusClass(doc.status)}`}
+                            >
+                              {tv(`status.${doc.status}`)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                );
+              })}
 
             {renderDeletionRequest()}
           </div>
