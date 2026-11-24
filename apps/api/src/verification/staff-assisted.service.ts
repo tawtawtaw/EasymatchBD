@@ -7,7 +7,6 @@ import {
   NotFoundException,
   forwardRef,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import {
   hasAcceptedCurrentTerms,
   isStaffAssistedProfile,
@@ -24,8 +23,6 @@ import {
   UserRole as PrismaUserRole,
 } from '@prisma/client';
 import { StaffAuditService } from '../audit/staff-audit.service';
-import type { SmsProvider } from '../auth/sms/sms.provider';
-import { SMS_PROVIDER } from '../auth/sms/sms.provider';
 import { LegalService } from '../legal/legal.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateFamilyDto } from '../profiles/dto/update-family.dto';
@@ -49,8 +46,6 @@ export class StaffAssistedService {
     private readonly verification: VerificationService,
     private readonly staffAudit: StaffAuditService,
     private readonly legal: LegalService,
-    private readonly config: ConfigService,
-    @Inject(SMS_PROVIDER) private readonly sms: SmsProvider,
   ) {}
 
   async create(
@@ -315,68 +310,12 @@ export class StaffAssistedService {
     }
   }
 
-  async sendInviteSmsIfNeeded(profileId: string) {
-    const profile = await this.prisma.profile.findUnique({
-      where: { id: profileId },
-      select: {
-        id: true,
-        profileCode: true,
-        creationMode: true,
-        isVerified: true,
-        staffInviteSmsSentAt: true,
-        createdByStaffId: true,
-        user: { select: { phone: true } },
-      },
-    });
-    if (!profile || !isStaffAssistedProfile(profile) || !profile.isVerified) {
-      return;
-    }
-    if (profile.staffInviteSmsSentAt || !profile.user.phone) {
-      return;
-    }
-    if (!this.sms.sendText) {
-      return;
-    }
-
-    const webUrl = (
-      this.config.get<string>('PUBLIC_WEB_URL') ||
-      this.config.get<string>('WEB_URL') ||
-      process.env.PUBLIC_WEB_URL ||
-      process.env.WEB_URL ||
-      'https://easymatchbd.com'
-    ).replace(/\/$/, '');
-
-    const message = `EasyMatchBD: Your profile ${profile.profileCode} is approved. Sign in with this mobile at ${webUrl}/en/login to access your account.`;
-
-    try {
-      await this.sms.sendText(profile.user.phone, message);
-      await this.prisma.profile.update({
-        where: { id: profileId },
-        data: { staffInviteSmsSentAt: new Date() },
-      });
-      if (profile.createdByStaffId) {
-        await this.staffAudit.log({
-          actorId: profile.createdByStaffId,
-          actorRole: UserRole.VERIFICATION_OFFICER,
-          category: StaffActivityCategory.verification,
-          action: 'staff_assisted.invite_sms',
-          summary: `Sent staff-assisted invite SMS for profile ${profile.profileCode}`,
-          entityType: 'profile',
-          entityId: profileId,
-          metadata: {
-            profileCode: profile.profileCode,
-            phone: profile.user.phone,
-          },
-        });
-      }
-    } catch (err) {
-      // Invite SMS must not roll back verification approval.
-      console.warn(
-        `Staff-assisted invite SMS failed for ${profile.profileCode}: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-      );
-    }
+  /**
+   * Post-approval member invite SMS is intentionally disabled until product
+   * defines / approves the message copy. Approval itself still proceeds.
+   */
+  async sendInviteSmsIfNeeded(_profileId: string) {
+    return;
   }
 
   private async logEdit(
