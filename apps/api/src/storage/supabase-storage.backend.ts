@@ -163,6 +163,25 @@ export class SupabaseStorageBackend implements StorageBackend {
     const buffer = Buffer.from(await data.arrayBuffer());
     return Readable.from(buffer);
   }
+
+  async createSignedDownloadUrl(
+    storageKey: string,
+    expiresInSeconds: number,
+    downloadFileName?: string,
+  ): Promise<string> {
+    const normalized = normalizeStorageKey(storageKey);
+    const { data, error } = await this.client.storage
+      .from(this.config.bucket)
+      .createSignedUrl(normalized, expiresInSeconds, {
+        download: downloadFileName || true,
+      });
+    if (error || !data?.signedUrl) {
+      throw new Error(
+        error?.message ?? `Supabase signed URL failed for ${normalized}`,
+      );
+    }
+    return data.signedUrl;
+  }
 }
 
 function splitStorageKey(storageKey: string): { folder: string; name: string } {

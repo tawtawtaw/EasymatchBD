@@ -149,6 +149,78 @@ export class AppReleaseService {
     return { current, stream };
   }
 
+  /**
+   * Prefer a direct Supabase signed URL so the APK does not stream through
+   * Railway. Local disk storage falls back to streaming via the API.
+   */
+  async resolveCurrentDownload(): Promise<
+    | {
+        mode: 'redirect';
+        url: string;
+        current: Awaited<ReturnType<AppReleaseService['getCurrentFile']>>;
+      }
+    | {
+        mode: 'stream';
+        stream: Awaited<ReturnType<StorageService['createReadStream']>>;
+        current: Awaited<ReturnType<AppReleaseService['getCurrentFile']>>;
+      }
+  > {
+    const current = await this.getCurrentFile();
+    const filename = `EasymatchBD-${current.versionName}.apk`;
+    const signedUrl = await this.trySignedDownloadUrl(
+      current.storageKey,
+      filename,
+    );
+    if (signedUrl) {
+      return { mode: 'redirect', url: signedUrl, current };
+    }
+    const stream = await this.storage.createReadStream(current.storageKey);
+    return { mode: 'stream', stream, current };
+  }
+
+  async resolveCurrentDownloadTarget(): Promise<{
+    mode: 'redirect' | 'stream';
+    url: string | null;
+    fileName: string;
+    fileSizeBytes: number;
+    versionName: string;
+    versionCode: number;
+  }> {
+    const current = await this.getCurrentFile();
+    const fileName = `EasymatchBD-${current.versionName}.apk`;
+    const signedUrl = await this.trySignedDownloadUrl(
+      current.storageKey,
+      fileName,
+    );
+    return {
+      mode: signedUrl ? 'redirect' : 'stream',
+      url: signedUrl,
+      fileName,
+      fileSizeBytes: current.fileSizeBytes,
+      versionName: current.versionName,
+      versionCode: current.versionCode,
+    };
+  }
+
+  private async trySignedDownloadUrl(
+    storageKey: string,
+    downloadFileName: string,
+  ): Promise<string | null> {
+    try {
+      return await this.storage.createSignedDownloadUrl(storageKey, {
+        expiresInSeconds: 600,
+        downloadFileName,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `APK signed URL unavailable, falling back to stream: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
+  }
+
   private async findCurrent() {
     return this.prisma.androidAppRelease.findFirst({
       where: { isCurrent: true },

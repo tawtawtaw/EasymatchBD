@@ -149,6 +149,33 @@ export class StorageService implements OnModuleInit {
     return await store.createReadStream(storageKey);
   }
 
+  /**
+   * Returns a time-limited direct download URL when the object lives in
+   * Supabase. Local disk storage returns null (caller should stream).
+   */
+  async createSignedDownloadUrl(
+    storageKey: string,
+    options?: { expiresInSeconds?: number; downloadFileName?: string },
+  ): Promise<string | null> {
+    const store = this.storeFor(storageKey);
+    if (!(store instanceof SupabaseStorageBackend)) {
+      return null;
+    }
+    if (!(await store.exists(storageKey))) {
+      if (
+        this.localFallback &&
+        (await this.localFallback.exists(storageKey))
+      ) {
+        return null;
+      }
+    }
+    return store.createSignedDownloadUrl(
+      storageKey,
+      options?.expiresInSeconds ?? 600,
+      options?.downloadFileName,
+    );
+  }
+
   private storeFor(storageKey: string) {
     return storageKey.startsWith(APP_RELEASE_STORAGE_PREFIX)
       ? this.appRelease

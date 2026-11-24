@@ -1,4 +1,5 @@
-import { Controller, Get, Header, StreamableFile } from '@nestjs/common';
+import { Controller, Get, Res, StreamableFile } from '@nestjs/common';
+import type { Response } from 'express';
 import { AppReleaseService } from './app-release.service';
 
 @Controller('public/app')
@@ -10,15 +11,29 @@ export class PublicAppReleaseController {
     return this.releases.getPublicLatest();
   }
 
+  /** Tiny JSON for web to redirect without proxying APK bytes. */
+  @Get('android-download')
+  getAndroidDownload() {
+    return this.releases.resolveCurrentDownloadTarget();
+  }
+
   @Get('android.apk')
-  @Header('Cache-Control', 'no-store')
-  async downloadAndroid(): Promise<StreamableFile> {
-    const { current, stream } = await this.releases.openCurrentStream();
-    const filename = `EasymatchBD-${current.versionName}.apk`;
-    return new StreamableFile(stream, {
+  async downloadAndroid(
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile | void> {
+    const resolved = await this.releases.resolveCurrentDownload();
+    if (resolved.mode === 'redirect') {
+      res.setHeader('Cache-Control', 'private, max-age=60');
+      res.redirect(302, resolved.url);
+      return;
+    }
+
+    const filename = `EasymatchBD-${resolved.current.versionName}.apk`;
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    return new StreamableFile(resolved.stream, {
       type: 'application/vnd.android.package-archive',
       disposition: `attachment; filename="${filename}"`,
-      length: current.fileSizeBytes,
+      length: resolved.current.fileSizeBytes,
     });
   }
 }

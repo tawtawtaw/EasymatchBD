@@ -8,7 +8,7 @@ import { PublicMarketingHome } from "@/components/PublicMarketingHome";
 import {
   buildDownloadPageUrl,
   getPublicAndroidAppRelease,
-  originFromRequestHeaders,
+  publicOriginForQr,
 } from "@/lib/app-release";
 import { toQrDataUrl } from "@/lib/app-release-qr";
 import { getPublicPlatformStats, listPublicProfiles } from "@/lib/public-browse";
@@ -102,7 +102,7 @@ export default async function HomePage({
     getPublicAndroidAppRelease(),
   ]);
   const appDownloadPageUrl = buildDownloadPageUrl(
-    originFromRequestHeaders(headerList),
+    publicOriginForQr(headerList),
     locale,
   );
   const appQrDataUrl = await toQrDataUrl(appDownloadPageUrl);

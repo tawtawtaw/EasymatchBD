@@ -90,10 +90,6 @@ const nextConfig: NextConfig = {
       : `http://127.0.0.1:${LOCAL_API_PORT}/api/v1`;
     return [
       {
-        source: "/download/android.apk",
-        destination: `${apiBase}/public/app/android.apk`,
-      },
-      {
         source: "/api/v1/:path*",
         destination: `${apiBase}/:path*`,
       },

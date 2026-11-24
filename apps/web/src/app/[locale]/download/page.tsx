@@ -6,7 +6,7 @@ import { getTranslations } from "next-intl/server";
 import {
   buildDownloadPageUrl,
   getPublicAndroidAppRelease,
-  originFromRequestHeaders,
+  publicOriginForQr,
 } from "@/lib/app-release";
 import { toQrDataUrl } from "@/lib/app-release-qr";
 import { generatePublicMetadata } from "@/lib/seo";
@@ -25,7 +25,7 @@ export default async function DownloadAppPage({
   const t = await getTranslations("appDownload");
   const headerList = await headers();
   const release = await getPublicAndroidAppRelease();
-  const pageUrl = buildDownloadPageUrl(originFromRequestHeaders(headerList), locale);
+  const pageUrl = buildDownloadPageUrl(publicOriginForQr(headerList), locale);
   const qrDataUrl = await toQrDataUrl(pageUrl);
 
   return (
