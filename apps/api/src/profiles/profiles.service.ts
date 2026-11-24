@@ -1,11 +1,10 @@
 import {
   BadRequestException,
   ForbiddenException,
-  Inject,
   Injectable,
   NotFoundException,
-  forwardRef,
 } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { MediaReviewStatus, Prisma } from '@prisma/client';
 import {
   feetInchesToCm,
@@ -19,7 +18,7 @@ import {
   minMarriageAgeForPartnerPreference,
   NID_DOCUMENT_SUBJECTS,
   ON_BEHALF_RELATIONS,
-  PROFILE_CREATION_MODES,
+  MEMBER_PROFILE_CREATION_MODES,
   showBeardPreferenceField,
   showHasBeardField,
   showHijabPracticeField,
@@ -34,7 +33,6 @@ import {
   LIVING_ARRANGEMENTS_OTHER_MALE_VALUE,
 } from '@easymatch/shared';
 import { generateUniqueProfileCode } from './profile-code.util';
-import { AuthService } from '../auth/auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PrivacyFieldsService } from '../privacy/privacy-fields.service';
 import { StaffNotificationService } from '../staff/staff-notification.service';
@@ -85,8 +83,7 @@ export class ProfilesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly privacyFields: PrivacyFieldsService,
-    @Inject(forwardRef(() => AuthService))
-    private readonly authService: AuthService,
+    private readonly moduleRef: ModuleRef,
     private readonly staffNotifications: StaffNotificationService,
   ) {}
 
@@ -96,8 +93,21 @@ export class ProfilesService {
   }
 
   invalidateMemberProfileCaches(userId: string) {
-    this.authService.clearEditorBootstrapCache(userId);
-    this.authService.clearFullProfileCache(userId);
+    this.clearAuthProfileCaches(userId);
+  }
+
+  /** Lazy resolve avoids auth.service ↔ profiles.service circular import under nodenext. */
+  private clearAuthProfileCaches(userId: string) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { AuthService } = require('../auth/auth.service') as {
+      AuthService: new (...args: never[]) => {
+        clearEditorBootstrapCache(userId: string): void;
+        clearFullProfileCache(userId: string): void;
+      };
+    };
+    const auth = this.moduleRef.get(AuthService, { strict: false });
+    auth.clearEditorBootstrapCache(userId);
+    auth.clearFullProfileCache(userId);
   }
 
   async getMemberHomeSummary(userId: string) {
@@ -116,7 +126,7 @@ export class ProfilesService {
     const profile = await this.ensureProfile(userId);
 
     if (profile.creationMode) {
-      this.authService.clearEditorBootstrapCache(userId);
+      this.clearAuthProfileCaches(userId);
       return this.getMyProfile(userId);
     }
 
@@ -133,7 +143,11 @@ export class ProfilesService {
       throw new BadRequestException('Invalid on-behalf relation');
     }
 
-    if (!PROFILE_CREATION_MODES.includes(dto.creationMode)) {
+    if (
+      !MEMBER_PROFILE_CREATION_MODES.includes(
+        dto.creationMode as (typeof MEMBER_PROFILE_CREATION_MODES)[number],
+      )
+    ) {
       throw new BadRequestException('Invalid profile creation mode');
     }
 
@@ -148,7 +162,7 @@ export class ProfilesService {
     });
 
     const { photos, nidDocuments, ...rest } = updated;
-    this.authService.clearEditorBootstrapCache(userId);
+    this.clearAuthProfileCaches(userId);
     return {
       ...rest,
       photos: photos.map((photo) => ({
@@ -241,10 +255,18 @@ export class ProfilesService {
     };
   }
 
-  async updatePersonal(userId: string, dto: UpdatePersonalDto) {
+  async updatePersonal(
+    userId: string,
+    dto: UpdatePersonalDto,
+    options?: { bypassNidNameLock?: boolean },
+  ) {
     const profile = await this.ensureProfile(userId);
 
-    if (profile.nidVerifiedAt && dto.fullName !== undefined) {
+    if (
+      profile.nidVerifiedAt &&
+      dto.fullName !== undefined &&
+      !options?.bypassNidNameLock
+    ) {
       const nextName = dto.fullName.trim();
       const currentName = (profile.fullName ?? '').trim();
       if (nextName !== currentName) {
@@ -286,7 +308,10 @@ export class ProfilesService {
       introduction: dto.introduction,
     };
 
-    if (!profile.nidVerifiedAt && dto.fullName !== undefined) {
+    if (
+      dto.fullName !== undefined &&
+      (!profile.nidVerifiedAt || options?.bypassNidNameLock)
+    ) {
       data.fullName = dto.fullName;
     }
 

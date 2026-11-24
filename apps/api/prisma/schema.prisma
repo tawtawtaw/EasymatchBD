@@ -64,6 +64,7 @@ enum NidDocumentSide {
 enum ProfileCreationMode {
   self
   on_behalf
+  staff_assisted
 }
 
 enum OnBehalfRelation {
@@ -126,6 +127,7 @@ model User {
   complaintMessagesSent          MemberComplaintMessage[]
   complaintDiaryEntries            MemberComplaintDiaryEntry[]
   staffActivityLogs              StaffActivityLog[]
+  staffAssistedProfilesCreated   Profile[]           @relation("StaffAssistedProfiles")
   pushTokens                     UserPushToken[]
   staffNotificationsTargeted     StaffNotification[]     @relation("StaffNotificationTarget")
   staffNotificationReads       StaffNotificationRead[]
@@ -470,6 +472,12 @@ model Profile {
   verifiedOnBehalf           Boolean              @default(false)
   creationMode               ProfileCreationMode?
   onBehalfRelation           OnBehalfRelation?
+  /// Staff-assisted intake: who recorded consent / created the profile.
+  createdByStaffId           String?
+  createdByStaff             User?                 @relation("StaffAssistedProfiles", fields: [createdByStaffId], references: [id], onDelete: SetNull)
+  consentNote                String?
+  consentedAt                DateTime?
+  staffInviteSmsSentAt       DateTime?
   nidVerifiedAt              DateTime?
   creatorNidVerifiedAt       DateTime?
   profileBiodataReviewStatus MediaReviewStatus?

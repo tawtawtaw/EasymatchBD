@@ -348,6 +348,7 @@ export default function AdminPage() {
             }}
             canRequestDeletion={fullAdmin}
             canManageMembership={fullAdmin}
+            canEditBiodata={fullAdmin}
             currentUserId={currentUserId}
           />
         ) : activeTab === "biodataExport" ? (

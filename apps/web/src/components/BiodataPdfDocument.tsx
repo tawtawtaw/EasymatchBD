@@ -55,7 +55,13 @@ function Section({
 
 export const BiodataPdfDocument = forwardRef<HTMLElement, BiodataPdfDocumentProps>(
   function BiodataPdfDocument(
-    { data, token, dropdowns, photoPath = photoFileUrl, fetchBlob },
+    {
+      data,
+      token,
+      dropdowns,
+      photoPath = (photoId) => photoFileUrl(photoId, "display"),
+      fetchBlob,
+    },
     ref,
   ) {
     const articleRef = useRef<HTMLElement>(null);

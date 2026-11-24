@@ -38,11 +38,17 @@ export function HeightField({
           <select
             value={feet}
             onChange={(e) => onFeetChange(e.target.value)}
-            className="field-input"
+            className="field-input bg-white text-zinc-950"
           >
-            <option value="">{selectLabel}</option>
+            <option value="" className="bg-white text-zinc-950">
+              {selectLabel}
+            </option>
             {getFeetOptions().map((value) => (
-              <option key={value} value={value}>
+              <option
+                key={value}
+                value={value}
+                className="bg-white text-zinc-950"
+              >
                 {value} ft
               </option>
             ))}
@@ -53,11 +59,17 @@ export function HeightField({
           <select
             value={inches}
             onChange={(e) => onInchesChange(e.target.value)}
-            className="field-input"
+            className="field-input bg-white text-zinc-950"
           >
-            <option value="">{selectLabel}</option>
+            <option value="" className="bg-white text-zinc-950">
+              {selectLabel}
+            </option>
             {getInchesOptions().map((value) => (
-              <option key={value} value={value}>
+              <option
+                key={value}
+                value={value}
+                className="bg-white text-zinc-950"
+              >
                 {value} in
               </option>
             ))}

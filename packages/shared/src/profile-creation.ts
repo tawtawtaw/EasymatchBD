@@ -1,5 +1,14 @@
-export const PROFILE_CREATION_MODES = ['self', 'on_behalf'] as const;
+export const PROFILE_CREATION_MODES = [
+  'self',
+  'on_behalf',
+  'staff_assisted',
+] as const;
 export type ProfileCreationMode = (typeof PROFILE_CREATION_MODES)[number];
+
+/** Modes a member can choose themselves when creating a profile. */
+export const MEMBER_PROFILE_CREATION_MODES = ['self', 'on_behalf'] as const;
+export type MemberProfileCreationMode =
+  (typeof MEMBER_PROFILE_CREATION_MODES)[number];
 
 export const ON_BEHALF_RELATIONS = [
   'my_son',
@@ -16,4 +25,10 @@ export function isOnBehalfProfile(profile: {
   creationMode?: ProfileCreationMode | string | null;
 }): boolean {
   return profile.creationMode === 'on_behalf';
+}
+
+export function isStaffAssistedProfile(profile: {
+  creationMode?: ProfileCreationMode | string | null;
+}): boolean {
+  return profile.creationMode === 'staff_assisted';
 }

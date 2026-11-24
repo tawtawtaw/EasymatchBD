@@ -57,22 +57,30 @@ function CountrySelectField({
           setCustomMode(false);
           onChange(next);
         }}
-        className="field-input"
+        className="field-input bg-white text-zinc-950"
       >
-        <option value="">{tc("select")}</option>
+        <option value="" className="bg-white text-zinc-950">
+          {tc("select")}
+        </option>
         {options.map((option) => (
-          <option key={option.value} value={option.value}>
+          <option
+            key={option.value}
+            value={option.value}
+            className="bg-white text-zinc-950"
+          >
             {option.label}
           </option>
         ))}
-        <option value="__custom__">{tc("other")}</option>
+        <option value="__custom__" className="bg-white text-zinc-950">
+          {tc("other")}
+        </option>
       </select>
       {customMode ? (
         <input
           value={value}
           onChange={(event) => onChange(event.target.value)}
           placeholder={tc("customValue")}
-          className="field-input mt-1"
+          className="field-input mt-1 bg-white text-zinc-950"
           required={required}
         />
       ) : null}
@@ -127,11 +135,17 @@ function SelectField({
         value={value}
         required={required}
         onChange={(event) => onChange(event.target.value)}
-        className="field-input"
+        className="field-input bg-white text-zinc-950"
       >
-        <option value="">{tc("select")}</option>
+        <option value="" className="bg-white text-zinc-950">
+          {tc("select")}
+        </option>
         {options.map((option) => (
-          <option key={option.value} value={option.value}>
+          <option
+            key={option.value}
+            value={option.value}
+            className="bg-white text-zinc-950"
+          >
             {option.label}
           </option>
         ))}

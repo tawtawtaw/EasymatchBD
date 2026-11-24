@@ -31,6 +31,28 @@ export class RtcomSmsProvider implements SmsProvider {
   constructor(private readonly config: ConfigService) {}
 
   async sendOtp(phone: string, code: string): Promise<void> {
+    await this.sendRaw(
+      phone,
+      formatOtpSmsMessage(code, {
+        androidAppHash: this.read('SMS_ANDROID_APP_HASH'),
+      }),
+      'Could not send the verification SMS. Please try again.',
+    );
+  }
+
+  async sendText(phone: string, message: string): Promise<void> {
+    await this.sendRaw(
+      phone,
+      message,
+      'Could not send the SMS. Please try again.',
+    );
+  }
+
+  private async sendRaw(
+    phone: string,
+    msg: string,
+    failureMessage: string,
+  ): Promise<void> {
     const url = this.read('SMS_RTCOM_URL') || 'https://api.rtcom.xyz/onetomany';
     const acode = this.read('SMS_RTCOM_ACODE');
     const apiKey = this.read('SMS_RTCOM_API_KEY');
@@ -47,9 +69,7 @@ export class RtcomSmsProvider implements SmsProvider {
       api_key: apiKey,
       senderid,
       type: OTP_SMS_TEXT_TYPE,
-      msg: formatOtpSmsMessage(code, {
-        androidAppHash: this.read('SMS_ANDROID_APP_HASH'),
-      }),
+      msg,
       contacts: phone,
       transactionType: this.read('SMS_RTCOM_TRANSACTION_TYPE') || 'T',
       contentID: '',
@@ -66,9 +86,7 @@ export class RtcomSmsProvider implements SmsProvider {
         this.logger.error(
           `RTCom SMS rejected for ${phone}: ${result.message} (${result.code}) requestID=${result.requestId}`,
         );
-        throw new ServiceUnavailableException(
-          'Could not send the verification SMS. Please try again.',
-        );
+        throw new ServiceUnavailableException(failureMessage);
       } catch (err) {
         if (err instanceof ServiceUnavailableException) {
           throw err;
@@ -86,9 +104,7 @@ export class RtcomSmsProvider implements SmsProvider {
     this.logger.error(
       `RTCom SMS request failed for ${phone}: ${describeNetworkError(lastNetworkError)}`,
     );
-    throw new ServiceUnavailableException(
-      'Could not send the verification SMS. Please try again.',
-    );
+    throw new ServiceUnavailableException(failureMessage);
   }
 
   private async postOnce(

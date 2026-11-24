@@ -5,6 +5,7 @@ import { DropdownsModule } from '../dropdowns/dropdowns.module';
 import { LegalModule } from '../legal/legal.module';
 import { MarketingModule } from '../marketing/marketing.module';
 import { PrivacyModule } from '../privacy/privacy.module';
+import { ProfilesModule } from '../profiles/profiles.module';
 import { StorageModule } from '../storage/storage.module';
 import { VerificationModule } from '../verification/verification.module';
 import { AdminConsultantCasesController } from './admin-consultant-cases.controller';
@@ -21,7 +22,17 @@ import { AdminInterestsController } from './admin-interests.controller';
 import { AdminInterestsService } from './admin-interests.service';
 
 @Module({
-  imports: [AuthModule, ConsultantModule, DropdownsModule, PrivacyModule, LegalModule, MarketingModule, VerificationModule, StorageModule],
+  imports: [
+    AuthModule,
+    ConsultantModule,
+    DropdownsModule,
+    PrivacyModule,
+    LegalModule,
+    MarketingModule,
+    ProfilesModule,
+    VerificationModule,
+    StorageModule,
+  ],
   controllers: [
     AdminConsultantCasesController,
     AdminDropdownsController,

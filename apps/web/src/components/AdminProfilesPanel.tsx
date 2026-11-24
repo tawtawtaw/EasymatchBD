@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { AuthenticatedBlobImage } from "@/components/AuthenticatedBlobImage";
+import { AdminBiodataEditForm } from "@/components/AdminBiodataEditForm";
 import { VerificationProfileDetails } from "@/components/VerificationProfileDetails";
 import { VerificationAuditBiodataPdfButton } from "@/components/VerificationAuditBiodataPdfButton";
 import { AUTH_TOKEN_KEY, DropdownMap, getDropdowns } from "@/lib/api";
@@ -29,6 +30,7 @@ type AdminProfilesPanelProps = {
   onGoToDeletions?: () => void;
   canRequestDeletion?: boolean;
   canManageMembership?: boolean;
+  canEditBiodata?: boolean;
   currentUserId?: string | null;
 };
 
@@ -55,6 +57,7 @@ export function AdminProfilesPanel({
   onGoToDeletions,
   canRequestDeletion = false,
   canManageMembership = false,
+  canEditBiodata = false,
   currentUserId = null,
 }: AdminProfilesPanelProps) {
   const t = useTranslations("admin.profiles");
@@ -87,6 +90,7 @@ export function AdminProfilesPanel({
     Set<string>
   >(new Set());
   const [showDeleted, setShowDeleted] = useState(false);
+  const [editingBiodata, setEditingBiodata] = useState(false);
 
   function updateSelectedMembership(userId: string, plan: string, isPaid: boolean) {
     setItems((prev) =>
@@ -179,6 +183,7 @@ export function AdminProfilesPanel({
       setDeletionFeedback(null);
       setDeleteConfirming(false);
       setDeleteReason("");
+      setEditingBiodata(false);
       onError(null);
 
       try {
@@ -580,13 +585,48 @@ export function AdminProfilesPanel({
               />
             ) : null}
 
-            <VerificationProfileDetails
-              submission={memberDetail}
-              acting={null}
-              onBiodataReview={() => undefined}
-              readOnly
-              dropdowns={dropdowns}
-            />
+            {canEditBiodata ? (
+              editingBiodata ? (
+                <AdminBiodataEditForm
+                  key={memberDetail.profileId}
+                  token={localStorage.getItem(AUTH_TOKEN_KEY) ?? ""}
+                  submission={memberDetail}
+                  dropdowns={dropdowns}
+                  onCancel={() => setEditingBiodata(false)}
+                  onError={onError}
+                  onSaved={(next) => {
+                    setMemberDetail(next);
+                    setEditingBiodata(false);
+                    onMessage?.(t("editBiodata.saved"));
+                  }}
+                />
+              ) : (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50/50 px-4 py-3">
+                  <p className="text-sm text-rose-950">{t("editBiodata.entryHint")}</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onError(null);
+                      onMessage?.(null);
+                      setEditingBiodata(true);
+                    }}
+                    className="rounded-lg bg-rose-800 px-3 py-1.5 text-sm font-semibold text-white"
+                  >
+                    {t("editBiodata.open")}
+                  </button>
+                </div>
+              )
+            ) : null}
+
+            {!editingBiodata ? (
+              <VerificationProfileDetails
+                submission={memberDetail}
+                acting={null}
+                onBiodataReview={() => undefined}
+                readOnly
+                dropdowns={dropdowns}
+              />
+            ) : null}
 
             {memberDetail.photos.length > 0 ? (
               <section>
@@ -602,7 +642,11 @@ export function AdminProfilesPanel({
                       {photo.mimeType.startsWith("image/") && (
                         <AuthenticatedBlobImage
                           token={localStorage.getItem(AUTH_TOKEN_KEY) ?? ""}
-                          path={officerPhotoUrl(memberDetail.profileId, photo.id)}
+                          path={officerPhotoUrl(
+                            memberDetail.profileId,
+                            photo.id,
+                            "display",
+                          )}
                           alt={photo.type}
                           fetchBlob={fetchVerificationBlob}
                           className="mb-3 aspect-square w-full rounded-lg border border-zinc-200 object-cover"

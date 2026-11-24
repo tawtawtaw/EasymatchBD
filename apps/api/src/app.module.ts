@@ -5,6 +5,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
+import { SmsModule } from './auth/sms/sms.module';
 import { HealthModule } from './health/health.module';
 import { ProfilesModule } from './profiles/profiles.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -41,6 +42,7 @@ import { StaffModule } from './staff/staff.module';
     StaffModule,
     StorageModule,
     AuditModule,
+    SmsModule,
     AuthModule,
     ProfilesModule,
     VerificationModule,

@@ -66,15 +66,16 @@ export function AppDownloadPromo({
 
   const available = Boolean(release?.available);
   const apkHref = androidApkHref();
-  const qr =
-    available && qrDataUrl ? (
-      <QrBlock
-        dataUrl={qrDataUrl}
-        label={t("qrLabel")}
-        hint={t("qrHint")}
-        tone={variant === "hero" ? "hero" : "page"}
-      />
-    ) : null;
+  // Show the QR whenever we have an image. It opens the download page, which
+  // already explains if no APK is published in this environment (local vs live).
+  const qr = qrDataUrl ? (
+    <QrBlock
+      dataUrl={qrDataUrl}
+      label={t("qrLabel")}
+      hint={t("qrHint")}
+      tone={variant === "hero" ? "hero" : "page"}
+    />
+  ) : null;
 
   if (variant === "hero") {
     return (

@@ -454,7 +454,7 @@ export type Profile = {
   hobbies: string[];
   interests: string | null;
   introduction: string | null;
-  creationMode: "self" | "on_behalf" | null;
+  creationMode: "self" | "on_behalf" | "staff_assisted" | null;
   onBehalfRelation: string | null;
   isVerified: boolean;
   verifiedOnBehalf: boolean;

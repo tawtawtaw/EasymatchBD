@@ -957,7 +957,7 @@ export function ProfileMediaTab({
               <AuthenticatedImage
                 key={primaryPhoto.id}
                 token={authToken}
-                path={photoFileUrl(primaryPhoto.id)}
+                path={photoFileUrl(primaryPhoto.id, "display")}
                 alt={t("passportPhoto")}
                 className="h-40 w-[7.5rem] rounded-lg border border-zinc-200 object-cover object-[center_22%]"
                 onLoadFailed={() => void loadMedia(true)}
@@ -1001,7 +1001,7 @@ export function ProfileMediaTab({
                 <div key={photo.id} className="space-y-2">
                   <AuthenticatedImage
                     token={authToken}
-                    path={photoFileUrl(photo.id)}
+                    path={photoFileUrl(photo.id, "display")}
                     alt={t("otherPhoto")}
                     className="aspect-square w-full rounded-lg border border-zinc-200 object-cover"
                   />
@@ -1048,7 +1048,7 @@ export function ProfileMediaTab({
             <div className="space-y-2">
               <AuthenticatedImage
                 token={authToken}
-                path={photoFileUrl(familyPhoto.id)}
+                path={photoFileUrl(familyPhoto.id, "display")}
                 alt={t("familyPhoto")}
                 className="aspect-square w-full max-w-xs rounded-lg border border-zinc-200 object-cover"
               />

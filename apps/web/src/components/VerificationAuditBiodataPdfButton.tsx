@@ -83,7 +83,9 @@ export function VerificationAuditBiodataPdfButton({
             data={exportData}
             token={authToken}
             dropdowns={dropdowns}
-            photoPath={(photoId) => officerPhotoUrl(profileId, photoId)}
+            photoPath={(photoId) =>
+              officerPhotoUrl(profileId, photoId, "display")
+            }
             fetchBlob={fetchVerificationBlob}
           />
         </div>

@@ -25,7 +25,7 @@ export function WeightField({ label, value, onChange }: WeightFieldProps) {
         pattern="[0-9]*"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`field-input ${error ? "border-red-500 ring-1 ring-red-200" : ""}`}
+        className={`field-input bg-white text-zinc-950 ${error ? "border-red-500 ring-1 ring-red-200" : ""}`}
         aria-invalid={error ? true : undefined}
       />
       {error && (

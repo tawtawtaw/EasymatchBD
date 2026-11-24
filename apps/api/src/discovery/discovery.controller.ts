@@ -3,11 +3,11 @@ import {
   Controller,
   Delete,
   Get,
-  Header,
   Param,
   Patch,
   Post,
   Query,
+  Res,
   StreamableFile,
   UploadedFile,
   UseGuards,
@@ -15,10 +15,12 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
+import type { Response } from 'express';
 import { DISCOVERY_DEFAULT_PROFILE_LIMIT, clampDiscoveryProfileLimit, parsePhotoVariant } from '@easymatch/shared';
 import type { AuthUser } from '../auth/decorators/current-user.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { photoCacheControl } from '../storage/photo-cache-headers';
 import { ConnectionsService } from './connections.service';
 import { parseDiscoveryFilters } from './discovery-filters';
 import { DiscoveryService } from './discovery.service';
@@ -248,20 +250,21 @@ export class DiscoveryController {
   }
 
   @Get('profiles/:profileId/photos/:photoId/file')
-  @Header('Cache-Control', 'private, no-store, no-cache, must-revalidate')
-  @Header('Pragma', 'no-cache')
-  @Header('X-Content-Type-Options', 'nosniff')
   async getPhotoFile(
     @CurrentUser() user: AuthUser,
     @Param('profileId') profileId: string,
     @Param('photoId') photoId: string,
-    @Query('variant') variant?: string,
+    @Query('variant') variant: string | undefined,
+    @Res({ passthrough: true }) res: Response,
   ) {
+    const parsed = parsePhotoVariant(variant);
+    res.setHeader('Cache-Control', photoCacheControl(parsed));
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     const { stream, mimeType } = await this.discovery.getVisiblePhotoFile(
       user.id,
       profileId,
       photoId,
-      parsePhotoVariant(variant),
+      parsed,
     );
     return new StreamableFile(stream, { type: mimeType });
   }

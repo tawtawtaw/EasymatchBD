@@ -11,11 +11,11 @@ import { AuthService } from './auth.service';
 import { RoleAssignmentService } from './role-assignment.service';
 import { AuthUserCacheService } from './auth-user-cache.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
-import { createSmsProvider } from './sms/create-sms-provider';
-import { SMS_PROVIDER } from './sms/sms.provider';
+import { SmsModule } from './sms/sms.module';
 
 @Module({
   imports: [
+    SmsModule,
     forwardRef(() => ProfilesModule),
     LegalModule,
     DropdownsModule,
@@ -38,11 +38,6 @@ import { SMS_PROVIDER } from './sms/sms.provider';
     AuthUserCacheService,
     RoleAssignmentService,
     JwtStrategy,
-    {
-      provide: SMS_PROVIDER,
-      inject: [ConfigService],
-      useFactory: createSmsProvider,
-    },
   ],
   exports: [AuthService, AuthUserCacheService, JwtModule],
 })

@@ -1458,6 +1458,13 @@
     "greeting": "Welcome, {name}",
     "subtitle": "Review member biodata, photos, and NID documents to keep the platform trusted and safe.",
     "openPortal": "Open verification queue",
+    "createMemberProfile": "Create member profile",
+    "intakeCard": {
+      "kicker": "Staff-assisted intake",
+      "title": "Create a consented member profile",
+      "body": "Enter phone and consent, then upload biodata, photo, and NID for Super Admin approval.",
+      "cta": "Start intake"
+    },
     "completionHint": "Your staff profile is {percent}% complete.",
     "completeProfile": "Complete staff profile",
     "stats": {
@@ -1466,6 +1473,8 @@
     },
     "quickActionsTitle": "Quick actions",
     "actions": {
+      "intake": "Create member profile",
+      "intakeDesc": "Staff-assisted intake with consent, biodata, photo, and NID",
       "queue": "Verification queue",
       "queueDesc": "Review biodata, photos, and NID documents",
       "profile": "My staff profile",
@@ -1488,6 +1497,19 @@
     "queueCount": "{count} pending",
     "pendingQueue": "Pending submissions",
     "emptyQueue": "No submissions waiting for review.",
+    "queueSearchLabel": "Search",
+    "queueSearchPlaceholder": "Profile ID, name, or phone",
+    "queueCreationMode": "Creation mode",
+    "queueGender": "Gender",
+    "queueFilterAll": "All",
+    "queueCreationModes": {
+      "self": "Self",
+      "on_behalf": "On behalf",
+      "staff_assisted": "Staff-assisted"
+    },
+    "queueSearch": "Search",
+    "queueClear": "Clear",
+    "searchFailed": "Could not search the verification queue.",
     "selectSubmission": "Select a submission from the queue.",
     "applicant": "Applicant",
     "fullName": "Full name",
@@ -1508,6 +1530,11 @@
     "biodataPending": "Biodata pending",
     "biodataReviewPrompt": "Approve profile biodata?",
     "biodataReviewHint": "Confirm the biodata matches the NID (name, date of birth, and other details) before approving.",
+    "adminEditBiodata": {
+      "open": "Edit biodata",
+      "hint": "Fix spelling or other errors before you approve. Verification status stays; changes are written to the staff activity log.",
+      "saved": "Biodata updated. You can approve below when ready."
+    },
     "approveBiodata": "Approve profile biodata",
     "rejectBiodata": "Reject profile biodata",
     "biodataApproved": "Profile biodata approved.",
@@ -1520,6 +1547,56 @@
     "fullyVerifiedOnBehalfYes": "Yes — on-behalf profile fully verified",
     "fullyVerifiedOnBehalfDualYes": "Yes — on-behalf profile with creator and member NID verified",
     "fullyVerifiedNo": "No — pending items remain",
+    "staffAssisted": {
+      "pageTitle": "Create member profile",
+      "pageSubtitle": "Record consent, fill biodata, upload photo and NID, then submit for Super Admin approval.",
+      "createdGotoQueue": "Profile created. Complete biodata and documents below, then submit. After that, open the verification queue.",
+      "openQueue": "Open verification queue",
+      "title": "Staff-assisted intake",
+      "hint": "1) Create with consent  2) Fill biodata  3) Upload photo and NID  4) Submit. Only Super Admin can approve; an SMS invite is sent after full approval.",
+      "phone": "Prospect mobile",
+      "consentChannel": "Consent channel",
+      "channels": {
+        "in_person": "In person",
+        "whatsapp": "WhatsApp",
+        "phone_call": "Phone call",
+        "written_form": "Written form"
+      },
+      "consentNote": "Consent note",
+      "consentNotePlaceholder": "Who consented, when, and how consent was given",
+      "create": "Create staff-assisted profile",
+      "creating": "Creating…",
+      "created": "Profile created. Fill biodata and upload photo/NID below, then submit.",
+      "createFailed": "Could not create staff-assisted profile.",
+      "profileCode": "Profile ID",
+      "biodataTitle": "Member biodata",
+      "biodataHint": "Save one section at a time. Photo and NID upload are below.",
+      "biodataSave": "Save section",
+      "biodataSaving": "Saving…",
+      "biodataSaveFailed": "Could not save biodata.",
+      "biodataSaved": "Biodata section saved.",
+      "documentsTitle": "Photo and NID",
+      "chooseFile": "Choose file",
+      "primaryPhoto": "Passport photo",
+      "nidFront": "NID front",
+      "nidBack": "NID back",
+      "photoUploaded": "Photo uploaded.",
+      "nidUploaded": "NID uploaded.",
+      "photoRemoved": "Photo removed.",
+      "nidRemoved": "NID removed.",
+      "removeFailed": "Could not remove file.",
+      "uploaded": "Uploaded",
+      "uploadFailed": "Upload failed.",
+      "mediaCounts": "{photos} photo(s), {nid} NID file(s)",
+      "submit": "Submit for verification",
+      "submitting": "Submitting…",
+      "submitted": "Submitted for Super Admin approval.",
+      "submitFailed": "Could not submit for verification.",
+      "missingFieldsTitle": "Still needed before submit:",
+      "createAnother": "Create another profile",
+      "badge": "Staff-assisted (consented intake)",
+      "adminApproveOnly": "Only Super Admin can approve staff-assisted biodata/NID. You can still approve photos and reject."
+    },
     "creationMode": "Profile created by",
     "onBehalfProfile": "Guardian / relative ({relation})",
     "onBehalfRelations": {
@@ -1897,7 +1974,26 @@
       "deletionPending": "Deletion request pending",
       "deletionPendingHint": "This account already has a pending deletion request awaiting another super admin.",
       "viewDeletionQueue": "View deletion requests",
-      "cannotDeleteSelf": "You cannot request deletion of your own account."
+      "cannotDeleteSelf": "You cannot request deletion of your own account.",
+      "editBiodata": {
+        "open": "Edit biodata",
+        "entryHint": "Super Admin can correct member biodata. Verification status is kept; changes are written to the staff activity log.",
+        "title": "Edit member biodata",
+        "hint": "Save one section at a time. Verification stays approved if it already was. Add an optional reason for the audit trail.",
+        "reason": "Reason for change (optional)",
+        "reasonPlaceholder": "e.g. Spelling correction from NID, member phone request",
+        "saveSection": "Save this section",
+        "saving": "Saving…",
+        "saved": "Biodata updated. Verification status unchanged. Change recorded in the activity log.",
+        "saveFailed": "Could not save biodata changes.",
+        "familyListsNote": "Sibling and relative lists are preserved as currently stored. Ask the member to edit those lists from their profile if needed.",
+        "sections": {
+          "personal": "Personal",
+          "marital": "Marital",
+          "family": "Family",
+          "partner": "Partner"
+        }
+      }
     },
     "biodataExport": {
       "title": "Biodata CSV export",
@@ -2051,7 +2147,8 @@
       "status": {
         "pending": "Pending",
         "accepted": "Accepted",
-        "declined": "Declined"
+        "declined": "Declined",
+        "ended": "Ended"
       },
       "relationshipLevel": "Level {level}: {label}",
       "level0InterestOnly": "Level 0 interest only",

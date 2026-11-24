@@ -1,6 +1,7 @@
 import { type VerificationBiodataChanges } from "@easymatch/shared";
 import type { BiodataExportPayload } from "@/lib/profile-biodata-export";
 import { getApiBaseUrl } from "@/lib/api-base-url";
+import { fetchAuthenticatedBlob } from "@/lib/media";
 import { apiFetch, readJsonResponse } from "@/lib/parse-response";
 
 export type MediaReviewStatus = "pending" | "approved" | "rejected";
@@ -11,9 +12,10 @@ export type VerificationQueueItem = {
   userId: string;
   fullName: string | null;
   phone: string;
+  gender?: string | null;
   isVerified: boolean;
   verifiedOnBehalf: boolean;
-  creationMode: "self" | "on_behalf" | null;
+  creationMode: "self" | "on_behalf" | "staff_assisted" | null;
   onBehalfRelation: string | null;
   nidVerifiedAt: string | null;
   creatorNidVerifiedAt: string | null;
@@ -22,6 +24,12 @@ export type VerificationQueueItem = {
   creatorNidReadyForReview: boolean;
   biodataPending: boolean;
   updatedAt: string;
+};
+
+export type VerificationQueueFilters = {
+  q?: string;
+  creationMode?: string;
+  gender?: string;
 };
 
 export type VerificationPersonal = {
@@ -141,8 +149,12 @@ export type VerificationSubmission = {
   phoneVerifiedAt: string | null;
   isVerified: boolean;
   verifiedOnBehalf: boolean;
-  creationMode: "self" | "on_behalf" | null;
+  creationMode: "self" | "on_behalf" | "staff_assisted" | null;
   onBehalfRelation: string | null;
+  createdByStaffId?: string | null;
+  consentNote?: string | null;
+  consentedAt?: string | null;
+  staffInviteSmsSentAt?: string | null;
   nidVerifiedAt: string | null;
   creatorNidVerifiedAt: string | null;
   profileBiodataReviewStatus: MediaReviewStatus | null;
@@ -176,6 +188,8 @@ export type VerificationSubmission = {
     reviewedAt: string | null;
   }[];
   biodataChanges: VerificationBiodataChanges;
+  completionPercent?: number;
+  completionMissing?: string[];
 };
 
 async function parseResponse<T>(res: Response): Promise<T> {
@@ -199,10 +213,23 @@ function authHeaders(token: string) {
   };
 }
 
-export async function getVerificationQueue(token: string) {
-  const res = await apiFetch(`${getApiBaseUrl()}/verification/queue`, {
-    headers: authHeaders(token),
-  });
+export async function getVerificationQueue(
+  token: string,
+  filters: VerificationQueueFilters = {},
+) {
+  const search = new URLSearchParams();
+  if (filters.q?.trim()) search.set("q", filters.q.trim());
+  if (filters.creationMode?.trim()) {
+    search.set("creationMode", filters.creationMode.trim());
+  }
+  if (filters.gender?.trim()) search.set("gender", filters.gender.trim());
+  const query = search.toString();
+  const res = await apiFetch(
+    `${getApiBaseUrl()}/verification/queue${query ? `?${query}` : ""}`,
+    {
+      headers: authHeaders(token),
+    },
+  );
   return readJsonResponse<VerificationQueueItem[]>(res);
 }
 
@@ -284,17 +311,17 @@ export async function fetchVerificationBlob(
   token: string,
   path: string,
 ): Promise<Blob> {
-  const res = await fetch(`${getApiBaseUrl()}${path}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) {
-    throw new Error("Failed to load file");
-  }
-  return res.blob();
+  return fetchAuthenticatedBlob(token, path);
 }
 
-export function officerPhotoUrl(profileId: string, photoId: string) {
-  return `/verification/profiles/${profileId}/photos/${photoId}/file`;
+export function officerPhotoUrl(
+  profileId: string,
+  photoId: string,
+  variant?: "thumb" | "display" | "original",
+) {
+  const base = `/verification/profiles/${profileId}/photos/${photoId}/file`;
+  if (!variant || variant === "original") return base;
+  return `${base}?variant=${variant}`;
 }
 
 export async function fetchVerificationAuditBiodata(

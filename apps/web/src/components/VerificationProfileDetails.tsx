@@ -275,6 +275,7 @@ export function VerificationProfileDetails({
   onBiodataReview,
   onRequestBiodataReject,
   readOnly = false,
+  canApprove = true,
   dropdowns = {},
 }: {
   submission: VerificationSubmission;
@@ -285,6 +286,8 @@ export function VerificationProfileDetails({
   ) => void;
   onRequestBiodataReject?: () => void;
   readOnly?: boolean;
+  /** When false, approve is hidden (e.g. VO on staff-assisted profiles). Reject still allowed. */
+  canApprove?: boolean;
   dropdowns?: DropdownMap;
 }) {
   const t = useTranslations("verification");
@@ -1061,15 +1064,22 @@ export function VerificationProfileDetails({
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
           <p className="text-sm font-semibold text-amber-950">{t("biodataReviewPrompt")}</p>
           <p className="mt-1 text-sm text-amber-900">{t("biodataReviewHint")}</p>
+          {!canApprove ? (
+            <p className="mt-2 text-sm font-medium text-amber-950">
+              {t("staffAssisted.adminApproveOnly")}
+            </p>
+          ) : null}
           <div className="mt-4 flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={acting?.startsWith("biodata-") ?? false}
-              onClick={() => onBiodataReview("approved")}
-              className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
-            >
-              {t("approveBiodata")}
-            </button>
+            {canApprove ? (
+              <button
+                type="button"
+                disabled={acting?.startsWith("biodata-") ?? false}
+                onClick={() => onBiodataReview("approved")}
+                className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
+              >
+                {t("approveBiodata")}
+              </button>
+            ) : null}
             <button
               type="button"
               disabled={acting?.startsWith("biodata-") ?? false}

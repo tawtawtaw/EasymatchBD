@@ -350,8 +350,13 @@ export async function fetchAuthenticatedBlob(
   }
 }
 
-export function photoFileUrl(photoId: string) {
-  return `/profiles/me/photos/${photoId}/file`;
+export function photoFileUrl(
+  photoId: string,
+  variant?: "thumb" | "display" | "original",
+) {
+  const base = `/profiles/me/photos/${photoId}/file`;
+  if (!variant || variant === "original") return base;
+  return `${base}?variant=${variant}`;
 }
 
 export function nidFileUrl(

@@ -13,6 +13,7 @@ import { JwtService } from '@nestjs/jwt';
 import {
   hasAcceptedCurrentTerms,
   isPaidMember,
+  isStaffAssistedProfile,
   isStaffRole,
   isSuperAdminRole,
   isValidBangladeshPhone,
@@ -563,7 +564,7 @@ export class AuthService {
           lastLoginAt: true,
           createdAt: true,
           profile: {
-            select: { id: true, isVerified: true },
+            select: { id: true, isVerified: true, creationMode: true },
           },
           subscription: {
             select: { plan: true, isActive: true, endsAt: true },
@@ -587,13 +588,21 @@ export class AuthService {
           : this.profiles.getCompletionSummary(authUser.id))
       : { completionPercent: 0, completionMissing: [] as string[] };
 
-    const termsAccepted = staff
-      ? true
-      : hasAcceptedCurrentTerms(
-          user.termsAcceptedAt,
-          user.termsVersion,
+    const termsState = staff
+      ? {
+          termsAccepted: true,
+          termsAcceptedAt: user.termsAcceptedAt,
+          termsVersion: user.termsVersion,
+          termsDeclinedAt: user.termsDeclinedAt,
+        }
+      : await this.ensureStaffAssistedTermsAccepted({
+          userId: authUser.id,
+          creationMode: user.profile?.creationMode ?? null,
+          termsAcceptedAt: user.termsAcceptedAt,
+          termsVersion: user.termsVersion,
+          termsDeclinedAt: user.termsDeclinedAt,
           currentTermsVersion,
-        );
+        });
 
     return {
       id: user.id,
@@ -603,11 +612,11 @@ export class AuthService {
       profileKind: staff ? 'staff' : 'member',
       phoneVerifiedAt: user.phoneVerifiedAt?.toISOString() ?? null,
       emailVerifiedAt: user.emailVerifiedAt?.toISOString() ?? null,
-      termsAccepted,
-      termsAcceptedAt: user.termsAcceptedAt?.toISOString() ?? null,
-      termsVersion: user.termsVersion,
+      termsAccepted: termsState.termsAccepted,
+      termsAcceptedAt: termsState.termsAcceptedAt?.toISOString() ?? null,
+      termsVersion: termsState.termsVersion,
       currentTermsVersion,
-      termsDeclinedAt: user.termsDeclinedAt?.toISOString() ?? null,
+      termsDeclinedAt: termsState.termsDeclinedAt?.toISOString() ?? null,
       lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
       createdAt: user.createdAt.toISOString(),
       profile: user.profile,
@@ -719,6 +728,64 @@ export class AuthService {
     };
   }
 
+  /**
+   * Staff-assisted members already consented via intake PDF — record current T&C as accepted.
+   */
+  private async ensureStaffAssistedTermsAccepted(input: {
+    userId: string;
+    creationMode: string | null | undefined;
+    termsAcceptedAt: Date | null;
+    termsVersion: string | null;
+    termsDeclinedAt: Date | null;
+    currentTermsVersion: string;
+  }): Promise<{
+    termsAccepted: boolean;
+    termsAcceptedAt: Date | null;
+    termsVersion: string | null;
+    termsDeclinedAt: Date | null;
+  }> {
+    const alreadyAccepted = hasAcceptedCurrentTerms(
+      input.termsAcceptedAt,
+      input.termsVersion,
+      input.currentTermsVersion,
+    );
+    if (alreadyAccepted) {
+      return {
+        termsAccepted: true,
+        termsAcceptedAt: input.termsAcceptedAt,
+        termsVersion: input.termsVersion,
+        termsDeclinedAt: null,
+      };
+    }
+
+    if (!isStaffAssistedProfile({ creationMode: input.creationMode ?? null })) {
+      return {
+        termsAccepted: false,
+        termsAcceptedAt: input.termsAcceptedAt,
+        termsVersion: input.termsVersion,
+        termsDeclinedAt: input.termsDeclinedAt,
+      };
+    }
+
+    const now = new Date();
+    await this.prisma.user.update({
+      where: { id: input.userId },
+      data: {
+        termsAcceptedAt: now,
+        termsVersion: input.currentTermsVersion,
+        termsDeclinedAt: null,
+      },
+    });
+    this.invalidateSessionCache(input.userId);
+
+    return {
+      termsAccepted: true,
+      termsAcceptedAt: now,
+      termsVersion: input.currentTermsVersion,
+      termsDeclinedAt: null,
+    };
+  }
+
   private computeMemberRedirectPath(input: {
     termsAccepted: boolean;
     completionPercent: number;
@@ -761,21 +828,28 @@ export class AuthService {
     id: string;
     termsAcceptedAt: Date | null;
     termsVersion: string | null;
-    profile: (ProfileVerificationPayload & { isVerified: boolean }) | null;
+    termsDeclinedAt?: Date | null;
+    profile: (ProfileVerificationPayload & {
+      isVerified: boolean;
+      creationMode?: string | null;
+    }) | null;
   }) {
     const [currentTermsVersion, completion] = await Promise.all([
       this.legalService.getCurrentVersion(),
       this.profiles.getCompletionSummary(user.id),
     ]);
 
-    const termsAccepted = hasAcceptedCurrentTerms(
-      user.termsAcceptedAt,
-      user.termsVersion,
+    const termsState = await this.ensureStaffAssistedTermsAccepted({
+      userId: user.id,
+      creationMode: user.profile?.creationMode ?? null,
+      termsAcceptedAt: user.termsAcceptedAt,
+      termsVersion: user.termsVersion,
+      termsDeclinedAt: user.termsDeclinedAt ?? null,
       currentTermsVersion,
-    );
+    });
 
     return this.computeMemberRedirectPath({
-      termsAccepted,
+      termsAccepted: termsState.termsAccepted,
       completionPercent: completion.completionPercent,
       completionMissing: completion.completionMissing,
       isVerified: user.profile?.isVerified ?? false,
@@ -796,7 +870,11 @@ export class AuthService {
     const [user, currentTermsVersion, completion, profile] = await Promise.all([
       this.prisma.user.findUnique({
         where: { id: userId },
-        select: { termsAcceptedAt: true, termsVersion: true },
+        select: {
+          termsAcceptedAt: true,
+          termsVersion: true,
+          termsDeclinedAt: true,
+        },
       }),
       this.legalService.getCurrentVersion(),
       this.profiles.getCompletionSummary(userId),
@@ -810,14 +888,17 @@ export class AuthService {
       return '/auth';
     }
 
-    const termsAccepted = hasAcceptedCurrentTerms(
-      user.termsAcceptedAt,
-      user.termsVersion,
+    const termsState = await this.ensureStaffAssistedTermsAccepted({
+      userId,
+      creationMode: profile?.creationMode ?? null,
+      termsAcceptedAt: user.termsAcceptedAt,
+      termsVersion: user.termsVersion,
+      termsDeclinedAt: user.termsDeclinedAt,
       currentTermsVersion,
-    );
+    });
 
     return this.computeMemberRedirectPath({
-      termsAccepted,
+      termsAccepted: termsState.termsAccepted,
       completionPercent: completion.completionPercent,
       completionMissing: completion.completionMissing,
       isVerified: profile?.isVerified ?? false,
@@ -836,7 +917,14 @@ export class AuthService {
           termsVersion: true,
           termsDeclinedAt: true,
           subscription: { select: { plan: true, isActive: true, endsAt: true } },
-          profile: { select: { isVerified: true, isPaused: true, pausedAt: true } },
+          profile: {
+            select: {
+              isVerified: true,
+              isPaused: true,
+              pausedAt: true,
+              creationMode: true,
+            },
+          },
         },
       }),
       this.legalService.getCurrentVersion(),
@@ -848,21 +936,29 @@ export class AuthService {
 
     const role = authUser.role;
     const staff = isStaffRole(role);
-    const termsAccepted = staff
-      ? true
-      : hasAcceptedCurrentTerms(
-          user.termsAcceptedAt,
-          user.termsVersion,
+    const termsState = staff
+      ? {
+          termsAccepted: true,
+          termsAcceptedAt: user.termsAcceptedAt,
+          termsVersion: user.termsVersion,
+          termsDeclinedAt: user.termsDeclinedAt,
+        }
+      : await this.ensureStaffAssistedTermsAccepted({
+          userId: authUser.id,
+          creationMode: user.profile?.creationMode ?? null,
+          termsAcceptedAt: user.termsAcceptedAt,
+          termsVersion: user.termsVersion,
+          termsDeclinedAt: user.termsDeclinedAt,
           currentTermsVersion,
-        );
+        });
 
     return {
       role,
       profileKind: staff ? ('staff' as const) : ('member' as const),
-      termsAccepted,
-      termsVersion: user.termsVersion,
+      termsAccepted: termsState.termsAccepted,
+      termsVersion: termsState.termsVersion,
       currentTermsVersion,
-      termsDeclinedAt: user.termsDeclinedAt?.toISOString() ?? null,
+      termsDeclinedAt: termsState.termsDeclinedAt?.toISOString() ?? null,
       subscription: user.subscription,
       isPaidMember: isPaidMember(user.subscription),
       hasProfile: user.profile != null,
@@ -1032,22 +1128,34 @@ export class AuthService {
     }
 
     const staffFromDb = isStaffRole(authUser.role);
-    const termsAccepted = staffFromDb
-      ? true
-      : hasAcceptedCurrentTerms(
-          user.termsAcceptedAt,
-          user.termsVersion,
-          currentTermsVersion,
-        );
+    const staff = isStaffRole(authUser.role);
+    const memberProfile =
+      !staff && profile && 'creationMode' in profile ? profile : null;
 
-    if (!staffFromDb && !termsAccepted) {
+    const termsState = staffFromDb
+      ? {
+          termsAccepted: true,
+          termsAcceptedAt: user.termsAcceptedAt,
+          termsVersion: user.termsVersion,
+          termsDeclinedAt: user.termsDeclinedAt,
+        }
+      : await this.ensureStaffAssistedTermsAccepted({
+          userId: authUser.id,
+          creationMode: memberProfile?.creationMode ?? null,
+          termsAcceptedAt: user.termsAcceptedAt,
+          termsVersion: user.termsVersion,
+          termsDeclinedAt: user.termsDeclinedAt,
+          currentTermsVersion,
+        });
+
+    if (!staffFromDb && !termsState.termsAccepted) {
       const declinedPayload = {
         role: authUser.role,
         profileKind: 'member' as const,
-        termsAccepted,
-        termsVersion: user.termsVersion,
+        termsAccepted: termsState.termsAccepted,
+        termsVersion: termsState.termsVersion,
         currentTermsVersion,
-        termsDeclinedAt: user.termsDeclinedAt?.toISOString() ?? null,
+        termsDeclinedAt: termsState.termsDeclinedAt?.toISOString() ?? null,
         phone: authUser.phone,
         profile: null,
         dropdowns: null,
@@ -1060,18 +1168,13 @@ export class AuthService {
       return declinedPayload;
     }
 
-    const staff = isStaffRole(authUser.role);
-
-    const memberProfile =
-      !staff && profile && 'creationMode' in profile ? profile : null;
-
     const payload = {
       role: authUser.role,
       profileKind: staff ? ('staff' as const) : ('member' as const),
-      termsAccepted,
-      termsVersion: user.termsVersion,
+      termsAccepted: termsState.termsAccepted,
+      termsVersion: termsState.termsVersion,
       currentTermsVersion,
-      termsDeclinedAt: user.termsDeclinedAt?.toISOString() ?? null,
+      termsDeclinedAt: termsState.termsDeclinedAt?.toISOString() ?? null,
       phone: authUser.phone,
       creationMode: memberProfile?.creationMode ?? null,
       onBehalfRelation: memberProfile?.onBehalfRelation ?? null,

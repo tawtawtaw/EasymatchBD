@@ -41,12 +41,22 @@ export function DistrictSelectField({
         disabled={!division}
         required={required}
         onChange={(e) => onChange(e.target.value)}
-        className="field-input disabled:cursor-not-allowed disabled:bg-zinc-100"
+        className="field-input bg-white text-zinc-950 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-700"
       >
-        <option value="">{division ? tc("select") : "—"}</option>
-        {!isKnown && value ? <option value="">{value}</option> : null}
+        <option value="" className="bg-white text-zinc-950">
+          {division ? tc("select") : "—"}
+        </option>
+        {!isKnown && value ? (
+          <option value="" className="bg-white text-zinc-950">
+            {value}
+          </option>
+        ) : null}
         {options.map((option) => (
-          <option key={option.value} value={option.value}>
+          <option
+            key={option.value}
+            value={option.value}
+            className="bg-white text-zinc-950"
+          >
             {option.label}
           </option>
         ))}
@@ -79,12 +89,22 @@ export function UpazilaSelectField({
         value={isKnown ? value : ""}
         disabled={!district}
         onChange={(e) => onChange(e.target.value)}
-        className="field-input disabled:cursor-not-allowed disabled:bg-zinc-100"
+        className="field-input bg-white text-zinc-950 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-700"
       >
-        <option value="">{district ? tc("select") : "—"}</option>
-        {!isKnown && value ? <option value="">{value}</option> : null}
+        <option value="" className="bg-white text-zinc-950">
+          {district ? tc("select") : "—"}
+        </option>
+        {!isKnown && value ? (
+          <option value="" className="bg-white text-zinc-950">
+            {value}
+          </option>
+        ) : null}
         {options.map((option) => (
-          <option key={option.value} value={option.value}>
+          <option
+            key={option.value}
+            value={option.value}
+            className="bg-white text-zinc-950"
+          >
             {option.label}
           </option>
         ))}

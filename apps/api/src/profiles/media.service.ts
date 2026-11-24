@@ -36,6 +36,35 @@ type UploadedFile = {
 
 const MEDIA_SUMMARY_CACHE_TTL_MS = 30_000;
 
+/** Human-readable labels for verification submit errors (English). */
+const COMPLETION_MISSING_LABELS: Record<string, string> = {
+  gender: 'Gender (Personal)',
+  dateOfBirth: 'Date of birth (Personal)',
+  maritalStatus: 'Marital status (Personal)',
+  religion: 'Religion (Personal)',
+  prayerPractice: 'Prayer practice (Personal)',
+  smokingHabit: 'Smoking habit (Personal)',
+  currentDivision: 'Current division (Personal)',
+  currentDistrict: 'Current district (Personal)',
+  currentCityTown: 'Current city/town (Personal)',
+  currentAddressLine: 'Current street address (Personal)',
+  permanentDistrict: 'Permanent district (Personal)',
+  permanentCityTown: 'Permanent city/town (Personal)',
+  permanentAddressLine: 'Permanent street address (Personal)',
+  introduction: 'Short introduction (Personal)',
+  highestDegree: 'Highest qualification (Personal)',
+  educationMedium: 'Education medium (Personal)',
+  occupation: 'Occupation (Personal)',
+  fatherProfession: "Father's profession (Family)",
+  motherProfession: "Mother's profession (Family)",
+  ageMin: 'Minimum partner age (Partner)',
+  primaryPhoto: 'Passport photo',
+  nidFront: 'NID front',
+  nidBack: 'NID back',
+  creatorNidFront: 'Creator NID front',
+  creatorNidBack: 'Creator NID back',
+};
+
 const profileMediaInclude = {
   photos: {
     orderBy: [
@@ -246,7 +275,7 @@ export class MediaService {
           completion.completionPercent < 100
         ) {
           throw new BadRequestException(
-            'Complete all required biodata sections before submitting for verification',
+            this.incompleteBiodataMessage(completion.completionMissing),
           );
         }
 
@@ -329,7 +358,7 @@ export class MediaService {
       completion.completionPercent < 100
     ) {
       throw new BadRequestException(
-        'Complete all required biodata sections before submitting for verification',
+        this.incompleteBiodataMessage(completion.completionMissing),
       );
     }
 
@@ -354,6 +383,13 @@ export class MediaService {
       submitted: true,
       profileBiodataReviewStatus: updated.profileBiodataReviewStatus,
     };
+  }
+
+  private incompleteBiodataMessage(completionMissing: string[]): string {
+    const labels = completionMissing.map(
+      (key) => COMPLETION_MISSING_LABELS[key] ?? key,
+    );
+    return `Complete all required fields before submitting. Still needed: ${labels.join('; ')}`;
   }
 
   async uploadPhoto(

@@ -8,6 +8,7 @@ import {
   Post,
   Put,
   Query,
+  Res,
   StreamableFile,
   UploadedFile,
   UseGuards,
@@ -16,7 +17,12 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { NidDocumentSide, NidDocumentSubject, ProfilePhotoType } from '@prisma/client';
 import { parsePhotoVariant } from '@easymatch/shared';
+import type { Response } from 'express';
 import { memoryStorage } from 'multer';
+import {
+  NID_FILE_CACHE_CONTROL,
+  photoCacheControl,
+} from '../storage/photo-cache-headers';
 import { MAX_NID_BYTES, MAX_PHOTO_BYTES } from '../storage/storage.constants';
 import type { AuthUser } from '../auth/decorators/current-user.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -83,12 +89,16 @@ export class MediaController {
   async getPhotoFile(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
-    @Query('variant') variant?: string,
+    @Query('variant') variant: string | undefined,
+    @Res({ passthrough: true }) res: Response,
   ) {
+    const parsed = parsePhotoVariant(variant);
+    res.setHeader('Cache-Control', photoCacheControl(parsed));
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     const { stream, mimeType } = await this.mediaService.getPhotoFile(
       user.id,
       id,
-      parsePhotoVariant(variant),
+      parsed,
     );
     return new StreamableFile(stream, { type: mimeType });
   }
@@ -132,8 +142,11 @@ export class MediaController {
   async getNidFile(
     @CurrentUser() user: AuthUser,
     @Param('side') side: string,
-    @Query('subject') subject?: string,
+    @Query('subject') subject: string | undefined,
+    @Res({ passthrough: true }) res: Response,
   ) {
+    res.setHeader('Cache-Control', NID_FILE_CACHE_CONTROL);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     const { stream, mimeType } = await this.mediaService.getNidFile(
       user.id,
       this.parseNidSide(side),

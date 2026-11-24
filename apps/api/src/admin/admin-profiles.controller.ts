@@ -1,4 +1,13 @@
-import { Controller, Get, Param, Query, Res, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Put,
+  Query,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import type { Response } from 'express';
 import { UserRole } from '@easymatch/shared';
 import type { AuthUser } from '../auth/decorators/current-user.decorator';
@@ -8,6 +17,10 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { StaffAuditService } from '../audit/staff-audit.service';
 import { parseDiscoveryFilters } from '../discovery/discovery-filters';
+import { UpdateFamilyDto } from '../profiles/dto/update-family.dto';
+import { UpdateMaritalDto } from '../profiles/dto/update-marital.dto';
+import { UpdatePartnerDto } from '../profiles/dto/update-partner.dto';
+import { UpdatePersonalDto } from '../profiles/dto/update-personal.dto';
 import { AdminBiodataCsvExportService } from './admin-biodata-csv-export.service';
 import {
   AdminProfilesService,
@@ -53,6 +66,50 @@ export class AdminProfilesController {
   @Get('members/:profileId')
   getMemberProfile(@Param('profileId') profileId: string) {
     return this.adminProfiles.getMemberProfile(profileId);
+  }
+
+  @Put('members/:profileId/personal')
+  @Roles(UserRole.SUPER_ADMIN)
+  updateMemberPersonal(
+    @CurrentUser() user: AuthUser,
+    @Param('profileId') profileId: string,
+    @Body() dto: UpdatePersonalDto,
+    @Query('reason') reason?: string,
+  ) {
+    return this.adminProfiles.updateMemberPersonal(user, profileId, dto, reason);
+  }
+
+  @Put('members/:profileId/family')
+  @Roles(UserRole.SUPER_ADMIN)
+  updateMemberFamily(
+    @CurrentUser() user: AuthUser,
+    @Param('profileId') profileId: string,
+    @Body() dto: UpdateFamilyDto,
+    @Query('reason') reason?: string,
+  ) {
+    return this.adminProfiles.updateMemberFamily(user, profileId, dto, reason);
+  }
+
+  @Put('members/:profileId/partner')
+  @Roles(UserRole.SUPER_ADMIN)
+  updateMemberPartner(
+    @CurrentUser() user: AuthUser,
+    @Param('profileId') profileId: string,
+    @Body() dto: UpdatePartnerDto,
+    @Query('reason') reason?: string,
+  ) {
+    return this.adminProfiles.updateMemberPartner(user, profileId, dto, reason);
+  }
+
+  @Put('members/:profileId/marital')
+  @Roles(UserRole.SUPER_ADMIN)
+  updateMemberMarital(
+    @CurrentUser() user: AuthUser,
+    @Param('profileId') profileId: string,
+    @Body() dto: UpdateMaritalDto,
+    @Query('reason') reason?: string,
+  ) {
+    return this.adminProfiles.updateMemberMarital(user, profileId, dto, reason);
   }
 
   @Get('staff/:userId')

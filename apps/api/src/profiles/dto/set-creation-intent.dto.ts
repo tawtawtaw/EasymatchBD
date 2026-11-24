@@ -1,14 +1,14 @@
 import { IsIn, IsOptional } from 'class-validator';
 import {
+  MEMBER_PROFILE_CREATION_MODES,
   ON_BEHALF_RELATIONS,
-  PROFILE_CREATION_MODES,
+  type MemberProfileCreationMode,
   type OnBehalfRelation,
-  type ProfileCreationMode,
 } from '@easymatch/shared';
 
 export class SetCreationIntentDto {
-  @IsIn([...PROFILE_CREATION_MODES])
-  creationMode!: ProfileCreationMode;
+  @IsIn([...MEMBER_PROFILE_CREATION_MODES])
+  creationMode!: MemberProfileCreationMode;
 
   @IsOptional()
   @IsIn([...ON_BEHALF_RELATIONS])

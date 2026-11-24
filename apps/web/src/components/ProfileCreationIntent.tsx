@@ -4,9 +4,9 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 import {
   ON_BEHALF_RELATIONS,
-  PROFILE_CREATION_MODES,
+  MEMBER_PROFILE_CREATION_MODES,
+  type MemberProfileCreationMode,
   type OnBehalfRelation,
-  type ProfileCreationMode,
 } from "@easymatch/shared";
 import { setCreationIntent, type Profile } from "@/lib/api";
 
@@ -20,7 +20,7 @@ export function ProfileCreationIntent({
   onComplete,
 }: ProfileCreationIntentProps) {
   const t = useTranslations("profile.creationIntent");
-  const [mode, setMode] = useState<ProfileCreationMode | null>(null);
+  const [mode, setMode] = useState<MemberProfileCreationMode | null>(null);
   const [relation, setRelation] = useState<OnBehalfRelation | "">("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +56,7 @@ export function ProfileCreationIntent({
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        {PROFILE_CREATION_MODES.map((value) => (
+        {MEMBER_PROFILE_CREATION_MODES.map((value) => (
           <button
             key={value}
             type="button"

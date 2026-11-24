@@ -1,7 +1,6 @@
-import { EASYMATCH_API_URL } from "@easymatch/shared";
+import { getApiBaseUrl } from "@/lib/api-base-url";
+import { apiFetch, readJsonResponse } from "@/lib/parse-response";
 import type { VerificationSubmission } from "@/lib/verification";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? EASYMATCH_API_URL;
 
 export type AdminProfileKind = "member" | "staff";
 
@@ -46,20 +45,6 @@ export type AdminStaffProfileDetail = {
   } | null;
 };
 
-async function parseResponse<T>(res: Response): Promise<T> {
-  const data = (await res.json()) as T & {
-    message?: string | string[];
-    statusCode?: number;
-  };
-  if (!res.ok) {
-    const message = Array.isArray(data.message)
-      ? data.message.join(", ")
-      : data.message || "Request failed";
-    throw new Error(message);
-  }
-  return data;
-}
-
 function authHeaders(token: string) {
   return {
     Authorization: `Bearer ${token}`,
@@ -87,12 +72,12 @@ export async function listAdminProfiles(
   if (params.includeInactive) search.set("includeInactive", "true");
 
   const query = search.toString();
-  const res = await fetch(
-    `${API_URL}/admin/profiles${query ? `?${query}` : ""}`,
+  const res = await apiFetch(
+    `${getApiBaseUrl()}/admin/profiles${query ? `?${query}` : ""}`,
     { headers: authHeaders(token) },
   );
 
-  return parseResponse<{
+  return readJsonResponse<{
     items: AdminProfileListItem[];
     total: number;
     page: number;
@@ -101,15 +86,76 @@ export async function listAdminProfiles(
 }
 
 export async function getAdminStaffProfile(token: string, userId: string) {
-  const res = await fetch(`${API_URL}/admin/profiles/staff/${userId}`, {
-    headers: authHeaders(token),
-  });
-  return parseResponse<AdminStaffProfileDetail>(res);
+  const res = await apiFetch(
+    `${getApiBaseUrl()}/admin/profiles/staff/${userId}`,
+    { headers: authHeaders(token) },
+  );
+  return readJsonResponse<AdminStaffProfileDetail>(res);
 }
 
 export async function getAdminMemberProfile(token: string, profileId: string) {
-  const res = await fetch(`${API_URL}/admin/profiles/members/${profileId}`, {
-    headers: authHeaders(token),
-  });
-  return parseResponse<VerificationSubmission>(res);
+  const res = await apiFetch(
+    `${getApiBaseUrl()}/admin/profiles/members/${profileId}`,
+    { headers: authHeaders(token) },
+  );
+  return readJsonResponse<VerificationSubmission>(res);
+}
+
+export type AdminBiodataSection = "personal" | "family" | "partner" | "marital";
+
+async function putAdminMemberBiodataSection(
+  token: string,
+  profileId: string,
+  section: AdminBiodataSection,
+  data: Record<string, unknown>,
+  reason?: string,
+) {
+  const search = new URLSearchParams();
+  if (reason?.trim()) search.set("reason", reason.trim());
+  const query = search.toString();
+  const res = await apiFetch(
+    `${getApiBaseUrl()}/admin/profiles/members/${profileId}/${section}${query ? `?${query}` : ""}`,
+    {
+      method: "PUT",
+      headers: authHeaders(token),
+      body: JSON.stringify(data),
+    },
+  );
+  return readJsonResponse<VerificationSubmission>(res);
+}
+
+export function updateAdminMemberPersonal(
+  token: string,
+  profileId: string,
+  data: Record<string, unknown>,
+  reason?: string,
+) {
+  return putAdminMemberBiodataSection(token, profileId, "personal", data, reason);
+}
+
+export function updateAdminMemberFamily(
+  token: string,
+  profileId: string,
+  data: Record<string, unknown>,
+  reason?: string,
+) {
+  return putAdminMemberBiodataSection(token, profileId, "family", data, reason);
+}
+
+export function updateAdminMemberPartner(
+  token: string,
+  profileId: string,
+  data: Record<string, unknown>,
+  reason?: string,
+) {
+  return putAdminMemberBiodataSection(token, profileId, "partner", data, reason);
+}
+
+export function updateAdminMemberMarital(
+  token: string,
+  profileId: string,
+  data: Record<string, unknown>,
+  reason?: string,
+) {
+  return putAdminMemberBiodataSection(token, profileId, "marital", data, reason);
 }

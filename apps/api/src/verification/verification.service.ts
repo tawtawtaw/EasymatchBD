@@ -11,12 +11,15 @@ import {
   NidDocumentSide,
   NidDocumentSubject,
   Prisma,
+  ProfileCreationMode,
   ProfilePhotoType,
   VerificationAlertType,
 } from '@prisma/client';
 import {
   buildVerificationBiodataChanges,
   isOnBehalfProfile,
+  PROFILE_CREATION_MODES,
+  type PhotoVariant,
 } from '@easymatch/shared';
 import { AuthService } from '../auth/auth.service';
 import {
@@ -29,14 +32,17 @@ import {
   buildAuditBiodataExport,
 } from '../profiles/biodata-audit-export';
 import { MediaService } from '../profiles/media.service';
+import { ProfilesService } from '../profiles/profiles.service';
 import { PrivacyFieldsService } from '../privacy/privacy-fields.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { PhotoVariantService } from '../storage/photo-variant.service';
 import { StorageService } from '../storage/storage.service';
 import { VerificationAlertsService } from './verification-alerts.service';
 import {
   buildVerificationBiodataSnapshotFromProfile,
   parseStoredVerificationBiodataSnapshot,
 } from './verification-biodata-snapshot';
+import { StaffAssistedService } from './staff-assisted.service';
 import {
   isNidReadyForReview,
   isProfileFullyVerified,
@@ -60,21 +66,68 @@ export class VerificationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
+    private readonly photoVariants: PhotoVariantService,
     private readonly verificationAlerts: VerificationAlertsService,
     private readonly privacyFields: PrivacyFieldsService,
     @Inject(forwardRef(() => AuthService))
     private readonly authService: AuthService,
     @Inject(forwardRef(() => MediaService))
     private readonly mediaService: MediaService,
+    @Inject(forwardRef(() => ProfilesService))
+    private readonly profiles: ProfilesService,
     private readonly pushNotifications: PushNotificationService,
+    @Inject(forwardRef(() => StaffAssistedService))
+    private readonly staffAssisted: StaffAssistedService,
   ) {}
 
-  async getQueue() {
+  async getQueue(filters?: {
+    q?: string;
+    creationMode?: string;
+    gender?: string;
+  }) {
+    const q = filters?.q?.trim();
+    const creationModeRaw = filters?.creationMode?.trim();
+    const creationMode = PROFILE_CREATION_MODES.includes(
+      creationModeRaw as (typeof PROFILE_CREATION_MODES)[number],
+    )
+      ? (creationModeRaw as ProfileCreationMode)
+      : undefined;
+    const gender = filters?.gender?.trim();
+
     const profiles = await this.prisma.profile.findMany({
       where: {
-        user: { isActive: true },
-        OR: [
+        AND: [
+          { user: { isActive: true } },
           { profileBiodataReviewStatus: MediaReviewStatus.pending },
+          ...(creationMode ? [{ creationMode }] : []),
+          ...(gender ? [{ gender }] : []),
+          ...(q
+            ? [
+                {
+                  OR: [
+                    {
+                      profileCode: {
+                        contains: q,
+                        mode: 'insensitive' as const,
+                      },
+                    },
+                    {
+                      fullName: {
+                        contains: q,
+                        mode: 'insensitive' as const,
+                      },
+                    },
+                    {
+                      user: {
+                        is: {
+                          phone: { contains: q },
+                        },
+                      },
+                    },
+                  ],
+                },
+              ]
+            : []),
         ],
       },
       include: {
@@ -94,6 +147,7 @@ export class VerificationService {
       userId: profile.userId,
       fullName: profile.fullName,
       phone: profile.user.phone,
+      gender: profile.gender,
       isVerified: profile.isVerified,
       verifiedOnBehalf: profile.verifiedOnBehalf,
       creationMode: profile.creationMode,
@@ -151,6 +205,10 @@ export class VerificationService {
       verifiedOnBehalf: profile.verifiedOnBehalf,
       creationMode: profile.creationMode,
       onBehalfRelation: profile.onBehalfRelation,
+      createdByStaffId: profile.createdByStaffId,
+      consentNote: profile.consentNote,
+      consentedAt: profile.consentedAt?.toISOString() ?? null,
+      staffInviteSmsSentAt: profile.staffInviteSmsSentAt?.toISOString() ?? null,
       nidVerifiedAt: profile.nidVerifiedAt?.toISOString() ?? null,
       creatorNidVerifiedAt: profile.creatorNidVerifiedAt?.toISOString() ?? null,
       profileBiodataReviewStatus: profile.profileBiodataReviewStatus,
@@ -302,6 +360,7 @@ export class VerificationService {
         reviewedAt: doc.reviewedAt?.toISOString() ?? null,
       })),
       biodataChanges,
+      ...(await this.profiles.getCompletionSummary(profile.userId)),
     };
   }
 
@@ -572,7 +631,11 @@ export class VerificationService {
     };
   }
 
-  async getPhotoFile(profileId: string, photoId: string) {
+  async getPhotoFile(
+    profileId: string,
+    photoId: string,
+    variant: PhotoVariant = 'original',
+  ) {
     const photo = await this.prisma.profilePhoto.findFirst({
       where: { id: photoId, profileId },
       include: { profile: { select: { userId: true } } },
@@ -582,10 +645,11 @@ export class VerificationService {
       throw new NotFoundException('Photo not found');
     }
 
-    return {
-      stream: await this.storage.createReadStream(photo.storageKey),
-      mimeType: photo.mimeType,
-    };
+    return this.photoVariants.streamOriginalOrVariant(
+      photo.storageKey,
+      photo.mimeType,
+      variant,
+    );
   }
 
   async getNidFile(
@@ -647,6 +711,7 @@ export class VerificationService {
         VerificationAlertType.profile_fully_verified,
       );
       void this.notifyProfileVerified(userId);
+      void this.staffAssisted.sendInviteSmsIfNeeded(profileId);
     }
 
     if (before?.isVerified !== after?.isVerified) {

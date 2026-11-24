@@ -4,9 +4,15 @@
  */
 import { spawn } from "node:child_process";
 
+function withHeapLimit(existing) {
+  if (existing && /max-old-space-size/.test(existing)) return existing;
+  return [existing, "--max-old-space-size=4096"].filter(Boolean).join(" ");
+}
+
 const env = {
   ...process.env,
   NODE_ENV: "development",
+  NODE_OPTIONS: withHeapLimit(process.env.NODE_OPTIONS),
   NGROK_DEV_ORIGIN:
     process.env.NGROK_DEV_ORIGIN?.trim() || "https://easymatchbd.ngrok.dev",
 };

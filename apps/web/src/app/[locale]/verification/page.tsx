@@ -1,7 +1,8 @@
 "use client";
 
 import { useTranslations, useLocale } from "next-intl";
-import { useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { AdminBiodataEditForm } from "@/components/AdminBiodataEditForm";
 import { AuthenticatedBlobImage } from "@/components/AuthenticatedBlobImage";
 import { VerificationProfileDetails } from "@/components/VerificationProfileDetails";
 import { VerificationRejectDialog } from "@/components/VerificationRejectDialog";
@@ -10,7 +11,7 @@ import { Link, useRouter } from "@/i18n/routing";
 import { AUTH_TOKEN_KEY, DropdownMap, getDropdowns, getMe } from "@/lib/api";
 import { useAuthToken } from "@/hooks/use-auth-token";
 import { useMounted } from "@/hooks/use-mounted";
-import { isOtherGalleryPhoto } from "@easymatch/shared";
+import { isOtherGalleryPhoto, isSuperAdminRole } from "@easymatch/shared";
 import {
   fetchVerificationBlob,
   getVerificationQueue,
@@ -21,6 +22,7 @@ import {
   reviewNid,
   reviewPhoto,
   reviewProfileBiodata,
+  type VerificationQueueFilters,
   VerificationQueueItem,
   VerificationSubmission,
 } from "@/lib/verification";
@@ -52,6 +54,7 @@ export default function VerificationPage() {
   const t = useTranslations("verification");
   const tc = useTranslations("common");
   const [authorized, setAuthorized] = useState<boolean | null>(null);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [queue, setQueue] = useState<VerificationQueueItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [submission, setSubmission] = useState<VerificationSubmission | null>(null);
@@ -61,18 +64,73 @@ export default function VerificationPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [rejectTarget, setRejectTarget] = useState<RejectTarget | null>(null);
+  const [editingBiodata, setEditingBiodata] = useState(false);
+  const [queueQ, setQueueQ] = useState("");
+  const [queueCreationMode, setQueueCreationMode] = useState("");
+  const [queueGender, setQueueGender] = useState("");
+  const [appliedQueueFilters, setAppliedQueueFilters] =
+    useState<VerificationQueueFilters>({});
+  const appliedQueueFiltersRef = useRef(appliedQueueFilters);
+  appliedQueueFiltersRef.current = appliedQueueFilters;
+  const [queueSearching, setQueueSearching] = useState(false);
   const mounted = useMounted();
   const authToken = useAuthToken();
+  /** Staff-assisted biodata/NID: Super Admin only. Photos: VO or Admin. */
+  const canApproveBiodataNid =
+    isSuperAdmin || submission?.creationMode !== "staff_assisted";
 
-  const loadQueue = useCallback(async () => {
+  const loadQueue = useCallback(async (filters?: VerificationQueueFilters) => {
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
     if (!token) return;
-    const items = await getVerificationQueue(token);
+    const items = await getVerificationQueue(
+      token,
+      filters ?? appliedQueueFiltersRef.current,
+    );
     setQueue(items);
-    if (items.length > 0 && !selectedId) {
-      setSelectedId(items[0].profileId);
+    setSelectedId((current) => {
+      if (items.length === 0) return null;
+      if (current && items.some((item) => item.profileId === current)) {
+        return current;
+      }
+      return items[0].profileId;
+    });
+  }, []);
+
+  async function handleQueueSearch(event?: FormEvent) {
+    event?.preventDefault();
+    const next: VerificationQueueFilters = {
+      q: queueQ.trim() || undefined,
+      creationMode: queueCreationMode || undefined,
+      gender: queueGender || undefined,
+    };
+    setAppliedQueueFilters(next);
+    setQueueSearching(true);
+    setError(null);
+    try {
+      await loadQueue(next);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("searchFailed"));
+    } finally {
+      setQueueSearching(false);
     }
-  }, [selectedId]);
+  }
+
+  async function handleQueueClear() {
+    setQueueQ("");
+    setQueueCreationMode("");
+    setQueueGender("");
+    const next: VerificationQueueFilters = {};
+    setAppliedQueueFilters(next);
+    setQueueSearching(true);
+    setError(null);
+    try {
+      await loadQueue(next);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("searchFailed"));
+    } finally {
+      setQueueSearching(false);
+    }
+  }
 
   const loadSubmission = useCallback(async (profileId: string) => {
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
@@ -95,6 +153,7 @@ export default function VerificationPage() {
           return;
         }
         setAuthorized(true);
+        setIsSuperAdmin(isSuperAdminRole(user.role));
         return loadQueue();
       })
       .catch(() => router.replace("/auth"))
@@ -282,11 +341,106 @@ export default function VerificationPage() {
           <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
         )}
 
+        <div className="rounded-xl border border-sky-200 bg-sky-50/60 px-4 py-3 text-sm text-sky-950">
+          <p className="font-semibold">{t("staffAssisted.pageTitle")}</p>
+          <p className="mt-1 text-sky-900/80">{t("staffAssisted.pageSubtitle")}</p>
+          <Link
+            href="/verification/intake"
+            className="mt-2 inline-flex font-semibold text-sky-900 underline-offset-2 hover:underline"
+          >
+            {t("staffAssisted.create")} →
+          </Link>
+        </div>
+
         <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)]">
           <aside className="min-w-0 rounded-2xl border border-zinc-300 bg-white p-4 shadow-md">
             <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-zinc-500">
               {t("pendingQueue")}
             </h2>
+
+            <form
+              onSubmit={(event) => void handleQueueSearch(event)}
+              className="mb-4 space-y-2 border-b border-zinc-200 pb-4"
+            >
+              <label className="block space-y-1">
+                <span className="text-xs font-semibold text-zinc-600">
+                  {t("queueSearchLabel")}
+                </span>
+                <input
+                  value={queueQ}
+                  onChange={(e) => setQueueQ(e.target.value)}
+                  placeholder={t("queueSearchPlaceholder")}
+                  className="field-input bg-white text-zinc-950"
+                />
+              </label>
+              <label className="block space-y-1">
+                <span className="text-xs font-semibold text-zinc-600">
+                  {t("queueCreationMode")}
+                </span>
+                <select
+                  value={queueCreationMode}
+                  onChange={(e) => setQueueCreationMode(e.target.value)}
+                  className="field-input bg-white text-zinc-950"
+                >
+                  <option value="" className="bg-white text-zinc-950">
+                    {t("queueFilterAll")}
+                  </option>
+                  <option value="self" className="bg-white text-zinc-950">
+                    {t("queueCreationModes.self")}
+                  </option>
+                  <option value="on_behalf" className="bg-white text-zinc-950">
+                    {t("queueCreationModes.on_behalf")}
+                  </option>
+                  <option
+                    value="staff_assisted"
+                    className="bg-white text-zinc-950"
+                  >
+                    {t("queueCreationModes.staff_assisted")}
+                  </option>
+                </select>
+              </label>
+              <label className="block space-y-1">
+                <span className="text-xs font-semibold text-zinc-600">
+                  {t("queueGender")}
+                </span>
+                <select
+                  value={queueGender}
+                  onChange={(e) => setQueueGender(e.target.value)}
+                  className="field-input bg-white text-zinc-950"
+                >
+                  <option value="" className="bg-white text-zinc-950">
+                    {t("queueFilterAll")}
+                  </option>
+                  {(dropdowns.gender ?? []).map((option) => (
+                    <option
+                      key={option.value}
+                      value={option.value}
+                      className="bg-white text-zinc-950"
+                    >
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <button
+                  type="submit"
+                  disabled={queueSearching}
+                  className="rounded-lg bg-rose-800 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+                >
+                  {queueSearching ? tc("loading") : t("queueSearch")}
+                </button>
+                <button
+                  type="button"
+                  disabled={queueSearching}
+                  onClick={() => void handleQueueClear()}
+                  className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-800 disabled:opacity-60"
+                >
+                  {t("queueClear")}
+                </button>
+              </div>
+            </form>
+
             {queue.length === 0 ? (
               <p className="text-sm text-zinc-600">{t("emptyQueue")}</p>
             ) : (
@@ -297,6 +451,7 @@ export default function VerificationPage() {
                       type="button"
                       onClick={() => {
                         setSelectedId(item.profileId);
+                        setEditingBiodata(false);
                         setMessage(null);
                         setError(null);
                       }}
@@ -382,6 +537,17 @@ export default function VerificationPage() {
                         </dd>
                       </div>
                     ) : null}
+                    {submission.creationMode === "staff_assisted" ? (
+                      <div className="md:col-span-2">
+                        <dt className="text-zinc-500">{t("creationMode")}</dt>
+                        <dd className="break-words font-semibold text-sky-900">
+                          {t("staffAssisted.badge")}
+                          {submission.consentNote
+                            ? ` — ${submission.consentNote}`
+                            : ""}
+                        </dd>
+                      </div>
+                    ) : null}
                   </dl>
                   {authToken && submission.profileCode ? (
                     <div className="mt-4 border-t border-zinc-100 pt-4">
@@ -395,13 +561,51 @@ export default function VerificationPage() {
                   ) : null}
                 </section>
 
-                <VerificationProfileDetails
-                  submission={submission}
-                  acting={acting}
-                  onBiodataReview={handleBiodataReview}
-                  onRequestBiodataReject={() => setRejectTarget({ kind: "biodata" })}
-                  dropdowns={dropdowns}
-                />
+                {isSuperAdmin && authToken ? (
+                  editingBiodata ? (
+                    <AdminBiodataEditForm
+                      key={submission.profileId}
+                      token={authToken}
+                      submission={submission}
+                      dropdowns={dropdowns}
+                      onCancel={() => setEditingBiodata(false)}
+                      onError={setError}
+                      onSaved={(next) => {
+                        setSubmission(next);
+                        setEditingBiodata(false);
+                        setMessage(t("adminEditBiodata.saved"));
+                      }}
+                    />
+                  ) : (
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50/50 px-4 py-3">
+                      <p className="text-sm text-rose-950">
+                        {t("adminEditBiodata.hint")}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setError(null);
+                          setMessage(null);
+                          setEditingBiodata(true);
+                        }}
+                        className="rounded-lg bg-rose-800 px-3 py-1.5 text-sm font-semibold text-white"
+                      >
+                        {t("adminEditBiodata.open")}
+                      </button>
+                    </div>
+                  )
+                ) : null}
+
+                {!editingBiodata ? (
+                  <VerificationProfileDetails
+                    submission={submission}
+                    acting={acting}
+                    onBiodataReview={handleBiodataReview}
+                    onRequestBiodataReject={() => setRejectTarget({ kind: "biodata" })}
+                    canApprove={canApproveBiodataNid}
+                    dropdowns={dropdowns}
+                  />
+                ) : null}
 
                 <section className="border-t border-zinc-200 pt-8">
                   <h2 className="text-lg font-bold text-zinc-900">{t("photosSection")}</h2>
@@ -425,7 +629,11 @@ export default function VerificationPage() {
                           {mounted && authToken && photo.mimeType.startsWith("image/") && (
                             <AuthenticatedBlobImage
                               token={authToken}
-                              path={officerPhotoUrl(submission.profileId, photo.id)}
+                              path={officerPhotoUrl(
+                                submission.profileId,
+                                photo.id,
+                                "display",
+                              )}
                               alt={photo.type}
                               fetchBlob={fetchVerificationBlob}
                               className="mb-3 aspect-square w-full rounded-lg border border-zinc-200 object-cover"
@@ -442,7 +650,7 @@ export default function VerificationPage() {
                             </span>
                           </div>
                           {photo.status === "pending" && (
-                            <div className="mt-3 flex gap-2">
+                            <div className="mt-3 flex flex-wrap gap-2">
                               <button
                                 type="button"
                                 disabled={acting === photo.id}
@@ -580,14 +788,20 @@ export default function VerificationPage() {
 
                             {readyForReview && !verifiedAt ? (
                               <div className="mt-4 flex flex-wrap gap-2">
-                                <button
-                                  type="button"
-                                  disabled={acting?.startsWith(`nid-${subject}-`) ?? false}
-                                  onClick={() => handleNidReview("approved", subject)}
-                                  className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
-                                >
-                                  {t("approveNidOnly")}
-                                </button>
+                                {canApproveBiodataNid ? (
+                                  <button
+                                    type="button"
+                                    disabled={acting?.startsWith(`nid-${subject}-`) ?? false}
+                                    onClick={() => handleNidReview("approved", subject)}
+                                    className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
+                                  >
+                                    {t("approveNidOnly")}
+                                  </button>
+                                ) : (
+                                  <p className="w-full text-sm font-medium text-amber-900">
+                                    {t("staffAssisted.adminApproveOnly")}
+                                  </p>
+                                )}
                                 <button
                                   type="button"
                                   disabled={acting?.startsWith(`nid-${subject}-`) ?? false}

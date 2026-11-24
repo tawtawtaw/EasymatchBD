@@ -112,15 +112,38 @@ export function VerificationHomeDashboard() {
             </h1>
             <p className="mt-2 max-w-2xl text-base text-zinc-600">{t("subtitle")}</p>
           </div>
-          <Link
-            href="/verification"
-            className="inline-flex rounded-xl bg-rose-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-rose-800"
-          >
-            {t("openPortal")} →
-          </Link>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href="/verification/intake"
+              className="inline-flex rounded-xl bg-sky-800 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-900"
+            >
+              {t("createMemberProfile")} →
+            </Link>
+            <Link
+              href="/verification"
+              className="inline-flex rounded-xl bg-rose-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-rose-800"
+            >
+              {t("openPortal")} →
+            </Link>
+          </div>
         </header>
 
-        <section className="mt-10">
+        <section className="mt-10 grid gap-4 sm:grid-cols-2">
+          <Link
+            href="/verification/intake"
+            className="block rounded-2xl border border-sky-200 border-l-4 border-l-sky-600 bg-white/90 p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+          >
+            <p className="text-sm font-bold uppercase tracking-wide text-sky-800">
+              {t("intakeCard.kicker")}
+            </p>
+            <p className="mt-2 text-lg font-semibold text-zinc-900">
+              {t("intakeCard.title")}
+            </p>
+            <p className="mt-2 text-sm text-zinc-600">{t("intakeCard.body")}</p>
+            <p className="mt-3 text-sm font-semibold text-sky-800">
+              {t("intakeCard.cta")} →
+            </p>
+          </Link>
           <Link
             href="/verification"
             className="block rounded-2xl border border-zinc-200 border-l-4 border-l-rose-500 bg-white/90 p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
@@ -149,6 +172,12 @@ export function VerificationHomeDashboard() {
           <h2 className="text-lg font-bold text-zinc-900">{t("quickActionsTitle")}</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {[
+              {
+                href: "/verification/intake",
+                title: t("actions.intake"),
+                desc: t("actions.intakeDesc"),
+                icon: "📝",
+              },
               {
                 href: "/verification",
                 title: t("actions.queue"),
