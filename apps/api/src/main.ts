@@ -12,6 +12,7 @@ import { ExpressAdapter } from '@nestjs/platform-express';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { AppModule } from './app.module';
 import { assertProductionEnv, logBootstrapEnv } from './bootstrap-env';
+import { ApiExceptionFilter } from './common/api-exception.filter';
 import { MulterExceptionFilter } from './common/multer-exception.filter';
 import { freeDevPort } from './dev-port.util';
 
@@ -129,7 +130,9 @@ async function bootstrap() {
 
   app.enableShutdownHooks();
   app.setGlobalPrefix('api/v1');
-  app.useGlobalFilters(new MulterExceptionFilter());
+  // ApiExceptionFilter last-registered would win; register it first so Multer
+  // keeps priority for upload errors, while everything else gets a short detail.
+  app.useGlobalFilters(new ApiExceptionFilter(), new MulterExceptionFilter());
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

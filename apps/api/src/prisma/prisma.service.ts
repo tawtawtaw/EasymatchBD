@@ -26,9 +26,8 @@ export class PrismaService
       await ensureMarketingBannerSchema(this, this.logger);
       await ensureAndroidAppReleaseSchema(this, this.logger);
       await ensureStaffAssistedSchema(this, this.logger);
-      if (process.env.NODE_ENV === 'production') {
-        await ensureConnectionEndedSchema(this, this.logger);
-      }
+      // Always ensure — authenticated tabs query Connection.endedAt.
+      await ensureConnectionEndedSchema(this, this.logger);
     }
   }
 
