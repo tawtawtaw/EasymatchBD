@@ -2,7 +2,6 @@ import { EASYMATCH_API_PORT } from "@easymatch/shared";
 
 type ApiErrorBody = {
   message?: string | string[];
-  error?: string;
   statusCode?: number;
 };
 
@@ -66,15 +65,7 @@ export async function readJsonResponse<T>(res: Response): Promise<T> {
     const message = Array.isArray(data.message)
       ? data.message.join(", ")
       : data.message || `Request failed (${res.status})`;
-    const detail =
-      typeof data.error === "string" && data.error.trim() && data.error !== message
-        ? data.error.trim()
-        : null;
-    throw new Error(
-      detail && message === "Internal server error"
-        ? `${message}: ${detail}`
-        : message,
-    );
+    throw new Error(message);
   }
 
   return data;
