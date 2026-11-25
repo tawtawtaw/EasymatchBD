@@ -54,6 +54,8 @@ export class HealthController {
       };
     }
 
+    const probes: Record<string, string> = {};
+
     try {
       const sample = await this.prisma.profile.findFirst({
         select: {
@@ -63,21 +65,101 @@ export class HealthController {
           staffInviteSmsSentAt: true,
         },
       });
-      return {
-        status: 'ok',
-        columns: columns.map((row) => row.column_name),
-        enumValues,
-        sampleFound: Boolean(sample),
-        timestamp: new Date().toISOString(),
-      };
+      probes.findFirst = sample ? 'ok' : 'empty';
     } catch (error) {
-      return {
-        status: 'error',
-        stage: 'findFirst',
-        columns: columns.map((row) => row.column_name),
-        enumValues,
-        message: error instanceof Error ? error.message : String(error),
-      };
+      probes.findFirst =
+        error instanceof Error ? error.message : String(error);
     }
+
+    try {
+      await this.prisma.profile.findMany({
+        where: {
+          user: { isActive: true },
+          profileBiodataReviewStatus: 'pending',
+        },
+        include: {
+          user: { select: { id: true, phone: true } },
+          photos: {
+            where: { status: 'pending' },
+            orderBy: [{ type: 'asc' }, { createdAt: 'asc' }],
+          },
+          nidDocuments: true,
+        },
+        take: 3,
+      });
+      probes.verificationQueue = 'ok';
+    } catch (error) {
+      probes.verificationQueue =
+        error instanceof Error ? error.message : String(error);
+    }
+
+    try {
+      await this.prisma.user.findMany({
+        where: { isActive: true },
+        include: {
+          profile: {
+            select: {
+              id: true,
+              profileCode: true,
+              fullName: true,
+              isVerified: true,
+              updatedAt: true,
+            },
+          },
+          staffProfile: {
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+              designation: true,
+              officeDistrict: true,
+              updatedAt: true,
+            },
+          },
+          subscription: {
+            select: { plan: true, isActive: true, endsAt: true },
+          },
+        },
+        take: 3,
+      });
+      probes.adminList = 'ok';
+    } catch (error) {
+      probes.adminList =
+        error instanceof Error ? error.message : String(error);
+    }
+
+    try {
+      await this.prisma.user.findFirst({
+        select: {
+          id: true,
+          termsAcceptedAt: true,
+          termsVersion: true,
+          profile: {
+            select: {
+              id: true,
+              isVerified: true,
+              creationMode: true,
+            },
+          },
+          subscription: {
+            select: { plan: true, isActive: true, endsAt: true },
+          },
+        },
+      });
+      probes.authMeShape = 'ok';
+    } catch (error) {
+      probes.authMeShape =
+        error instanceof Error ? error.message : String(error);
+    }
+
+    const failed = Object.entries(probes).filter(([, value]) => value !== 'ok' && value !== 'empty');
+    return {
+      status: failed.length === 0 ? 'ok' : 'error',
+      columns: columns.map((row) => row.column_name),
+      enumValues,
+      probes,
+      failed: failed.map(([name, message]) => ({ name, message })),
+      timestamp: new Date().toISOString(),
+    };
   }
 }
